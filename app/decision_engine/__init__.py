@@ -1,0 +1,1 @@
+# Rockib AI — Decision Engine (Moteur de Décision Déterministe)

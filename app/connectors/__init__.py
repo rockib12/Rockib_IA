@@ -1,0 +1,1 @@
+# Rockib AI — Connectors (Intégrations externes)

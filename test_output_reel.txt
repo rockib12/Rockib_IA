@@ -1,0 +1,26 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\Priv�\AppData\Local\pypoetry\Cache\virtualenvs\rockib-ia-pM4MUn1m-py3.12\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Priv�\Rockib_ia
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-0.23.8
+asyncio: mode=Mode.STRICT
+collecting ... collected 11 items / 1 error
+
+=================================== ERRORS ====================================
+__________________ ERROR collecting tests/test_arbitrator.py __________________
+..\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\rockib-ia-pM4MUn1m-py3.12\\Lib\\site-packages\\_pytest\\python.py:498: in importtestmodule\n    mod = import_path(\n..\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\rockib-ia-pM4MUn1m-py3.12\\Lib\\site-packages\\_pytest\\pathlib.py:587: in import_path\n    importlib.import_module(module_name)\nC:\\Program Files\\Python312\\Lib\\importlib\\__init__.py:90: in import_module\n    return _bootstrap._gcd_import(name[level:], package, level)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n<frozen importlib._bootstrap>:1387: in _gcd_import\n    ???\n<frozen importlib._bootstrap>:1360: in _find_and_load\n    ???\n<frozen importlib._bootstrap>:1331: in _find_and_load_unlocked\n    ???\n<frozen importlib._bootstrap>:935: in _load_unlocked\n    ???\n..\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\rockib-ia-pM4MUn1m-py3.12\\Lib\\site-packages\\_pytest\\assertion\\rewrite.py:177: in exec_module\n    source_stat, co = _rewrite_test(fn, self.config)\n                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n..\\AppData\\Local\\pypoetry\\Cache\\virtualenvs\\rockib-ia-pM4MUn1m-py3.12\\Lib\\site-packages\\_pytest\\assertion\\rewrite.py:357: in _rewrite_test\n    tree = ast.parse(source, filename=strfn)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nC:\\Program Files\\Python312\\Lib\\ast.py:52: in parse\n    return compile(source, filename, mode, flags,\nE     File "C:\\Users\\Priv\xe9\\Rockib_ia\\tests\\test_arbitrator.py", line 131\nE       """V\ufffdrifie que l'autonomie appliqu\ufffde ne d\ufffdpasse jamais l'autonomie demand\ufffde."""\nE       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\nE   SyntaxError: (unicode error) 'utf-8' codec can't decode byte 0xe9 in position 1: invalid continuation byte
+============================== warnings summary ===============================
+..\AppData\Local\pypoetry\Cache\virtualenvs\rockib-ia-pM4MUn1m-py3.12\Lib\site-packages\_pytest\cacheprovider.py:475
+  C:\Users\Priv�\AppData\Local\pypoetry\Cache\virtualenvs\rockib-ia-pM4MUn1m-py3.12\Lib\site-packages\_pytest\cacheprovider.py:475: PytestCacheWarning: could not create cache path C:\Users\Priv�\Rockib_ia\.pytest_cache\v\cache\nodeids: [WinError 5] Acc�s refus�: 'C:\\Users\\Priv�\\Rockib_ia\\.pytest_cache\\v\\cache'
+    config.cache.set("cache/nodeids", sorted(self.cached_nodeids))
+
+..\AppData\Local\pypoetry\Cache\virtualenvs\rockib-ia-pM4MUn1m-py3.12\Lib\site-packages\_pytest\cacheprovider.py:429
+  C:\Users\Priv�\AppData\Local\pypoetry\Cache\virtualenvs\rockib-ia-pM4MUn1m-py3.12\Lib\site-packages\_pytest\cacheprovider.py:429: PytestCacheWarning: could not create cache path C:\Users\Priv�\Rockib_ia\.pytest_cache\v\cache\lastfailed: [WinError 5] Acc�s refus�: 'C:\\Users\\Priv�\\Rockib_ia\\.pytest_cache\\v\\cache'
+    config.cache.set("cache/lastfailed", self.lastfailed)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+ERROR tests/test_arbitrator.py
+!!!!!!!!!!!!!!!!!!! Interrupted: 1 error during collection !!!!!!!!!!!!!!!!!!!!
+======================== 2 warnings, 1 error in 0.94s =========================

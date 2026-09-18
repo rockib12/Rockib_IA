@@ -1,0 +1,76 @@
+﻿============================= test session starts =============================
+platform win32 -- Python 3.12.10, pytest-8.4.2, pluggy-1.6.0 -- C:\Users\Priv├®\AppData\Local\pypoetry\Cache\virtualenvs\rockib-ia-pM4MUn1m-py3.12\Scripts\python.exe
+cachedir: .pytest_cache
+rootdir: C:\Users\Priv├®\Rockib_ia
+configfile: pyproject.toml
+plugins: anyio-4.15.1, asyncio-0.23.8
+asyncio: mode=Mode.STRICT
+collecting ... collected 43 items
+
+tests/test_ai_provider.py::test_ai_provider_protocol_compatibility PASSED [  2%]
+tests/test_ai_provider.py::test_ai_provider_call PASSED                  [  4%]
+tests/test_ai_provider.py::test_ai_provider_exception_hierarchy PASSED   [  6%]
+tests/test_arbitrator.py::TestAutonomyRule::test_applied_never_exceeds_requested_low PASSED [  9%]
+tests/test_arbitrator.py::TestAutonomyRule::test_applied_never_exceeds_requested_medium PASSED [ 11%]
+tests/test_arbitrator.py::TestAutonomyRule::test_applied_never_exceeds_requested_high PASSED [ 13%]
+tests/test_arbitrator.py::TestAutonomyRule::test_autonomy_invariant_guaranteed PASSED [ 16%]
+tests/test_arbitrator.py::TestApprovalRule::test_delete_always_requires_approval PASSED [ 18%]
+tests/test_arbitrator.py::TestApprovalRule::test_escalate_rule_requires_approval PASSED [ 20%]
+tests/test_arbitrator.py::TestApprovalRule::test_high_risk_requires_approval PASSED [ 23%]
+tests/test_arbitrator.py::TestApprovalRule::test_critical_risk_requires_approval PASSED [ 25%]
+tests/test_arbitrator.py::TestApprovalRule::test_irreversible_requires_approval PASSED [ 27%]
+tests/test_arbitrator.py::TestApprovalRule::test_disagreement_exceeds_threshold_requires_approval PASSED [ 30%]
+tests/test_arbitrator.py::TestApprovalRule::test_low_risk_read_no_approval_when_no_trigger PASSED [ 32%]
+tests/test_arbitrator.py::TestRiskRule::test_max_risk_low_medium PASSED  [ 34%]
+tests/test_arbitrator.py::TestRiskRule::test_max_risk_medium_high PASSED [ 37%]
+tests/test_arbitrator.py::TestRiskRule::test_max_risk_low_critical PASSED [ 39%]
+tests/test_arbitrator.py::TestRiskRule::test_max_risk_same PASSED        [ 41%]
+tests/test_arbitrator.py::TestRiskRule::test_max_risk_never_below_base PASSED [ 44%]
+tests/test_arbitrator.py::TestRiskRule::test_risk_never_below_base_in_arbitration PASSED [ 46%]
+tests/test_arbitrator.py::TestRiskRule::test_risk_high_not_lowered PASSED [ 48%]
+tests/test_domain_classifier.py::test_classify_certain PASSED            [ 51%]
+tests/test_domain_classifier.py::test_classify_unknown PASSED            [ 53%]
+tests/test_domain_classifier.py::test_classify_ambiguous PASSED          [ 55%]
+tests/test_domain_classifier.py::test_classify_technical_error PASSED    [ 58%]
+tests/test_domain_classifier.py::test_classify_invalid_permission PASSED [ 60%]
+tests/test_intelligence_schemas.py::test_intelligence_input_valid PASSED [ 62%]
+tests/test_intelligence_schemas.py::test_intelligence_input_missing_field PASSED [ 65%]
+tests/test_intelligence_schemas.py::test_intelligence_output_valid PASSED [ 67%]
+tests/test_intelligence_schemas.py::test_intelligence_output_default_reasoning PASSED [ 69%]
+tests/test_intelligence_schemas.py::test_intelligence_output_confidence_bounds PASSED [ 72%]
+tests/test_intelligence_schemas.py::test_intelligence_output_invalid_risk_level PASSED [ 74%]
+tests/test_intelligence_service.py::test_intelligence_service_instantiation PASSED [ 76%]
+tests/test_intelligence_service.py::test_intelligence_service_evaluate_is_async PASSED [ 79%]
+tests/test_intelligence_service.py::test_intelligence_service_evaluate_valid_call PASSED [ 81%]
+tests/test_intelligence_service.py::test_intelligence_service_output_constraints PASSED [ 83%]
+tests/test_intelligence_wiring.py::test_intelligence_service_orchestration_flow PASSED [ 86%]
+tests/test_intelligence_wiring.py::test_intelligence_service_error_propagation PASSED [ 88%]
+tests/test_rational_agent.py::test_rational_agent_di PASSED              [ 90%]
+tests/test_rational_agent.py::test_rational_agent_evaluate_call PASSED   [ 93%]
+tests/test_rational_agent.py::test_rational_agent_parsing_error_invalid_json PASSED [ 95%]
+tests/test_rational_agent.py::test_rational_agent_parsing_error_schema_mismatch PASSED [ 97%]
+tests/test_rational_agent.py::test_rational_agent_error_propagation PASSED [100%]
+
+============================== warnings summary ===============================
+tests/test_arbitrator.py::TestRiskRule::test_max_risk_low_medium
+  tests\test_arbitrator.py:231: PytestWarning: The test <Function test_max_risk_low_medium> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_max_risk_low_medium(self) -> None:
+
+tests/test_arbitrator.py::TestRiskRule::test_max_risk_medium_high
+  tests\test_arbitrator.py:235: PytestWarning: The test <Function test_max_risk_medium_high> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_max_risk_medium_high(self) -> None:
+
+tests/test_arbitrator.py::TestRiskRule::test_max_risk_low_critical
+  tests\test_arbitrator.py:239: PytestWarning: The test <Function test_max_risk_low_critical> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_max_risk_low_critical(self) -> None:
+
+tests/test_arbitrator.py::TestRiskRule::test_max_risk_same
+  tests\test_arbitrator.py:243: PytestWarning: The test <Function test_max_risk_same> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_max_risk_same(self) -> None:
+
+tests/test_arbitrator.py::TestRiskRule::test_max_risk_never_below_base
+  tests\test_arbitrator.py:247: PytestWarning: The test <Function test_max_risk_never_below_base> is marked with '@pytest.mark.asyncio' but it is not an async function. Please remove the asyncio mark. If the test is not marked explicitly, check for global marks applied via 'pytestmark'.
+    def test_max_risk_never_below_base(self) -> None:
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 43 passed, 5 warnings in 1.41s ========================

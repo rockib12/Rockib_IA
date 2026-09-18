@@ -1,0 +1,7 @@
+﻿{
+    "send": ["communication", "SEND"],
+    "publish": ["communication", "PUBLISH"],
+    "delete": ["system", "DELETE"],
+    "refund": ["finance", "UPDATE"],
+    "verify": ["security", "READ"]
+}

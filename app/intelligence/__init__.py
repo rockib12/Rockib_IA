@@ -1,0 +1,1 @@
+# Rockib AI — AI Intelligence Layer (Couche d'Intelligence Artificielle)

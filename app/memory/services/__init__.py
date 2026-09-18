@@ -1,0 +1,1 @@
+# Rockib AI — Memory Services (decay, search, ingestion)

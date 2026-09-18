@@ -1,0 +1,1 @@
+# Rockib AI — Cognitive Model Layer (Modèle Cognitif)
