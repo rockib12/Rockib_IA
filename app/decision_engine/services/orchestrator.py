@@ -2,15 +2,31 @@ from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.decision_engine.models import ControlOutcome, Decision, DecisionStatus, DominantSource, PermissionAction, RiskLevel
+from app.decision_engine.models import (
+    ControlOutcome,
+    Decision,
+    DecisionOutcome,
+    DecisionStatus,
+    DominantSource,
+    PermissionAction,
+    RiskLevel,
+)
 from app.decision_engine.services.control import set_control
 from app.identity.models import Agent
 from app.decision_engine.schemas import DecisionRequest, DecisionResponse
 from app.decision_engine.services.domain_classifier import DomainClassifier
 from app.decision_engine.services.arbitrator import DeterministicArbitrator
 from app.intelligence.services.intelligence_service import IntelligenceService
-from app.execution.services.executor import execute
-from app.execution.services.auditor import log_execution
+from app.execution.models import ActionRecord, EffectCertainty
+from app.execution.services.authorizations import (
+    AuthorizationError,
+    issue_authorization,
+)
+from app.execution.services.fingerprint import (
+    compute_fingerprint,
+    compute_idempotency_key,
+)
+from app.execution.services.reliable_executor import dispatch_authorized_action
 from app.intelligence.schemas import IntelligenceInput
 from app.cognitive.services.pattern_miner import mine_patterns
 from app.cognitive.services.simulation import CognitiveSimulator
@@ -112,16 +128,85 @@ class DecisionOrchestrator:
         ):
             set_control(decision, ControlOutcome.ESCALATE, "ACTION_REQUIRES_REEVALUATION")
 
-        # 4. Persist
+        # 4. Persister la décision, puis l'action structurée correspondante
+        #    (l'action est auditable même pour un refus : elle trace ce qui a
+        #    été demandé).
         self.db.add(decision)
         await self.db.commit()
         await self.db.refresh(decision)
 
-        # Only an explicit server-side ALLOW may reach the executor.
-        # The executor independently verifies permission and payload integrity.
+        tool = classification.domain
+        operation = classification.permission_action.value
+        action_record = ActionRecord(
+            workspace_id=decision.workspace_id,
+            agent_id=decision.agent_id,
+            decision_id=decision.id,
+            objective=decision.objective,
+            tool=tool,
+            operation=operation,
+            arguments={},  # Phase 3 : actions structurées enrichies côté LLM
+            permission_required=decision.permission_required,
+            risk_level=decision.risk_level,
+            risk_reversibility=decision.risk_reversibility,
+            risk_impact=decision.risk_impact,
+            canonical_fingerprint=compute_fingerprint(
+                workspace_id=decision.workspace_id,
+                agent_id=decision.agent_id,
+                tool=tool,
+                operation=operation,
+                permission_required=decision.permission_required,
+                objective=decision.objective,
+                arguments={},
+            ),
+            idempotency_key=compute_idempotency_key(
+                workspace_id=decision.workspace_id,
+                tool=tool,
+                operation=operation,
+                idempotency_scope=str(decision.id),
+            ),
+            version=1,
+        )
+        self.db.add(action_record)
+        await self.db.flush()
+
+        # 5. Autorisation puis exécution fiable. Aucun effet sans autorisation :
+        #    DENY/ESCALATE/STOP n'atteignent jamais ce bloc (INV-01).
+        execution_effect = None
+        execution_attempt_id = None
+        execution_error = None
         if decision.control_outcome == ControlOutcome.ALLOW:
-            exec_result = await execute(decision)
-            log_execution(decision, exec_result)
+            outcome = None
+            try:
+                authorization = await issue_authorization(
+                    self.db, decision=decision, action=action_record, actor="orchestrator"
+                )
+                outcome = await dispatch_authorized_action(
+                    self.db,
+                    action=action_record,
+                    authorization_id=authorization.id,
+                    actor="orchestrator",
+                    lease_owner=f"orchestrator:{request.agent_id}",
+                    caller_workspace_id=decision.workspace_id,
+                )
+                execution_effect = outcome.effect.value
+                execution_attempt_id = str(outcome.attempt_id)
+            except AuthorizationError as exc:
+                # Refus contrôlé avant tout effet (handler absent, autorisation
+                # expirée/révoquée, empreinte changée) : rien n'a été engagé.
+                execution_effect = EffectCertainty.none.value
+                execution_error = f"{exc.code}: {exc.message}"
+
+            outcome_row = DecisionOutcome(
+                decision_id=decision.id,
+                result_summary=(execution_error or (outcome.output or "confirmed"))[:500],
+                success=(
+                    None
+                    if execution_effect == EffectCertainty.unknown.value
+                    else (bool(outcome.success) if outcome is not None else False)
+                ),
+            )
+            self.db.add(outcome_row)
+            await self.db.commit()
 
         return DecisionResponse(
             decision_id=str(decision.id),
@@ -132,4 +217,7 @@ class DecisionOrchestrator:
             control_outcome=decision.control_outcome,
             control_reason=decision.control_reason,
             permission_granted=decision.permission_granted,
+            execution_effect=execution_effect,
+            execution_attempt_id=execution_attempt_id,
+            execution_error=execution_error,
         )

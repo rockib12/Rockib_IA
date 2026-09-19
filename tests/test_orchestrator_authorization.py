@@ -73,9 +73,13 @@ async def test_unauthorized_action_never_reaches_executor():
             return_value="",
         ),
         patch(
-            "app.decision_engine.services.orchestrator.execute",
+            "app.decision_engine.services.orchestrator.issue_authorization",
             new_callable=AsyncMock,
-        ) as execute,
+        ) as issue_authorization,
+        patch(
+            "app.decision_engine.services.orchestrator.dispatch_authorized_action",
+            new_callable=AsyncMock,
+        ) as dispatch_authorized_action,
     ):
         load_agent.return_value = Mock(default_autonomy_level=3)
         load_policy.return_value = policy
@@ -86,14 +90,22 @@ async def test_unauthorized_action_never_reaches_executor():
         assert response.control_reason == "EXECUTION_NOT_PREAUTHORIZED"
         assert response.permission_granted is False
         assert response.final_action == action
-        execute.assert_not_called()
-        execute.assert_not_awaited()
-        db.add.assert_called_once()
+        issue_authorization.assert_not_awaited()
+        dispatch_authorized_action.assert_not_awaited()
+        # Décision + action structurée refusée : le refus est audité avec ce qui
+        # a été demandé.
+        assert db.add.call_count == 2
         db.commit.assert_awaited_once()
-        saved = db.add.call_args.args[0]
-        assert saved.control_outcome == ControlOutcome.DENY
-        assert saved.permission_granted is False
-        assert saved.final_action == action
+        saved_decision, saved_action = [
+            call.args[0] for call in db.add.call_args_list
+        ]
+        assert saved_decision.control_outcome == ControlOutcome.DENY
+        assert saved_decision.permission_granted is False
+        assert saved_decision.final_action == action
+        # L'action refusée est auditée : liée à la décision, bon outil/opération.
+        assert saved_action.decision_id == saved_decision.id
+        assert saved_action.tool == "communication"
+        assert saved_action.operation == PermissionAction.SEND.value
         load_policy.assert_awaited_once_with(
             "workspace-test", "communication", PermissionAction.SEND
         )

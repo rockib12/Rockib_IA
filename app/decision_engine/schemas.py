@@ -28,3 +28,15 @@ class DecisionResponse(BaseModel):
     control_outcome: ControlOutcome
     control_reason: str
     permission_granted: bool
+    execution_effect: Optional[str] = Field(
+        default=None,
+        description="Résultat d'exécution fiable : confirmed | none | unknown (Phase 2).",
+    )
+    execution_attempt_id: Optional[str] = Field(
+        default=None,
+        description="Identifiant de la tentative persistée (Phase 2).",
+    )
+    execution_error: Optional[str] = Field(
+        default=None,
+        description="Motif stable du refus d'exécution contrôlé (Phase 2).",
+    )

@@ -13,7 +13,6 @@ from app.decision_engine.schemas import ClassificationResult, ClassificationStat
 from app.decision_engine.services.orchestrator import DecisionOrchestrator
 from app.decision_engine.services.domain_classifier import DomainClassifier
 from app.decision_engine.services.arbitrator import DeterministicArbitrator
-from app.execution.services.executor import ExecutionResult
 from app.intelligence.schemas import IntelligenceInput, IntelligenceOutput
 from app.identity.models import Agent
 
@@ -124,12 +123,12 @@ async def test_orchestrator_full_flow(
         "app.decision_engine.services.orchestrator.mine_patterns",
         new_callable=AsyncMock,
     ) as mock_mine_patterns, patch(
-        "app.decision_engine.services.orchestrator.execute",
+        "app.decision_engine.services.orchestrator.issue_authorization",
         new_callable=AsyncMock,
-    ) as mock_execute, patch(
-        "app.decision_engine.services.orchestrator.log_execution",
-        new_callable=Mock,
-    ) as mock_log_execution, patch.object(
+    ) as mock_issue_authorization, patch(
+        "app.decision_engine.services.orchestrator.dispatch_authorized_action",
+        new_callable=AsyncMock,
+    ) as mock_dispatch, patch.object(
         orchestrator,
         "_load_agent",
         new_callable=AsyncMock,
@@ -141,7 +140,6 @@ async def test_orchestrator_full_flow(
         mock_mine_patterns.return_value = "Mocked patterns"
         mock_load_agent.return_value = mock_agent
         mock_load_domain_config.return_value = mock_domain_config()
-        mock_execute.return_value = ExecutionResult(success=True, output="ok", error=None)
 
         # Act
         response = await orchestrator.handle_decision(decision_request)
@@ -171,8 +169,15 @@ async def test_orchestrator_full_flow(
 
         # 3. Résultat final et persistance
         assert response.decision_id is not None
-        mock_db.add.assert_called_once()
+        # Décision + action structurée (audit de ce qui a été demandé, même
+        # pour une escalade).
+        assert mock_db.add.call_count == 2
         mock_db.commit.assert_called_once()
+        # Escalade : aucune autorisation ni exécution (INV-01).
+        mock_issue_authorization.assert_not_awaited()
+        mock_dispatch.assert_not_awaited()
+        assert response.execution_effect is None
+        assert response.execution_error is None
 
 # ---------------------------------------------------------------------------
 # Test 2 : Escalade sur classification UNKNOWN
