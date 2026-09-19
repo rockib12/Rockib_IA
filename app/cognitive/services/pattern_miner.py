@@ -1,6 +1,6 @@
-﻿from sqlalchemy import select, or_
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.memory.models import Memory
+from app.memory.models import Memory, MemoryType
 from app.memory.services.decay import compute_effective_confidence, compute_effective_weight
 
 async def mine_patterns(db: AsyncSession, workspace_id: str, limit: int = 20) -> str:
@@ -10,7 +10,7 @@ async def mine_patterns(db: AsyncSession, workspace_id: str, limit: int = 20) ->
     """
     stmt = select(Memory).where(
         Memory.workspace_id == workspace_id,
-        or_(Memory.type == "preference", Memory.type == "decision")
+        or_(Memory.type == MemoryType.preference, Memory.type == MemoryType.decision_rule)
     )
     
     result = await db.execute(stmt)
@@ -32,7 +32,7 @@ async def mine_patterns(db: AsyncSession, workspace_id: str, limit: int = 20) ->
 
     lines = []
     for m, weight in top_memories:
-        label = "PREFERENCE" if m.type == "preference" else "DECISION"
+        label = "PREFERENCE" if m.type == MemoryType.preference else "DECISION"
         lines.append(f"- [{label}] {m.content} (poids: {weight:.2f})")
 
     return "\n".join(lines)

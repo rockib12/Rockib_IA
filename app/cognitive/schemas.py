@@ -1,9 +1,10 @@
-﻿from __future__ import annotations
+from __future__ import annotations
+import uuid
 from pydantic import BaseModel, Field
 
 class CognitiveInput(BaseModel):
     """Entree standard vers le Cognitive Model."""
-    workspace_id: str
+    workspace_id: uuid.UUID
     objective: str = Field(..., description="Objectif a analyser")
     situation: str = Field(default="", description="Situation actuelle / contexte")
 

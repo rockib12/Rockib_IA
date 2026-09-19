@@ -1,4 +1,5 @@
 """Authorization must gate dispatch in the actual decision pipeline."""
+import uuid
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
@@ -55,8 +56,8 @@ async def test_unauthorized_action_never_reaches_executor():
         cognitive_simulator=cognitive,
     )
     request = DecisionRequest(
-        workspace_id="workspace-test",
-        agent_id="agent-test",
+        workspace_id=uuid.uuid4(),
+        agent_id=uuid.uuid4(),
         objective="Send an update",
         proposed_action=action,
         requested_autonomy_level=3,
@@ -107,5 +108,5 @@ async def test_unauthorized_action_never_reaches_executor():
         assert saved_action.tool == "communication"
         assert saved_action.operation == PermissionAction.SEND.value
         load_policy.assert_awaited_once_with(
-            "workspace-test", "communication", PermissionAction.SEND
+            request.workspace_id, "communication", PermissionAction.SEND
         )

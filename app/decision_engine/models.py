@@ -151,9 +151,10 @@ class Decision(Base):
     requested_autonomy_level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     applied_autonomy_level: Mapped[int] = mapped_column(SmallInteger, nullable=False)
 
-    # Permission
-    permission_required: Mapped[PermissionAction] = mapped_column(
-        PERMISSION_ACTION_ENUM, nullable=False
+    # Permission : NULL quand la classification a echoue — jamais de valeur
+    # fabriquee (contrat §6 : ne jamais presumer un droit non defini).
+    permission_required: Mapped[Optional[PermissionAction]] = mapped_column(
+        PERMISSION_ACTION_ENUM, nullable=True
     )
     permission_granted: Mapped[bool] = mapped_column(default=False, nullable=False)
 

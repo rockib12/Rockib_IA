@@ -1,11 +1,17 @@
-﻿import pytest
+﻿import uuid
+
+import pytest
 from unittest.mock import AsyncMock, Mock, patch
 from datetime import datetime, timezone
+from sqlalchemy import select
 
 from app.cognitive.schemas import CognitiveInput, CognitiveOutput
 from app.decision_engine.models import (
     ArbitrationRule,
+    ControlOutcome,
+    Decision,
     DecisionDomainConfig,
+    DominantSource,
     PermissionAction,
     RiskLevel,
 )
@@ -71,8 +77,8 @@ def mock_agent():
 @pytest.fixture
 def decision_request():
     return DecisionRequest(
-        workspace_id="ws-1",
-        agent_id="test-agent-123",
+        workspace_id=uuid.uuid4(),
+        agent_id=uuid.uuid4(),
         objective="Test objective",
         situation="Test situation",
         proposed_action="Test action",
@@ -180,102 +186,160 @@ async def test_orchestrator_full_flow(
         assert response.execution_error is None
 
 # ---------------------------------------------------------------------------
-# Test 2 : Escalade sur classification UNKNOWN
+# Tests 2-4 : Classification incertaine -> vraie Decision persistée (PostgreSQL)
 # ---------------------------------------------------------------------------
+# Doctrine §10 : ces tests prouvent la persistance sur vraie base via les
+# fixtures db_session/workspace_agent — aucun mock de session. Vérifié :
+# ligne Decision réelle, decision_id = UUID valide, permission_required NULL.
+async def _assert_persisted_escalation(db_session, workspace_id, agent_id, response):
+    assert response.control_outcome == ControlOutcome.ESCALATE
+    assert response.control_reason == "CLASSIFICATION_UNCERTAIN"
+    assert response.permission_granted is False
+    assert response.approval_required is True
+    assert response.dominant_source == DominantSource.cognitive
+
+    # decision_id est un UUID valide correspondant à une vraie ligne en base.
+    # Nouvelle session : la session du test est en transaction, expire_all() +
+    # relecture directe dessus declenchent un MissingGreenlet au teardown
+    # (lazy-load ORM hors boucle). On relit en isolation, sans toucher aux
+    # objets ORM du test.
+    from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
+    from app.core.config import settings
+
+    decision_id = uuid.UUID(response.decision_id)
+    engine = create_async_engine(settings.ASYNC_DATABASE_URL, poolclass=None)
+    maker = async_sessionmaker(bind=engine, expire_on_commit=False)
+    async with maker() as reader:
+        row = (
+            await reader.execute(
+                select(Decision).where(Decision.id == decision_id)
+            )
+        ).scalar_one()
+        assert row.workspace_id == workspace_id
+        assert row.agent_id == agent_id
+        assert row.control_outcome == ControlOutcome.ESCALATE
+        assert row.control_reason == "CLASSIFICATION_UNCERTAIN"
+        # Inconnu, jamais classifié : pas de valeur fabriquée (§6).
+        assert row.permission_required is None
+        assert row.permission_granted is False
+    await engine.dispose()
+
+
 @pytest.mark.asyncio
-async def test_orchestrator_escalation_unknown(
-    mock_db,
-    mock_agent,
-    decision_request,
+async def test_orchestrator_escalation_unknown_persists(
+    db_session,
+    workspace_agent,
 ):
-    """Classification UNKNOWN -> Escalade immédiate, aucun service appelé."""
+    """Classification UNKNOWN -> escalade persistée, aucun service appelé."""
+    from app.decision_engine.services.orchestrator import DecisionOrchestrator as _Orch
+    from app.decision_engine.services.domain_classifier import DomainClassifier as _Clf
+    from app.decision_engine.services.arbitrator import DeterministicArbitrator as _Arb
+    workspace_id, agent_id = workspace_agent[0].id, workspace_agent[1].id
     intelligence_service = AsyncMock()
     cognitive_simulator = AsyncMock()
-    
-    classifier = DomainClassifier(mapping={})
-    arbitrator = DeterministicArbitrator()
 
-    orchestrator = DecisionOrchestrator(
-        db=mock_db,
+    classifier = _Clf(mapping={})
+    arbitrator = _Arb()
+
+    orchestrator = _Orch(
+        db=db_session,
         classifier=classifier,
         arbitrator=arbitrator,
         intelligence=intelligence_service,
         cognitive_simulator=cognitive_simulator,
     )
+    decision_request = DecisionRequest(
+        workspace_id=workspace_id,
+        agent_id=agent_id,
+        objective="Test objective",
+        situation="Test situation",
+        proposed_action="Test action",
+    )
 
     response = await orchestrator.handle_decision(decision_request)
 
-    assert response.approval_required is True
-    assert response.dominant_source == "human"
+    await _assert_persisted_escalation(db_session, workspace_id, agent_id, response)
     intelligence_service.evaluate.assert_not_awaited()
 
-# ---------------------------------------------------------------------------
-# Test 3 : Escalade sur classification AMBIGUOUS
-# ---------------------------------------------------------------------------
+
 @pytest.mark.asyncio
-async def test_orchestrator_escalation_ambiguous(
-    mock_db,
-    mock_agent,
-    decision_request,
+async def test_orchestrator_escalation_ambiguous_persists(
+    db_session,
+    workspace_agent,
 ):
-    """Classification AMBIGUOUS -> Escalade immédiate, aucun service appelé."""
+    """Classification AMBIGUOUS -> escalade persistée, aucun service appelé."""
+    from app.decision_engine.services.orchestrator import DecisionOrchestrator as _Orch
+    from app.decision_engine.services.domain_classifier import DomainClassifier as _Clf
+    from app.decision_engine.services.arbitrator import DeterministicArbitrator as _Arb
+    workspace_id, agent_id = workspace_agent[0].id, workspace_agent[1].id
     intelligence_service = AsyncMock()
     cognitive_simulator = AsyncMock()
-    
+
     # Deux mots-clés matchant -> AMBIGUOUS
     mapping = {
         "test": ("finance", PermissionAction.UPDATE),
         "action": ("security", PermissionAction.READ),
     }
-    decision_request.proposed_action = "test action"
-    
-    classifier = DomainClassifier(mapping=mapping)
-    arbitrator = DeterministicArbitrator()
 
-    orchestrator = DecisionOrchestrator(
-        db=mock_db,
+    classifier = _Clf(mapping=mapping)
+    arbitrator = _Arb()
+
+    orchestrator = _Orch(
+        db=db_session,
         classifier=classifier,
         arbitrator=arbitrator,
         intelligence=intelligence_service,
         cognitive_simulator=cognitive_simulator,
     )
+    decision_request = DecisionRequest(
+        workspace_id=workspace_id,
+        agent_id=agent_id,
+        objective="Test objective",
+        situation="Test situation",
+        proposed_action="test action",
+    )
 
     response = await orchestrator.handle_decision(decision_request)
 
-    assert response.approval_required is True
-    assert response.dominant_source == "human"
+    await _assert_persisted_escalation(db_session, workspace_id, agent_id, response)
     intelligence_service.evaluate.assert_not_awaited()
 
-# ---------------------------------------------------------------------------
-# Test 4 : Escalade sur classification ERROR
-# ---------------------------------------------------------------------------
+
 @pytest.mark.asyncio
-async def test_orchestrator_escalation_error(
-    mock_db,
-    mock_agent,
-    decision_request,
+async def test_orchestrator_escalation_error_persists(
+    db_session,
+    workspace_agent,
 ):
-    """Classification ERROR -> Escalade immédiate, aucun service appelé."""
+    """Classification ERROR -> escalade persistée, aucun service appelé."""
+    from app.decision_engine.services.orchestrator import DecisionOrchestrator as _Orch
+    from app.decision_engine.services.domain_classifier import DomainClassifier as _Clf
+    from app.decision_engine.services.arbitrator import DeterministicArbitrator as _Arb
+    workspace_id, agent_id = workspace_agent[0].id, workspace_agent[1].id
     intelligence_service = AsyncMock()
     cognitive_simulator = AsyncMock()
-    
+
     # Permission invalide -> ERROR
     mapping = {"test": ("finance", "INVALID_PERMISSION")}
-    decision_request.proposed_action = "test action"
-    
-    classifier = DomainClassifier(mapping=mapping)
-    arbitrator = DeterministicArbitrator()
 
-    orchestrator = DecisionOrchestrator(
-        db=mock_db,
+    classifier = _Clf(mapping=mapping)
+    arbitrator = _Arb()
+
+    orchestrator = _Orch(
+        db=db_session,
         classifier=classifier,
         arbitrator=arbitrator,
         intelligence=intelligence_service,
         cognitive_simulator=cognitive_simulator,
     )
+    decision_request = DecisionRequest(
+        workspace_id=workspace_id,
+        agent_id=agent_id,
+        objective="Test objective",
+        situation="Test situation",
+        proposed_action="test action",
+    )
 
     response = await orchestrator.handle_decision(decision_request)
 
-    assert response.approval_required is True
-    assert response.dominant_source == "human"
+    await _assert_persisted_escalation(db_session, workspace_id, agent_id, response)
     intelligence_service.evaluate.assert_not_awaited()

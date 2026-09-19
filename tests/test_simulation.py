@@ -1,3 +1,5 @@
+import uuid
+
 import pytest
 import json
 from unittest.mock import AsyncMock
@@ -17,7 +19,7 @@ def simulator(mock_provider):
 @pytest.fixture
 def cognitive_input():
     return CognitiveInput(
-        workspace_id="ws1",
+        workspace_id=uuid.uuid4(),
         objective="Fix a bug",
         situation="The server is crashing on startup"
     )

@@ -8,7 +8,9 @@ from app.decision_engine.models import (
     DecisionOutcome,
     DecisionStatus,
     DominantSource,
+    ImpactType,
     PermissionAction,
+    ReversibilityLevel,
     RiskLevel,
 )
 from app.decision_engine.services.control import set_control
@@ -63,16 +65,43 @@ class DecisionOrchestrator:
         )
 
         if classification.status != "CERTAIN":
-            # Escalate if classification is not CERTAIN
-            return DecisionResponse(
-                decision_id="escalated",
-                dominant_source="human",
-                final_action=request.proposed_action,
-                risk_level="high",
-                approval_required=True,
+            # Classification incertaine : persister une vraie Decision d'escalade
+            # (ecart §11 « escalades non persistees »). permission_required reste
+            # NULL — inconnu, jamais classifie, pas de valeur fabriquee (§6).
+            # Tous les enums sont passes comme membres, jamais comme strings.
+            decision = Decision(
+                workspace_id=request.workspace_id,
+                agent_id=request.agent_id,
+                objective=request.objective,
+                situation=request.situation,
+                proposed_action=request.proposed_action,
+                status=DecisionStatus.escalated,
                 control_outcome=ControlOutcome.ESCALATE,
                 control_reason="CLASSIFICATION_UNCERTAIN",
+                permission_required=None,
                 permission_granted=False,
+                approval_required=True,
+                risk_level=RiskLevel.high,
+                risk_reversibility=ReversibilityLevel.reversible,
+                risk_impact=ImpactType.internal,
+                requested_autonomy_level=0,
+                applied_autonomy_level=0,
+                dominant_source=DominantSource.cognitive,
+                final_action=request.proposed_action,
+            )
+            self.db.add(decision)
+            await self.db.commit()
+            await self.db.refresh(decision)
+
+            return DecisionResponse(
+                decision_id=str(decision.id),
+                dominant_source=decision.dominant_source,
+                final_action=decision.final_action,
+                risk_level=decision.risk_level,
+                approval_required=decision.approval_required,
+                control_outcome=decision.control_outcome,
+                control_reason=decision.control_reason,
+                permission_granted=decision.permission_granted,
             )
 
         # 2. Opinions

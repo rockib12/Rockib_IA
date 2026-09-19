@@ -1,12 +1,16 @@
 from __future__ import annotations
+import uuid
 from typing import Optional
 from pydantic import BaseModel, Field
 from app.decision_engine.models import PermissionAction, ClassificationStatus, ControlOutcome
 
 class DecisionRequest(BaseModel):
     """Requ?te d'arbitrage vers le Decision Engine."""
-    workspace_id: str
-    agent_id: str
+    # UUID valides des l'entree API (Pydantic convertit les strings valides) :
+    # plus aucune conversion manuelle dans l'orchestrateur, bloc nominal et
+    # bloc classification incertaine profitent du meme correctif.
+    workspace_id: uuid.UUID
+    agent_id: uuid.UUID
     objective: str = Field(..., description="Objectif de la d?cision")
     situation: str = Field(default="", description="Situation actuelle")
     proposed_action: str = Field(..., description="Action propos?e")

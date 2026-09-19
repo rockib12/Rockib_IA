@@ -65,13 +65,17 @@ async def workspace_agent(db_session: AsyncSession) -> tuple[Workspace, Agent]:
     db_session.add(agent)
     await db_session.flush()
 
+    workspace_id, agent_id = workspace.id, agent.id
     yield workspace, agent
 
     # Le journal d'audit est protégé : l'effacement passe par un chemin explicite.
+    # L'id a été capturé avant le yield : un commit() intervenu pendant le test
+    # expire les objets ORM, et toucher workspace.id ici déclencherait un
+    # lazy-load hors boucle (MissingGreenlet au teardown).
     await db_session.rollback()
     await db_session.execute(text("SET LOCAL rockib.audit_maintenance = 'on'"))
     await db_session.execute(
-        Workspace.__table__.delete().where(Workspace.id == workspace.id)
+        Workspace.__table__.delete().where(Workspace.id == workspace_id)
     )
     await db_session.commit()
 
