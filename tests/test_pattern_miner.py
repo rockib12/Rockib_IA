@@ -1,9 +1,10 @@
 ﻿import pytest
 from datetime import datetime, timezone
+from decimal import Decimal
 from unittest.mock import AsyncMock, MagicMock
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.cognitive.services.pattern_miner import mine_patterns
-from app.memory.models import Memory
+from app.memory.models import Memory, MemoryType, MemoryStatus
 
 @pytest.mark.asyncio
 async def test_mine_patterns_success():
@@ -12,10 +13,37 @@ async def test_mine_patterns_success():
     
     now = datetime.now(timezone.utc)
     
-    # Mock memories
-    m1 = Memory(id=1, workspace_id="ws1", type="preference", content="Prefers Python", confidence_level=1.0, importance_level=1, status="active", last_accessed_at=now)
-    m2 = Memory(id=2, workspace_id="ws1", type="decision", content="Use Pytest", confidence_level=1.0, importance_level=2, status="active", last_accessed_at=now)
-    m3 = Memory(id=3, workspace_id="ws1", type="other", content="Irrelevant", confidence_level=1.0, importance_level=1, status="active", last_accessed_at=now)
+    # Mock memories using correct enums and Decimal types (matching real database behavior)
+    m1 = Memory(
+        id=1,
+        workspace_id="ws1",
+        type=MemoryType.preference,
+        content="Prefers Python",
+        confidence_level=Decimal("1.000"),
+        importance_level=Decimal("1.000"),
+        status=MemoryStatus.known,
+        last_accessed_at=now,
+    )
+    m2 = Memory(
+        id=2,
+        workspace_id="ws1",
+        type=MemoryType.decision_rule,
+        content="Use Pytest",
+        confidence_level=Decimal("1.000"),
+        importance_level=Decimal("2.000"),
+        status=MemoryStatus.known,
+        last_accessed_at=now,
+    )
+    m3 = Memory(
+        id=3,
+        workspace_id="ws1",
+        type=MemoryType.fact,
+        content="Irrelevant",
+        confidence_level=Decimal("1.000"),
+        importance_level=Decimal("1.000"),
+        status=MemoryStatus.known,
+        last_accessed_at=now,
+    )
     
     # Mock execute result to return just m1 and m2 (as if the SQL filter worked)
     mock_result = MagicMock()

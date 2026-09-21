@@ -13,7 +13,7 @@ from app.core.database import Base  # re-export de Base pour l'autogénération
 from app.identity.models import Workspace, User, Agent  # noqa: F401
 from app.memory.models import Memory  # noqa: F401
 from app.goal_engine.models import Goal  # noqa: F401
-from app.task_engine.models import Task  # noqa: F401
+from app.task_engine.models import Task, TaskDependency  # noqa: F401
 from app.decision_engine.models import (  # noqa: F401
     DecisionDomainConfig,
     Decision,

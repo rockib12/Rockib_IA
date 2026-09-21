@@ -1,4 +1,6 @@
+import uuid
 from typing import Optional
+
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -54,7 +56,9 @@ class DecisionOrchestrator:
         result = await self.db.execute(stmt)
         return result.scalar_one()
 
-    async def handle_decision(self, request: DecisionRequest) -> DecisionResponse:
+    async def handle_decision(
+        self, request: DecisionRequest, *, task_id: Optional[uuid.UUID] = None
+    ) -> DecisionResponse:
         # 0. Load agent and mine patterns
         agent = await self._load_agent(request.agent_id)
         patterns = await mine_patterns(self.db, request.workspace_id)
@@ -170,6 +174,7 @@ class DecisionOrchestrator:
             workspace_id=decision.workspace_id,
             agent_id=decision.agent_id,
             decision_id=decision.id,
+            task_id=task_id,
             objective=decision.objective,
             tool=tool,
             operation=operation,

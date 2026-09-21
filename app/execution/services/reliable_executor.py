@@ -16,6 +16,7 @@ produit ``UNKNOWN`` : l'effet n'est jamais rejoué à l'aveugle (INV-09).
 from __future__ import annotations
 
 import asyncio
+import inspect
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -44,13 +45,51 @@ ActionHandler = Callable[[ActionRecord], Awaitable[ExecutionResult]]
 _ACTION_HANDLERS: dict[tuple[str, str], ActionHandler] = {}
 
 
-def register_action_handler(tool: str, operation: str, handler: ActionHandler) -> None:
-    """Enregistre l'implémentation réelle d'un couple (outil, opération)."""
-    _ACTION_HANDLERS[(tool, operation)] = handler
+def register_action_handler(
+    tool: str,
+    operation: str,
+    handler: ActionHandler,
+    *,
+    replace: bool = False,
+) -> None:
+    """Enregistre de manière déterministe un handler pour un couple (tool, operation)."""
+    if not isinstance(tool, str):
+        raise TypeError(f"tool must be a str, got {type(tool).__name__}")
+    if not tool.strip():
+        raise ValueError("tool must be a non-empty string")
+
+    if not isinstance(operation, str):
+        raise TypeError(f"operation must be a str, got {type(operation).__name__}")
+    if not operation.strip():
+        raise ValueError("operation must be a non-empty string")
+
+    if not callable(handler):
+        raise TypeError(f"handler must be callable, got {type(handler).__name__}")
+
+    is_async = inspect.iscoroutinefunction(handler) or (
+        callable(handler) and inspect.iscoroutinefunction(getattr(handler, "__call__", None))
+    )
+    if not is_async:
+        raise TypeError("handler must be an async coroutine function")
+
+    key = (tool, operation)
+    existing = _ACTION_HANDLERS.get(key)
+    if existing is not None:
+        if existing is handler:
+            return
+        if not replace:
+            raise ValueError(f"Handler already registered for {tool}.{operation}")
+
+    _ACTION_HANDLERS[key] = handler
 
 
 def get_action_handler(tool: str, operation: str) -> Optional[ActionHandler]:
     return _ACTION_HANDLERS.get((tool, operation))
+
+
+def clear_action_handlers() -> None:
+    """Réinitialise complètement le registre des handlers (usage tests/isolation)."""
+    _ACTION_HANDLERS.clear()
 
 
 @dataclass

@@ -30,11 +30,14 @@ def compute_effective_confidence(
     days_elapsed = max((now - last_accessed_at).total_seconds() / 86400, 0)
     rate = _DECAY_RATE_PER_DAY.get(status, 0.03)
 
-    decayed = base_confidence * math.exp(-rate * days_elapsed)
+    # Conversion en float car base_confidence peut être un Decimal (colonne Numeric de la BD).
+    # Une perte de précision infinitésimale est tout à fait acceptable pour un score de confiance.
+    base_confidence_float = float(base_confidence)
+    decayed = base_confidence_float * math.exp(-rate * days_elapsed)
 
     floor = _CONFIDENCE_FLOOR.get(status)
     if floor is not None:
-        decayed = max(decayed, floor)
+        decayed = max(decayed, float(floor))
 
     return round(decayed, 4)
 
@@ -44,4 +47,7 @@ def compute_effective_weight(
     importance_level: float,
 ) -> float:
     """Poids final utilisé pour classer/prioriser les mémoires."""
-    return round(confidence_effective * importance_level, 4)
+    # Conversion en float car importance_level peut être un Decimal (colonne Numeric de la BD).
+    # Une perte de précision infinitésimale est tout à fait acceptable pour un score de pondération.
+    importance_level_float = float(importance_level)
+    return round(float(confidence_effective) * importance_level_float, 4)
