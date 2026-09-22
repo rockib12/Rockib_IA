@@ -4,8 +4,8 @@ from typing import Dict
 
 from app.decision_engine.models import RiskLevel
 from app.intelligence.schemas import RiskAnalystOutput
-from app.core.ai.provider import AIProvider
-from app.core.exceptions import AIProviderParsingError
+from app.intelligence.services.ai_provider import AIProvider
+from app.intelligence.exceptions import AIProviderParsingError
 
 logger = logging.getLogger(__name__)
 

@@ -4,7 +4,7 @@ from sqlalchemy import select
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password
 from app.identity.models import User, workspace_memberships
-from app.identity.schemas import Token, UserCreate, UserLogin
+from app.identity.schemas import Token, UserCreate, UserLogin, UserRead
 from app.core.dependencies import get_current_user
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
@@ -68,7 +68,7 @@ def login_user(
     return Token(access_token=token, token_type="bearer")
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserRead)
 def get_me(
     current_user: User = Depends(get_current_user),
 ) -> User:

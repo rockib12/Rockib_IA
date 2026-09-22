@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.identity.router import router as auth_router
 from app.decision_engine.router import router as decision_router
+from app.goal_engine.router import router as goal_router
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -26,6 +27,7 @@ app.include_router(auth_router)
 
 # API endpoints
 app.include_router(decision_router, prefix="/api/v1")
+app.include_router(goal_router, prefix="/api/v1")
 
 
 @app.get("/")
