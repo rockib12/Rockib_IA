@@ -84,7 +84,22 @@ def register_action_handler(
 
 
 def get_action_handler(tool: str, operation: str) -> Optional[ActionHandler]:
-    return _ACTION_HANDLERS.get((tool, operation))
+    t = tool.strip().lower()
+    o = operation.strip().lower()
+    handler = _ACTION_HANDLERS.get((t, o))
+    if handler is not None:
+        return handler
+    handler = _ACTION_HANDLERS.get((tool, operation))
+    if handler is not None:
+        return handler
+    # Fallbacks pour les domaines de haut niveau
+    if t in ("research", "web"):
+        return _ACTION_HANDLERS.get(("web", "search")) or _ACTION_HANDLERS.get(("system", "read"))
+    if t in ("general", "system", "infrastructure"):
+        if o in ("create", "write", "update"):
+            return _ACTION_HANDLERS.get(("system", "create")) or _ACTION_HANDLERS.get(("system", "read"))
+        return _ACTION_HANDLERS.get(("system", "read"))
+    return None
 
 
 def clear_action_handlers() -> None:
@@ -190,6 +205,16 @@ async def dispatch_authorized_action(
         lease_seconds=lease_seconds,
     )
 
+    action_fingerprint = action.canonical_fingerprint
+    action_decision_id = action.decision_id
+    action_id = action.id
+    auth_id = authorization.id
+    attempt_id = attempt.id
+
+    # 4b. Persistance stricte avant effet (Idempotence post-crash, STEP 5C.11)
+    # Exige expire_on_commit=False pour garder l'objet attempt valide.
+    await db.commit()
+
     # 5. Appel de l'outil : toute incertitude devient un état explicite.
     try:
         if timeout_seconds is not None:
@@ -218,6 +243,13 @@ async def dispatch_authorized_action(
     effect = _classify(result)
 
     # 6. Persistance du résultat et des transitions.
+    cost_amount = result.cost_amount
+    cost_unit = result.cost_unit
+    if cost_amount is not None and cost_unit is None:
+        cost_unit = "credits"
+    elif cost_amount is None and cost_unit is not None:
+        cost_amount = Decimal("0.0")
+
     await attempts_service.record_result(
         db,
         attempt=attempt,
@@ -228,11 +260,12 @@ async def dispatch_authorized_action(
         error_code=result.error_code,
         error_message=result.error,
         provider_reference=result.provider_reference,
-        cost_amount=result.cost_amount,
-        cost_unit=result.cost_unit,
-        action_fingerprint=action.canonical_fingerprint,
-        decision_id=action.decision_id,
+        cost_amount=cost_amount,
+        cost_unit=cost_unit,
+        action_fingerprint=action_fingerprint,
+        decision_id=action_decision_id,
     )
+
 
     if reservation is not None:
         if effect == EffectCertainty.confirmed:
@@ -250,9 +283,9 @@ async def dispatch_authorized_action(
         # l'effet peut avoir eu lieu et le solde ne doit pas être réutilisé à tort.
 
     return ExecutionOutcome(
-        action_id=action.id,
-        authorization_id=authorization.id,
-        attempt_id=attempt.id,
+        action_id=action_id,
+        authorization_id=auth_id,
+        attempt_id=attempt_id,
         attempt_status=attempt.status,
         effect=effect,
         output=result.output,

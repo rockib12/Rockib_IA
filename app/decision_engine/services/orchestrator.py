@@ -1,5 +1,6 @@
+import json
 import uuid
-from typing import Optional
+from typing import Any, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -20,6 +21,7 @@ from app.identity.models import Agent
 from app.decision_engine.schemas import DecisionRequest, DecisionResponse
 from app.decision_engine.services.domain_classifier import DomainClassifier
 from app.decision_engine.services.arbitrator import DeterministicArbitrator
+from app.decision_engine.services.escalation import notify_escalation
 from app.intelligence.services.intelligence_service import IntelligenceService
 from app.execution.models import ActionRecord, EffectCertainty
 from app.execution.services.authorizations import (
@@ -108,6 +110,9 @@ class DecisionOrchestrator:
                 permission_granted=decision.permission_granted,
             )
 
+        classification_domain = classification.domain
+        classification_permission = classification.permission_action
+
         # 2. Opinions
         # Cognitive Opinion
         cog_opinion = await self.cognitive_simulator.simulate(
@@ -120,8 +125,8 @@ class DecisionOrchestrator:
             objective=request.objective,
             situation=request.situation,
             proposed_action=request.proposed_action,
-            domain=classification.domain,
-            permission_action=classification.permission_action
+            domain=classification_domain,
+            permission_action=classification_permission
         )
         intel_opinion = await self.intelligence.evaluate(intel_input)
 
@@ -139,8 +144,8 @@ class DecisionOrchestrator:
                 "confidence": intel_opinion.confidence,
                 "risk_level": intel_opinion.risk_level,
             },
-            domain=classification.domain,
-            permission_action=classification.permission_action,
+            domain=classification_domain,
+            permission_action=classification_permission,
             requested_autonomy_level=(
                 request.requested_autonomy_level
                 if request.requested_autonomy_level is not None
@@ -150,10 +155,20 @@ class DecisionOrchestrator:
             agent_id=request.agent_id,
         )
 
+        import json
+        def is_json(text: str) -> bool:
+            try:
+                json.loads(text)
+                return True
+            except (ValueError, TypeError):
+                return False
+
         # Until actions are structured, a changed action needs a fresh scope/risk
-        # evaluation. Preserve it, but never execute it under the original policy.
+        # evaluation. If the proposed action was unstructured (natural language),
+        # transforming it into JSON is the expected behavior, not a reason to escalate.
         if (
             decision.control_outcome == ControlOutcome.ALLOW
+            and is_json(request.proposed_action)
             and (
                 decision.final_action != request.proposed_action
                 or decision.final_action != intel_opinion.suggested_action
@@ -168,8 +183,24 @@ class DecisionOrchestrator:
         await self.db.commit()
         await self.db.refresh(decision)
 
-        tool = classification.domain
-        operation = classification.permission_action.value
+        tool = classification_domain
+        operation = classification_permission.value
+        
+        # 4b. Extraction robuste des arguments selon la source dominante
+        parsed_arguments: dict[str, Any] = {}
+        if decision.dominant_source == DominantSource.intelligence:
+            parsed_arguments = getattr(intel_opinion, "arguments", {}) or {}
+        elif decision.dominant_source == DominantSource.cognitive:
+            parsed_arguments = getattr(cog_opinion, "arguments", {}) or {}
+        elif decision.dominant_source == DominantSource.consensus:
+            parsed_arguments = getattr(intel_opinion, "arguments", {}) or getattr(cog_opinion, "arguments", {}) or {}
+        else:
+            parsed_arguments = {}
+
+        # Validation défensive : s'assurer que c'est bien un dictionnaire
+        if not isinstance(parsed_arguments, dict):
+            parsed_arguments = {}
+
         action_record = ActionRecord(
             workspace_id=decision.workspace_id,
             agent_id=decision.agent_id,
@@ -178,7 +209,7 @@ class DecisionOrchestrator:
             objective=decision.objective,
             tool=tool,
             operation=operation,
-            arguments={},  # Phase 3 : actions structurées enrichies côté LLM
+            arguments=parsed_arguments,
             permission_required=decision.permission_required,
             risk_level=decision.risk_level,
             risk_reversibility=decision.risk_reversibility,
@@ -190,7 +221,7 @@ class DecisionOrchestrator:
                 operation=operation,
                 permission_required=decision.permission_required,
                 objective=decision.objective,
-                arguments={},
+                arguments=parsed_arguments,
             ),
             idempotency_key=compute_idempotency_key(
                 workspace_id=decision.workspace_id,
@@ -208,6 +239,7 @@ class DecisionOrchestrator:
         execution_effect = None
         execution_attempt_id = None
         execution_error = None
+        execution_output = None
         if decision.control_outcome == ControlOutcome.ALLOW:
             outcome = None
             try:
@@ -224,6 +256,7 @@ class DecisionOrchestrator:
                 )
                 execution_effect = outcome.effect.value
                 execution_attempt_id = str(outcome.attempt_id)
+                execution_output = outcome.output
             except AuthorizationError as exc:
                 # Refus contrôlé avant tout effet (handler absent, autorisation
                 # expirée/révoquée, empreinte changée) : rien n'a été engagé.
@@ -240,18 +273,34 @@ class DecisionOrchestrator:
                 ),
             )
             self.db.add(outcome_row)
+
+        # Extract attributes BEFORE any commit to avoid MissingGreenlet on expired objects
+        d_id = str(decision.id)
+        d_dominant_source = decision.dominant_source or DominantSource.cognitive
+        d_final_action = decision.final_action or request.proposed_action
+        d_control_outcome = decision.control_outcome
+        d_risk_level = decision.risk_level
+        d_approval_required = decision.approval_required
+        d_control_reason = decision.control_reason
+        d_permission_granted = decision.permission_granted
+
+        if decision.control_outcome == ControlOutcome.ALLOW:
             await self.db.commit()
+        elif decision.control_outcome == ControlOutcome.ESCALATE:
+            await self.db.commit()
+            await notify_escalation(decision=decision, action_record=action_record)
 
         return DecisionResponse(
-            decision_id=str(decision.id),
-            dominant_source=decision.dominant_source or DominantSource.cognitive,
-            final_action=decision.final_action or request.proposed_action,
-            risk_level=decision.risk_level,
-            approval_required=decision.approval_required,
-            control_outcome=decision.control_outcome,
-            control_reason=decision.control_reason,
-            permission_granted=decision.permission_granted,
+            decision_id=d_id,
+            dominant_source=d_dominant_source,
+            final_action=d_final_action,
+            risk_level=d_risk_level,
+            approval_required=d_approval_required,
+            control_outcome=d_control_outcome,
+            control_reason=d_control_reason,
+            permission_granted=d_permission_granted,
             execution_effect=execution_effect,
             execution_attempt_id=execution_attempt_id,
             execution_error=execution_error,
+            execution_output=execution_output,
         )

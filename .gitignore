@@ -11,3 +11,10 @@ build/
 node_modules/
 frontend/dist/
 .git-msg.tmp
+scratch/
+workspaces/
+temp_*
+*.log
+rendered_dom.html
+docker_logs.txt
+launch_mission.py

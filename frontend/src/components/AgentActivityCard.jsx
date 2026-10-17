@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bot, 
   Cpu, 
@@ -10,8 +10,10 @@ import {
   CheckCircle2, 
   AlertTriangle,
   Terminal,
-  Clock
+  Clock,
+  FileText
 } from 'lucide-react';
+import { authFetch } from '../lib/authFetch';
 
 /**
  * AgentActivityCard — Carte holographique affichant en direct
@@ -32,6 +34,23 @@ export default function AgentActivityCard({
 
   const isOrchestrator = !agent.parent_agent_id;
   const statusClass = (agent.current_status || 'ready').toLowerCase();
+
+  const [showLogs, setShowLogs] = useState(false);
+  const [logs, setLogs] = useState([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+
+  useEffect(() => {
+    if (agent && agent.id) {
+      setLoadingLogs(true);
+      authFetch(`/api/v1/agents/${agent.id}/logs?limit=30`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data && data.logs) setLogs(data.logs);
+        })
+        .catch((err) => console.warn('Erreur chargement logs agent:', err))
+        .finally(() => setLoadingLogs(false));
+    }
+  }, [agent?.id]);
 
   return (
     <div className="agent-activity-card glass-panel hud-interactive">
@@ -199,6 +218,60 @@ export default function AgentActivityCard({
             </div>
             <span className="mono" style={{ color: 'var(--neon-emerald)' }}>0.0 credits</span>
           </div>
+        </div>
+
+        {/* Section 6 : Journal d'Audit & Logs de l'Agent */}
+        <div className="info-section">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="info-section-title">
+              Journal d'Audit & Logs ({logs.length})
+            </span>
+            <button
+              onClick={() => setShowLogs(!showLogs)}
+              className="control-btn"
+              style={{ padding: '3px 8px', fontSize: '0.72rem', color: 'var(--neon-cyan)', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <FileText size={12} />
+              {showLogs ? 'Masquer' : 'Afficher'}
+            </button>
+          </div>
+
+          {showLogs && (
+            <div style={{
+              background: '#040711',
+              border: '1px solid rgba(0, 240, 255, 0.2)',
+              borderRadius: '6px',
+              padding: '8px',
+              maxHeight: '190px',
+              overflowY: 'auto',
+              marginTop: '6px',
+              fontFamily: 'monospace',
+              fontSize: '0.72rem',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+            }}>
+              {loadingLogs && <div style={{ color: '#64748B' }}>Chargement des logs de l'agent...</div>}
+              {!loadingLogs && logs.length === 0 && <div style={{ color: '#64748B' }}>Aucun log enregistré pour cet agent.</div>}
+              {!loadingLogs && logs.map((log) => {
+                const badgeColor =
+                  log.level === 'ALLOW' || log.level === 'SUCCESS' ? '#10B981' :
+                  log.level === 'DENY' || log.level === 'CRITICAL' ? '#F43F5E' :
+                  log.level === 'ESCALATE' || log.level === 'WARNING' ? '#F59E0B' : '#00F0FF';
+                return (
+                  <div key={log.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '5px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', color: badgeColor, fontWeight: 'bold' }}>
+                      <span>[{log.type.toUpperCase()}] {log.title}</span>
+                      <span style={{ color: '#64748B', fontSize: '0.65rem' }}>{new Date(log.timestamp).toLocaleTimeString('fr-FR')}</span>
+                    </div>
+                    <div style={{ color: '#CBD5E1', marginTop: '2px', wordBreak: 'break-word', fontSize: '0.70rem' }}>
+                      {log.summary}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

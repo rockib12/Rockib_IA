@@ -22,7 +22,7 @@ async def test_intelligence_service_evaluate_is_async():
     
     # Mock evaluation results
     mock_ra.evaluate.return_value = RationalAgentOutput(suggested_action="a", confidence=0.5, reasoning="r")
-    mock_risk.evaluate.return_value = RiskAnalystOutput(risk_level=RiskLevel.low, reasoning="r")
+    mock_risk.assess.return_value = RiskAnalystOutput(risk_level=RiskLevel.low, reasoning="r")
     
     service = IntelligenceService(rational_agent=mock_ra, risk_analyst=mock_risk)
     input_data = IntelligenceInput(
@@ -53,7 +53,7 @@ async def test_intelligence_service_evaluate_valid_call():
     
     # Mock evaluation results
     mock_ra.evaluate.return_value = RationalAgentOutput(suggested_action="a", confidence=0.5, reasoning="r")
-    mock_risk.evaluate.return_value = RiskAnalystOutput(risk_level=RiskLevel.low, reasoning="r")
+    mock_risk.assess.return_value = RiskAnalystOutput(risk_level=RiskLevel.low, reasoning="r")
     
     result = await service.evaluate(input_data)
     
@@ -79,7 +79,7 @@ async def test_intelligence_service_output_constraints():
     
     # Mock evaluation results
     mock_ra.evaluate.return_value = RationalAgentOutput(suggested_action="a", confidence=0.5, reasoning="r")
-    mock_risk.evaluate.return_value = RiskAnalystOutput(risk_level=RiskLevel.low, reasoning="r")
+    mock_risk.assess.return_value = RiskAnalystOutput(risk_level=RiskLevel.low, reasoning="r")
     
     result = await service.evaluate(input_data)
     

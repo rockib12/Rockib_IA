@@ -22,7 +22,7 @@ async def test_intelligence_service_orchestration_flow():
     )
     
     # Risk évalue l'action modifiée
-    mock_risk.evaluate.return_value = RiskAnalystOutput(
+    mock_risk.assess.return_value = RiskAnalystOutput(
         risk_level=RiskLevel.high,
         reasoning="Risk reasoning"
     )
@@ -49,11 +49,11 @@ async def test_intelligence_service_orchestration_flow():
     )
     
     # 2. Risk appelé avec l'action SUGGÉRÉE par RA
-    mock_risk.evaluate.assert_called_once_with(
-        action_to_evaluate="Modified action",
+    mock_risk.assess.assert_called_once_with(
+        objective="Objective",
         situation="Situation",
-        domain="Domain",
-        permission_action=PermissionAction.UPDATE
+        proposed_action="Modified action",
+        base_risk=RiskLevel.medium,
     )
     
     # 3. Résultat agrégé

@@ -14,6 +14,11 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
 from app.core.config import settings
+
+# Configuration du Credential Vault pour l'environnement de test automatisé
+if not settings.CREDENTIAL_VAULT_KEY:
+    settings.CREDENTIAL_VAULT_KEY = "test_vault_key_32_bytes_long_secret_12345"
+
 from app.decision_engine.models import (
     ControlOutcome,
     Decision,

@@ -773,7 +773,7 @@ class GoalManager:
         ready_tasks = graph.get_ready_tasks()
 
         # Des tâches sont prêtes ou en cours d'exécution
-        if ready_tasks or any(t.status is TaskStatus.RUNNING for t in tasks):
+        if ready_tasks or any(t.status in (TaskStatus.READY, TaskStatus.RUNNING) for t in tasks):
             return goal.status
 
         # Impasse détectée : aucune tâche READY/RUNNING et Goal inachevé

@@ -1,4 +1,4 @@
-﻿"""Arbitre déterministe du Decision Engine.
+"""Arbitre déterministe du Decision Engine.
 
 Ce module applique des règles de configuration lues en base
 (`decision_domain_config`) pour produire un objet `Decision`
@@ -7,6 +7,7 @@ structuré sans le persister.
 from __future__ import annotations
 
 import math
+import uuid
 from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -52,7 +53,7 @@ class DeterministicArbitrator:
 
     async def _load_domain_config(
         self,
-        workspace_id: str,
+        workspace_id: str | uuid.UUID,
         domain: str,
         permission_action: PermissionAction,
     ) -> DecisionDomainConfig | None:
@@ -60,16 +61,38 @@ class DeterministicArbitrator:
         if self.db is None:
             return None
 
+        ws_uuid = workspace_id
+        if isinstance(workspace_id, str):
+            try:
+                ws_uuid = uuid.UUID(workspace_id)
+            except ValueError:
+                ws_uuid = None
+
         stmt = (
             select(DecisionDomainConfig)
             .where(
-                DecisionDomainConfig.workspace_id == workspace_id,
+                DecisionDomainConfig.workspace_id == ws_uuid,
                 DecisionDomainConfig.domain == domain,
                 DecisionDomainConfig.permission_action == permission_action,
             )
         )
         result = await self.db.execute(stmt)
-        return result.scalar_one_or_none()
+        config = result.scalar_one_or_none()
+        if config is not None:
+            return config
+
+        # Fallback au template de domaine global / existant si pas d'override par workspace
+        fallback_stmt = (
+            select(DecisionDomainConfig)
+            .where(
+                DecisionDomainConfig.domain == domain,
+                DecisionDomainConfig.permission_action == permission_action,
+            )
+            .order_by(DecisionDomainConfig.id.asc())
+            .limit(1)
+        )
+        fb_result = await self.db.execute(fallback_stmt)
+        return fb_result.scalar_one_or_none()
 
     async def arbitrate(
         self,

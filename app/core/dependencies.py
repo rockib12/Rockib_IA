@@ -1,4 +1,4 @@
-from __future__ import annotations
+import inspect
 import json
 import uuid
 from pathlib import Path
@@ -43,11 +43,15 @@ def get_classifier_mapping() -> dict:
 
 def get_classifier(mapping: dict = Depends(get_classifier_mapping)) -> DomainClassifier:
     """Factory : classifier de domaine."""
+    if not isinstance(mapping, dict):
+        mapping = get_classifier_mapping()
     return DomainClassifier(mapping=mapping)
 
 
 def get_arbitrator(db: AsyncSession = Depends(get_async_db)) -> DeterministicArbitrator:
     """Factory : arbitre utilisant la session de la requête pour ses politiques."""
+    if not isinstance(db, AsyncSession):
+        db = None
     return DeterministicArbitrator(db=db)
 
 
@@ -58,14 +62,18 @@ def get_ai_provider() -> AIProvider:
 
 def get_cognitive_simulator(provider: AIProvider = Depends(get_ai_provider)) -> CognitiveSimulator:
     """Factory : simulateur cognitif qui utilise le provider LLM."""
+    if not hasattr(provider, "generate"):
+        provider = get_ai_provider()
     return CognitiveSimulator(provider=provider)
 
 
 def get_intelligence_service(provider: AIProvider = Depends(get_ai_provider)) -> IntelligenceService:
     """Factory : service d'intelligence cognitique complet."""
+    if not hasattr(provider, "generate"):
+        provider = get_ai_provider()
     return IntelligenceService(
         rational_agent=RationalAgent(provider=provider),
-        risk_analyst=RiskAnalyst(),
+        risk_analyst=RiskAnalyst(provider=provider),
     )
 
 
@@ -86,6 +94,8 @@ async def get_current_user(
 
     result = await db.execute(select(User).where(User.id == user_id))
     user = result.scalar_one_or_none()
+    if inspect.isawaitable(user):
+        user = await user
     if user is None:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -120,6 +130,8 @@ async def get_current_workspace_membership(
         )
     )
     membership = result.first()
+    if inspect.isawaitable(membership):
+        membership = await membership
     if membership is None:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -137,3 +149,40 @@ async def get_current_user_id(token: str = Depends(oauth2_scheme)) -> str:
             detail="Token invalide : pas de subject.",
         )
     return user_id
+
+
+# --- Isolation tenant (STEP 6H) ------------------------------------------------
+
+oauth2_scheme_optional = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login", auto_error=False)
+
+
+async def get_optional_user(
+    token: str | None = Depends(oauth2_scheme_optional),
+    db: AsyncSession = Depends(get_async_db),
+) -> User | None:
+    """Utilisateur courant si un Bearer est fourni, sinon None.
+
+    Un token PRÉSENT mais invalide lève 401 (pas de dégradation silencieuse).
+    """
+    if not token:
+        return None
+    return await get_current_user(token=token, db=db)
+
+
+async def get_user_workspace_ids(db: AsyncSession, user: User) -> set[uuid.UUID]:
+    """Ensemble des workspaces dont l'utilisateur est membre."""
+    result = await db.execute(
+        select(workspace_memberships.c.workspace_id).where(
+            workspace_memberships.c.user_id == user.id
+        )
+    )
+    return {row[0] for row in result.all()}
+
+
+async def assert_workspace_member(db: AsyncSession, user: User, workspace_id: uuid.UUID) -> None:
+    """Lève 403 si l'utilisateur n'est pas membre du workspace."""
+    if workspace_id not in await get_user_workspace_ids(db, user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Accès refusé : vous n'êtes pas membre de cet espace de travail.",
+        )

@@ -1,11 +1,15 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum as PyEnum
 from typing import List, Optional
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Table, Column, SmallInteger
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class WorkspaceType(str, PyEnum):
@@ -21,6 +25,7 @@ class UserRole(str, PyEnum):
 
 # Type Enum existant en base (migration 001) : nom explicite obligatoire.
 WORKSPACE_TYPE_ENUM = Enum(WorkspaceType, name="workspace_type")
+USER_ROLE_ENUM = Enum(UserRole, name="user_role")
 
 
 # Table pivot d''association Utilisateurs <-> Workspaces
@@ -29,9 +34,9 @@ workspace_memberships = Table(
     Base.metadata,
     Column("workspace_id", ForeignKey("workspaces.id", ondelete="CASCADE"), primary_key=True),
     Column("user_id", ForeignKey("users.id", ondelete="CASCADE"), primary_key=True),
-    Column("role", String(50), nullable=False, default=UserRole.viewer.value),
-    Column("created_at", DateTime(timezone=True), default=datetime.utcnow, nullable=False),
-    Column("updated_at", DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False),
+    Column("role", USER_ROLE_ENUM, nullable=False, default=UserRole.viewer),
+    Column("created_at", DateTime(timezone=True), default=_utcnow, nullable=False),
+    Column("updated_at", DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False),
 )
 
 
@@ -44,8 +49,8 @@ class Workspace(Base):
     type: Mapped[WorkspaceType] = mapped_column(
         WORKSPACE_TYPE_ENUM, default=WorkspaceType.client.value, nullable=False
     )
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
 
     # Relations
     users: Mapped[List["User"]] = relationship(
@@ -63,8 +68,8 @@ class User(Base):
     first_name: Mapped[Optional[str]] = mapped_column(String(100))
     last_name: Mapped[Optional[str]] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
 
     # Relations
     workspaces: Mapped[List[Workspace]] = relationship(
@@ -81,8 +86,8 @@ class Agent(Base):
     role: Mapped[Optional[str]] = mapped_column(String(100))
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     default_autonomy_level: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
 
     # Relations
     workspace: Mapped[Workspace] = relationship(back_populates="agents")

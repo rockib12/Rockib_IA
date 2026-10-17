@@ -44,3 +44,7 @@ class DecisionResponse(BaseModel):
         default=None,
         description="Motif stable du refus d'exécution contrôlé (Phase 2).",
     )
+    execution_output: Optional[str] = Field(
+        default=None,
+        description="Résultat textuel de l'outil exécuté (Phase 3).",
+    )

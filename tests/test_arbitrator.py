@@ -226,7 +226,6 @@ class TestApprovalRule:
         assert result.approval_required is False
 
 
-@pytest.mark.asyncio
 class TestRiskRule:
     """Règle : risk.level_final = max(base, IA). L'IA ne peut jamais baisser."""
 

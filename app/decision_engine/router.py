@@ -1,4 +1,5 @@
-﻿from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, status
+from sqlalchemy import select
 from typing import List
 from app.decision_engine.services.orchestrator import DecisionOrchestrator
 from app.decision_engine.schemas import DecisionRequest, DecisionResponse
@@ -8,7 +9,10 @@ from app.core.dependencies import (
     get_classifier,
     get_arbitrator,
     get_cognitive_simulator,
+    get_current_user,
+    assert_workspace_member,
 )
+from app.identity.models import User, Agent
 from app.intelligence.services.intelligence_service import IntelligenceService
 from app.decision_engine.services.domain_classifier import DomainClassifier
 from app.decision_engine.services.arbitrator import DeterministicArbitrator
@@ -35,12 +39,38 @@ async def get_orchestrator(
 @router.post("/", response_model=DecisionResponse)
 async def submit_decision(
     request: DecisionRequest, 
-    orchestrator: DecisionOrchestrator = Depends(get_orchestrator)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+    orchestrator: DecisionOrchestrator = Depends(get_orchestrator),
 ):
+    # 1. Vérification d'appartenance au workspace (403 si étranger)
+    await assert_workspace_member(db, current_user, request.workspace_id)
+
+    # 2. Vérification que l'agent existe dans ce workspace (404 si introuvable)
+    stmt = select(Agent).where(
+        Agent.id == request.agent_id,
+        Agent.workspace_id == request.workspace_id,
+    )
+    agent = (await db.execute(stmt)).scalar_one_or_none()
+    if not agent:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Agent introuvable dans cet espace de travail.",
+        )
+
     try:
         return await orchestrator.handle_decision(request)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        import logging
+        logging.getLogger("rockib.decision_router").error(
+            "Internal error in submit_decision: %s", e, exc_info=True
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Erreur interne lors du traitement de la décision.",
+        )
 
 @router.get("/{decision_id}", response_model=DecisionResponse)
 async def get_decision(

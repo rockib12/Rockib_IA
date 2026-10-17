@@ -1,4 +1,4 @@
-﻿"""AutonomousExecutionLoop â€” STEP 5B : boucle autonome contrÃ´lÃ©e (une tÃ¢che par appel).
+"""AutonomousExecutionLoop â€” STEP 5B : boucle autonome contrÃ´lÃ©e (une tÃ¢che par appel).
 
 Composition des composants existants, sans les modifier :
 
@@ -108,6 +108,7 @@ class WakeResult:
     status: str
     task_id: uuid.UUID | None = None
     execution_effect: str | None = None
+    execution_output: str | None = None
     violations: list[str] = field(default_factory=list)
 
 
@@ -267,6 +268,10 @@ async def _admit_one_step(db: AsyncSession, *, goal_id: uuid.UUID) -> AdmitResul
         # les amonts sont tous COMPLETED (mÃªme rÃ¨gle de dÃ©pendances).
         dag_candidate_ids = {t.id for t in graph.get_ready_tasks()}
         dag_ok_ids = set(dag_candidate_ids)
+        for cand_id in dag_candidate_ids:
+            cand_task = by_id.get(cand_id)
+            if cand_task is not None and cand_task.status is TaskStatus.PENDING:
+                TaskStateMachine.transition(cand_task, TaskStatus.READY)
         for t in tasks:
             if t.status is TaskStatus.READY and t.id not in dag_ok_ids:
                 upstream = graph.get_dependencies(t.id)
@@ -304,9 +309,10 @@ async def _admit_one_step(db: AsyncSession, *, goal_id: uuid.UUID) -> AdmitResul
         goal.goal_metadata = metadata
         flag_modified(goal, "goal_metadata")
 
-        # 6. Commit court : publie RUNNING + rÃ©servation, libÃ¨re les verrous.
+        # 6. Commit court : publie RUNNING + réservation, libère les verrous.
+        task_id_val = task.id
         await db.commit()
-        return AdmitResult(admitted=True, task_id=task.id)
+        return AdmitResult(admitted=True, task_id=task_id_val)
     except Exception:
         await db.rollback()
         raise
@@ -439,10 +445,12 @@ async def _recover_one_orphan(
             except InvalidTaskTransitionError:
                 await db.commit()
                 return RecoverResult(recovered=False, reason="ALREADY_TERMINAL")
-            _audit_orphan(goal, task.id, "W1_NO_ACTION")
+            
+            task_id_val = task.id
+            _audit_orphan(goal, task_id_val, "W1_NO_ACTION")
             await db.commit()
             return RecoverResult(
-                recovered=True, task_id=task.id, to_status=TaskStatus.FAILED,
+                recovered=True, task_id=task_id_val, to_status=TaskStatus.FAILED,
                 reason="W1_NO_ACTION",
             )
         action_ids = [a.id for a in actions]
@@ -711,6 +719,7 @@ async def wake_goal(
         return WakeResult(
             status="AWAITING_PROOF", task_id=snap_task_id,
             execution_effect=response.execution_effect,
+            execution_output=response.execution_output,
         )
     manager = GoalManager(db)
     try:
@@ -723,5 +732,6 @@ async def wake_goal(
     return WakeResult(
         status=status.value, task_id=snap_task_id,
         execution_effect=response.execution_effect,
+        execution_output=response.execution_output,
     )
 

@@ -114,6 +114,30 @@ def test_autonomy_calculation_invalid_bounds():
         GoalManager.calculate_applied_autonomy(3, 3, parent_applied_autonomy=6)
 
 
+def test_hierarchical_autonomy_scenarios():
+    # Test 1: Parent = 1, Child requested = 4, Agent default = 5 -> Child applied = 1
+    assert GoalManager.calculate_applied_autonomy(requested_autonomy_level=4, agent_default_autonomy=5, parent_applied_autonomy=1) == 1
+
+    # Test 2: Parent = 3, Child requested = 5, Agent default = 5 -> Child applied = 3
+    assert GoalManager.calculate_applied_autonomy(requested_autonomy_level=5, agent_default_autonomy=5, parent_applied_autonomy=3) == 3
+
+    # Test 3: Parent = 4, Child = 3, Grandchild requested = 5 -> Grandchild <= 3
+    child_applied = GoalManager.calculate_applied_autonomy(requested_autonomy_level=3, agent_default_autonomy=5, parent_applied_autonomy=4)
+    assert child_applied == 3
+    grandchild_applied = GoalManager.calculate_applied_autonomy(requested_autonomy_level=5, agent_default_autonomy=5, parent_applied_autonomy=child_applied)
+    assert grandchild_applied <= 3
+    assert grandchild_applied == 3
+
+    # Test 4: Root Goal: parent = None -> historical behavior unchanged
+    assert GoalManager.calculate_applied_autonomy(requested_autonomy_level=4, agent_default_autonomy=2, parent_applied_autonomy=None) == 2
+
+    # Test 5 (Adversarial): Parent = 1, Child requested = 5, Domain allowed = 5, Agent default = 5 -> applied = 1, NEVER 5
+    adversarial_applied = GoalManager.calculate_applied_autonomy(requested_autonomy_level=5, agent_default_autonomy=5, parent_applied_autonomy=1)
+    assert adversarial_applied == 1
+    assert adversarial_applied != 5
+
+
+
 # =============================================================================
 # 2. TESTS DEADLINES (PURS & RESOLUTION)
 # =============================================================================

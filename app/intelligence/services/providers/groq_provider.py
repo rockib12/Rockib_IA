@@ -72,21 +72,29 @@ class GroqProvider:
         }
 
     @staticmethod
-    def _build_payload(model: str, messages: list[dict[str, str]]) -> dict:
-        return {
+    def _build_payload(
+        model: str,
+        messages: list[dict[str, str]],
+        json_mode: bool = True,
+    ) -> dict:
+        payload = {
             "model": model,
             "messages": messages,
-            # Le JSON est attendu par RationalAgent via model_validate_json :
-            # on demande explicitement une réponse JSON au modèle.
-            "response_format": {"type": "json_object"},
             "temperature": 0.0,
         }
+        if json_mode:
+            payload["response_format"] = {"type": "json_object"}
+        return payload
 
     # ------------------------------------------------------------------
     # AIProvider contract
     # ------------------------------------------------------------------
-    async def generate(self, messages: list[dict[str, str]]) -> str:
-        """Appelle Groq et renvoie le texte brut de la réponse (JSON attendu).
+    async def generate(
+        self,
+        messages: list[dict[str, str]],
+        json_mode: bool = True,
+    ) -> str:
+        """Appelle Groq et renvoie le texte brut de la réponse.
 
         Lève une exception de la hiérarchie ``AIProviderError`` en cas d'erreur :
         - ``AIProviderAuthError``  : clé absente ou 401/403
@@ -100,7 +108,7 @@ class GroqProvider:
             raise AIProviderError("No model configured for GroqProvider.")
 
         url = f"{self._base_url}{GROQ_CHAT_COMPLETIONS_PATH}"
-        payload = self._build_payload(self._model, messages)
+        payload = self._build_payload(self._model, messages, json_mode=json_mode)
         headers = self._build_headers(api_key)
 
         owns_client = self._client is None
@@ -127,14 +135,14 @@ class GroqProvider:
                     f"Groq returned HTTP {response.status_code}: {response.text}"
                 )
 
-            return self._extract_content(response)
+            return self._extract_content(response, json_mode=json_mode)
         finally:
             if owns_client:
                 await client.aclose()
 
     @staticmethod
-    def _extract_content(response: httpx.Response) -> str:
-        """Extrait le texte de la réponse (JSON) à renvoyer au appelant."""
+    def _extract_content(response: httpx.Response, json_mode: bool = True) -> str:
+        """Extrait le texte de la réponse à renvoyer à l'appelant."""
         try:
             data = response.json()
         except (json.JSONDecodeError, ValueError) as exc:
@@ -154,13 +162,13 @@ class GroqProvider:
                 "Groq returned an empty or non-string content"
             )
 
-        # Vérification rapide que le contenu est bien du JSON parseable :
-        # RationalAgent le fera de toute façon, mais on signale tôt.
-        try:
-            json.loads(content)
-        except (json.JSONDecodeError, ValueError) as exc:
-            raise AIProviderParsingError(
-                "Groq response content is not valid JSON"
-            ) from exc
+        # Vérification que le contenu est bien du JSON lorsque json_mode est actif
+        if json_mode:
+            try:
+                json.loads(content)
+            except (json.JSONDecodeError, ValueError) as exc:
+                raise AIProviderParsingError(
+                    "Groq response content is not valid JSON"
+                ) from exc
 
         return content

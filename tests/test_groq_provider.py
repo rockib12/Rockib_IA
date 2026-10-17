@@ -144,8 +144,9 @@ async def test_timeout_is_configured():
 # Tests complémentaires : auth, timeout transport, réseau
 # ---------------------------------------------------------------------------
 @pytest.mark.asyncio
-async def test_missing_api_key_raises_auth_error():
+async def test_missing_api_key_raises_auth_error(monkeypatch):
     """Absence de clé API => AIProviderAuthError."""
+    monkeypatch.setattr("app.core.config.settings.GROQ_API_KEY", None)
     provider = GroqProvider(api_key=None, model="test-model")
 
     with pytest.raises(AIProviderAuthError, match="GROQ_API_KEY"):

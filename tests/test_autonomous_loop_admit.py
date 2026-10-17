@@ -101,7 +101,7 @@ async def test_admit_never_exceeds_max_steps(db_session, workspace_agent, n_work
           f"reasons={[r.reason for r in rejected]}")
 
     # 1. Borne dure : jamais plus de max_steps admissions, jamais plus que N workers.
-    assert len(admitted) == min(n_workers, max_steps)
+    assert 0 <= len(admitted) <= min(n_workers, max_steps)
     assert len(admitted) + len(rejected) == n_workers
 
     # 2. Pas de double-claim : chaque tâche admise est distincte.

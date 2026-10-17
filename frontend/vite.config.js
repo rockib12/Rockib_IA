@@ -12,4 +12,15 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    chunkSizeWarningLimit: 650,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-three': ['three'],
+          'vendor-ui': ['react', 'react-dom', 'lucide-react'],
+        },
+      },
+    },
+  },
 });

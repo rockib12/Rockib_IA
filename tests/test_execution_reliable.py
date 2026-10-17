@@ -379,3 +379,74 @@ async def test_same_logical_operation_never_double_charges(db_session, workspace
     ).scalars().all()
     assert len(held) == 1
     assert held[0].units == Decimal("2")
+
+@pytest.mark.asyncio
+async def test_hard_crash_idempotency_recovery(db_session, workspace_agent):
+    """Simule un hard crash (CancelledError) pendant le handler externe."""
+    import asyncio
+    workspace, agent = workspace_agent
+    decision, action = await _stage(db_session, workspace, agent)
+
+    authorization = await authorizations.issue_authorization(
+        db_session, decision=decision, action=action, actor=ACTOR
+    )
+    
+    async def crashing_handler(action_record):
+        raise asyncio.CancelledError("SIMULATED HARD CRASH")
+
+    # L'appel lève CancelledError (qui remonte et fait échouer la tâche asynchrone parente).
+    # Cela simule l'extinction brutale du process en cours de route.
+    with pytest.raises(asyncio.CancelledError):
+        await dispatch_authorized_action(
+            db_session,
+            action=action,
+            authorization_id=authorization.id,
+            actor=ACTOR,
+            lease_owner="crashing_worker",
+            handler=crashing_handler,
+        )
+
+    # Étant donné que le dispatch a fait "await db.commit()" AVANT d'appeler le handler,
+    # l'ExecutionAttempt doit être en base avec le statut RUNNING !
+    action_id = action.id
+    db_session.expire_all()
+    
+    result = await db_session.execute(
+        select(ExecutionAttempt).where(ExecutionAttempt.action_id == action_id)
+    )
+    attempt = result.scalar_one_or_none()
+    assert attempt is not None, "L'ExecutionAttempt n'a pas survécu au crash !"
+    assert attempt.status == attempts_service.AttemptStatus.RUNNING
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_timeout_protection(db_session, workspace_agent):
+    """Vérifie que timeout_seconds interrompt bien un outil bloqué."""
+    import asyncio
+    workspace, agent = workspace_agent
+    decision, action = await _stage(db_session, workspace, agent)
+
+    authorization = await authorizations.issue_authorization(
+        db_session, decision=decision, action=action, actor=ACTOR
+    )
+
+    async def hanging_handler(action_record):
+        await asyncio.sleep(10.0)
+        return ExecutionResult(success=True, output="too late", error=None)
+
+    outcome = await dispatch_authorized_action(
+        db_session,
+        action=action,
+        authorization_id=authorization.id,
+        actor=ACTOR,
+        lease_owner="worker-timeout",
+        handler=hanging_handler,
+        timeout_seconds=0.1,  # Court timeout
+    )
+
+    assert outcome.effect is EffectCertainty.unknown
+    assert outcome.success is False
+    assert outcome.error_code == "TIMEOUT_AMBIGUOUS"
+
+    attempt = await db_session.get(ExecutionAttempt, outcome.attempt_id)
+    assert attempt.status == attempts_service.AttemptStatus.UNKNOWN

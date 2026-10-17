@@ -4,6 +4,11 @@ import CockpitHeader from './components/CockpitHeader';
 import AgentActivityCard from './components/AgentActivityCard';
 import TaskDAGPanel from './components/TaskDAGPanel';
 import SpawnAgentModal from './components/SpawnAgentModal';
+import AuthModal from './components/AuthModal';
+import DashboardPanel from './components/DashboardPanel';
+import CyberTerminal from './components/CyberTerminal';
+import EventTimeline from './components/EventTimeline';
+import { authFetch } from './lib/authFetch';
 
 // Workspace par défaut pour l'environnement local
 const DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
@@ -21,11 +26,28 @@ export default function App() {
   const [spawnEvent, setSpawnEvent] = useState(null);
   const [isWaking, setIsWaking] = useState(false);
   const [workspaceId, setWorkspaceId] = useState(DEFAULT_WORKSPACE_ID);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+
+  // New panel states
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isTerminalOpen, setIsTerminalOpen] = useState(false);
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+
+  // Écouter l'événement 401 pour afficher le modal d'authentification
+  useEffect(() => {
+    const handleUnauthorized = () => {
+      setCurrentUser(null);
+      setIsAuthModalOpen(true);
+    };
+    window.addEventListener('rockib:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('rockib:unauthorized', handleUnauthorized);
+  }, []);
 
   // Charger les agents depuis l'API
   const fetchAgents = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/agents');
+      const res = await authFetch('/api/v1/agents');
       if (res.ok) {
         const data = await res.json();
         setAgents(data);
@@ -43,7 +65,7 @@ export default function App() {
   // Charger les goals
   const fetchGoals = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/goals');
+      const res = await authFetch('/api/v1/goals');
       if (res.ok) {
         const data = await res.json();
         setGoals(data);
@@ -62,20 +84,22 @@ export default function App() {
   const fetchGoalDetails = useCallback(async (goalId) => {
     if (!goalId) return;
     try {
-      const res = await fetch(`/api/v1/goals/${goalId}`);
+      const res = await authFetch(`/api/v1/goals/${goalId}`);
       if (res.ok) {
         const data = await res.json();
         setGoalDetails(data);
+        return data;
       }
     } catch (e) {
       console.warn("Erreur détails goal:", e);
     }
+    return null;
   }, []);
 
   // Charger la télémétrie
   const fetchTelemetry = useCallback(async () => {
     try {
-      const res = await fetch('/api/v1/telemetry');
+      const res = await authFetch('/api/v1/telemetry');
       if (res.ok) {
         const data = await res.json();
         setTelemetry(data);
@@ -93,9 +117,9 @@ export default function App() {
       await fetchTelemetry();
 
       // Si la base est encore vide d'agents, créons un orchestrateur de démarrage
-      if (loadedAgents.length === 0) {
+      if (loadedAgents && loadedAgents.length === 0) {
         try {
-          const createRes = await fetch('/api/v1/agents', {
+          const createRes = await authFetch('/api/v1/agents', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -108,7 +132,7 @@ export default function App() {
           if (createRes.ok) {
             const newAgent = await createRes.json();
             // Créer un goal initial avec handler system.read
-            await fetch('/api/v1/goals', {
+            await authFetch('/api/v1/goals', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -132,15 +156,48 @@ export default function App() {
       }
     };
 
-    initData();
-    const interval = setInterval(() => {
-      fetchAgents();
-      fetchGoals();
-      fetchTelemetry();
-    }, 4500);
+    // Vérifier si un token existe pour restaurer la session utilisateur
+    const savedToken = localStorage.getItem('rockib_token');
+    if (savedToken) {
+      authFetch('/api/v1/auth/me')
+        .then((r) => (r.ok ? r.json() : null))
+        .then((userData) => {
+          if (userData) {
+            setCurrentUser(userData);
+            initData();
+          }
+        })
+        .catch(() => {});
+    }
 
-    return () => clearInterval(interval);
+    // Ne lancer le polling que si un token existe
+    if (savedToken) {
+      const interval = setInterval(() => {
+        fetchAgents();
+        fetchGoals();
+        fetchTelemetry();
+      }, 4500);
+
+      return () => clearInterval(interval);
+    }
+  }, [currentUser]);
+
+  // Raccourci clavier Ctrl+` pour le terminal
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey && e.key === '`') {
+        e.preventDefault();
+        setIsTerminalOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem('rockib_token');
+    setCurrentUser(null);
+  };
 
   // Mettre à jour les détails du goal actif
   useEffect(() => {
@@ -154,7 +211,7 @@ export default function App() {
     if (!goalId || isWaking) return;
     setIsWaking(true);
     try {
-      const res = await fetch(`/api/v1/goals/${goalId}/wake`, {
+      const res = await authFetch(`/api/v1/goals/${goalId}/wake`, {
         method: 'POST',
       });
       if (res.ok) {
@@ -163,11 +220,13 @@ export default function App() {
         // Rafraîchissement immédiat
         await fetchAgents();
         await fetchGoals();
-        await fetchGoalDetails(goalId);
+        const details = await fetchGoalDetails(goalId);
         await fetchTelemetry();
+        return { result, details };
       }
     } catch (err) {
       console.error("Erreur lors de l'appel wake_goal:", err);
+      throw err;
     } finally {
       setIsWaking(false);
     }
@@ -177,7 +236,7 @@ export default function App() {
   const handleSpawnAgent = async (agentData) => {
     try {
       const targetWorkspace = agents.length > 0 ? agents[0].workspace_id : DEFAULT_WORKSPACE_ID;
-      const res = await fetch('/api/v1/agents', {
+      const res = await authFetch('/api/v1/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -194,7 +253,7 @@ export default function App() {
 
         // Si une mission est spécifiée, créer un Goal associé
         if (agentData.mission) {
-          await fetch('/api/v1/goals', {
+          await authFetch('/api/v1/goals', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -203,10 +262,6 @@ export default function App() {
               objective: agentData.mission,
               requested_autonomy_level: agentData.default_autonomy_level,
               parent_goal_id: selectedGoalId || null,
-              initial_tasks: [
-                `Exécuter mission: ${agentData.mission}`,
-                "Audit des effets via system.read",
-              ],
             }),
           });
         }
@@ -259,6 +314,15 @@ export default function App() {
         onWakeGlobal={() => handleWakeGoal(selectedGoalId || goals[0]?.id)}
         onResetCamera={() => setSelectedAgentId(null)}
         isWaking={isWaking}
+        currentUser={currentUser}
+        onOpenAuthModal={() => setIsAuthModalOpen(true)}
+        onLogout={handleLogout}
+        isDashboardOpen={isDashboardOpen}
+        onToggleDashboard={() => setIsDashboardOpen(!isDashboardOpen)}
+        isTerminalOpen={isTerminalOpen}
+        onToggleTerminal={() => setIsTerminalOpen(!isTerminalOpen)}
+        isTimelineOpen={isTimelineOpen}
+        onToggleTimeline={() => setIsTimelineOpen(!isTimelineOpen)}
       />
 
       {/* Zone de rendu 3D & HUD */}
@@ -277,7 +341,7 @@ export default function App() {
         />
 
         {/* Fiche d'activité holographique de l'agent sélectionné */}
-        {selectedAgent && (
+        {selectedAgent && !isTimelineOpen && (
           <AgentActivityCard
             agent={selectedAgent}
             parentAgent={parentAgent}
@@ -307,7 +371,58 @@ export default function App() {
             isWaking={isWaking}
           />
         )}
+
+        {/* Dashboard Panel (bottom-left) */}
+        <DashboardPanel
+          isOpen={isDashboardOpen}
+          onClose={() => setIsDashboardOpen(false)}
+          agents={agents}
+          goals={goals}
+          telemetry={telemetry}
+        />
+
+        {/* Event Timeline (right side) */}
+        <EventTimeline
+          isOpen={isTimelineOpen}
+          onClose={() => setIsTimelineOpen(false)}
+          telemetry={telemetry}
+        />
       </main>
+
+      {/* Terminal CLI (bottom overlay) */}
+      <CyberTerminal
+        isOpen={isTerminalOpen}
+        onClose={() => setIsTerminalOpen(false)}
+        agents={agents}
+        goals={goals}
+        telemetry={telemetry}
+        onWakeGoal={handleWakeGoal}
+        onSpawnAgent={handleSpawnAgent}
+        onSelectAgent={(id) => {
+          setSelectedAgentId(id);
+          const g = goals.find((x) => x.agent_id === id);
+          if (g) setSelectedGoalId(g.id);
+        }}
+        onCreateGoal={async (agentId, objective) => {
+           const targetWorkspace = agents.length > 0 ? agents[0].workspace_id : DEFAULT_WORKSPACE_ID;
+           const res = await authFetch('/api/v1/goals', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                workspace_id: targetWorkspace,
+                agent_id: agentId,
+                objective: objective,
+                requested_autonomy_level: 2,
+              }),
+            });
+            if (!res.ok) throw new Error("Erreur de l'API lors de la création de la mission.");
+            const created = await res.json();
+            setSelectedGoalId(created.id);
+            await fetchGoals();
+            await fetchGoalDetails(created.id);
+            return created;
+        }}
+      />
 
       {/* Modal de création / matérialisation d'agent */}
       <SpawnAgentModal
@@ -316,6 +431,18 @@ export default function App() {
         parentAgentId={spawnParentId}
         agents={agents}
         onSpawn={handleSpawnAgent}
+      />
+
+      {/* Modal d'Authentification / Connexion */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onLoginSuccess={(userData) => {
+          setCurrentUser(userData);
+          fetchAgents();
+          fetchGoals();
+          fetchTelemetry();
+        }}
       />
     </div>
   );

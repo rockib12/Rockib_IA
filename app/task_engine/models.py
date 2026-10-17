@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum as PyEnum
 from typing import List, Optional
 from sqlalchemy import (
@@ -14,6 +14,10 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 class TaskStatus(str, PyEnum):
@@ -48,12 +52,12 @@ class Task(Base):
         TASK_STATUS_ENUM, default=TaskStatus.PENDING, nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+        DateTime(timezone=True), default=_utcnow, nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=_utcnow,
+        onupdate=_utcnow,
         nullable=False,
     )
 
@@ -115,7 +119,7 @@ class TaskDependency(Base):
     task_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     depends_on_task_id: Mapped[uuid.UUID] = mapped_column(nullable=False)
     created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), default=datetime.utcnow, nullable=False
+        DateTime(timezone=True), default=_utcnow, nullable=False
     )
 
     # Relations explicites vers Task (primaryjoin & foreign_keys désambiguïsés)

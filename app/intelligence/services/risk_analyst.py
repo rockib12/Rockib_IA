@@ -52,11 +52,14 @@ class RiskAnalyst:
             f"3. You MUST provide clear reasoning based on the text signals."
         )
 
+        messages = [
+            {"role": "system", "content": "You are a Senior Risk Analyst. You output valid JSON strictly matching the RiskAnalystOutput schema."},
+            {"role": "user", "content": prompt}
+        ]
+
         try:
-            result = await self.provider.complete(
-                prompt=prompt, 
-                response_model=RiskAnalystOutput
-            )
+            raw_response = await self.provider.generate(messages)
+            result = RiskAnalystOutput.model_validate_json(raw_response)
             
             ai_risk = result.risk_level
             

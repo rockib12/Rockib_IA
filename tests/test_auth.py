@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 from unittest.mock import AsyncMock, patch
 
 import pytest
+import pytest_asyncio
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -35,7 +36,7 @@ pytestmark = pytest.mark.asyncio
 # Section 1 : Hachage / vérification de mot de passe (unitaires)
 # ---------------------------------------------------------------------------
 
-def test_hash_and_verify_password():
+async def test_hash_and_verify_password():
     """hash_password produit un hash vérifiable ; mauvais mot de passe rejeté."""
     password = "SuperSecret123!"
     password_hash = hash_password(password)
@@ -44,7 +45,7 @@ def test_hash_and_verify_password():
     assert verify_password("WrongPassword", password_hash) is False
 
 
-def test_hash_password_is_not_reversible():
+async def test_hash_password_is_not_reversible():
     """Le hash ne doit jamais être égal au mot de passe clair."""
     password = "SomePassword"
     password_hash = hash_password(password)
@@ -56,7 +57,7 @@ def test_hash_password_is_not_reversible():
 # Section 2 : JWT — création et décodage (unitaires)
 # ---------------------------------------------------------------------------
 
-def test_create_and_decode_access_token():
+async def test_create_and_decode_access_token():
     """Un token créé avec create_access_token se décode correctement."""
     user_id = str(uuid.uuid4())
     token = create_access_token({"sub": user_id})
@@ -64,7 +65,7 @@ def test_create_and_decode_access_token():
     assert payload["sub"] == user_id
 
 
-def test_create_access_token_with_custom_expiry():
+async def test_create_access_token_with_custom_expiry():
     """Un token avec un delta d'expiration personnalisé expire après le bon délai."""
     user_id = str(uuid.uuid4())
     delta = timedelta(minutes=5)
@@ -74,14 +75,14 @@ def test_create_access_token_with_custom_expiry():
     assert "exp" in payload
 
 
-def test_decode_access_token_raises_on_invalid_token():
+async def test_decode_access_token_raises_on_invalid_token():
     """Un token invalide lève HTTPException 401."""
     with pytest.raises(Exception) as exc_info:
         decode_access_token("invalid.token.value")
     assert exc_info.value.status_code == 401
 
 
-def test_decode_access_token_raises_on_expired_token():
+async def test_decode_access_token_raises_on_expired_token():
     """Un token expiré lève HTTPException 401."""
     user_id = str(uuid.uuid4())
     # Créer un token expiré dans le passé
@@ -182,28 +183,30 @@ async def test_get_current_user_raises_401_for_inactive():
 # Section 4 : get_current_workspace_membership — 403 pour non-membre (intégration DB)
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def user_and_workspace(db_session: AsyncSession):
     """Crée un utilisateur, un workspace et une membership."""
     from app.identity.models import Workspace
 
-    workspace = Workspace(name="Test Workspace", slug="test-workspace")
+    uid = uuid.uuid4().hex[:8]
+    workspace = Workspace(name="Test Workspace", slug=f"test-workspace-{uid}")
     db_session.add(workspace)
     await db_session.flush()
 
     user = User(
-        email="member@example.com",
+        email=f"member-{uid}@example.com",
         password_hash=hash_password("memberpass"),
         is_active=True,
     )
     db_session.add(user)
     await db_session.flush()
 
-    membership = workspace_memberships(
-        workspace_id=workspace.id,
-        user_id=user.id,
+    await db_session.execute(
+        workspace_memberships.insert().values(
+            workspace_id=workspace.id,
+            user_id=user.id,
+        )
     )
-    db_session.add(membership)
     await db_session.commit()
     await db_session.refresh(user)
     await db_session.refresh(workspace)
@@ -232,12 +235,13 @@ async def test_get_current_workspace_membership_refuses_non_member(db_session: A
     from fastapi import HTTPException
     from app.identity.models import Workspace
 
-    workspace = Workspace(name="Other Workspace", slug="other-workspace")
+    uid = uuid.uuid4().hex[:8]
+    workspace = Workspace(name="Other Workspace", slug=f"other-workspace-{uid}")
     db_session.add(workspace)
     await db_session.flush()
 
     user = User(
-        email="nonmember@example.com",
+        email=f"nonmember-{uid}@example.com",
         password_hash=hash_password("somepass"),
         is_active=True,
     )
@@ -254,7 +258,7 @@ async def test_get_current_workspace_membership_refuses_non_member(db_session: A
             db=db_session,
         )
     assert exc_info.value.status_code == 403
-    assert "non membre" in exc_info.value.detail.lower()
+    assert "pas membre" in exc_info.value.detail.lower()
 
 
 async def test_get_current_workspace_membership_refuses_invalid_workspace_id():
@@ -284,12 +288,13 @@ async def test_get_current_workspace_membership_refuses_deleted_user(db_session:
     from fastapi import HTTPException
     from app.identity.models import Workspace
 
-    workspace = Workspace(name="Test Workspace", slug="test-workspace")
+    uid = uuid.uuid4().hex[:8]
+    workspace = Workspace(name="Test Workspace", slug=f"test-ws-del-{uid}")
     db_session.add(workspace)
     await db_session.flush()
 
     user = User(
-        email="deleted@example.com",
+        email=f"deleted-{uid}@example.com",
         password_hash=hash_password("pass"),
         is_active=True,
     )
