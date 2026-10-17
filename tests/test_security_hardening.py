@@ -576,4 +576,74 @@ async def test_preview_workspace_file_includes_csp_sandbox_header(tmp_path, monk
         assert res.headers.get("x-content-type-options") == "nosniff"
 
 
+# ==============================================================================
+# LOT P5 : Anti-Bruteforce Auth, X-Request-ID & Bounded Voice Sessions
+# ==============================================================================
 
+
+@pytest.mark.asyncio
+async def test_auth_login_rate_limiting_blocks_bruteforce():
+    """Vérifie que plus de 15 tentatives de login en 60s depuis une même IP renvoient HTTP 429."""
+    from app.identity.router import _auth_ip_attempts, _AUTH_MAX_ATTEMPTS
+
+    test_ip = "203.0.113.99"
+    _auth_ip_attempts.pop(test_ip, None)
+
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            for _ in range(_AUTH_MAX_ATTEMPTS):
+                res = await client.post(
+                    "/api/v1/auth/login",
+                    json={"email": "nonexistent_bruteforce@example.com", "password": "wrongpassword"},
+                    headers={"X-Forwarded-For": test_ip},
+                )
+                assert res.status_code == 401
+
+            # La 16e tentative doit être bloquée en 429 Too Many Requests
+            res_blocked = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "nonexistent_bruteforce@example.com", "password": "wrongpassword"},
+                headers={"X-Forwarded-For": test_ip},
+            )
+            assert res_blocked.status_code == 429
+            assert res_blocked.headers.get("retry-after") == "60"
+    finally:
+        _auth_ip_attempts.pop(test_ip, None)
+
+
+@pytest.mark.asyncio
+async def test_x_request_id_header_injection_and_sanitization():
+    """Vérifie l'injection automatique et la validation stricte du header X-Request-ID."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        # 1. Sans header entrant -> UUID généré
+        res1 = await client.get("/")
+        assert res1.status_code == 200
+        assert res1.headers.get("x-request-id") is not None
+        assert len(res1.headers["x-request-id"]) >= 32
+
+        # 2. Avec header valide -> conservé
+        res2 = await client.get("/", headers={"X-Request-ID": "trace-rockib-2026-001"})
+        assert res2.headers.get("x-request-id") == "trace-rockib-2026-001"
+
+        # 3. Avec header malveillant (CRLF / caractères spéciaux) -> remplacé par un UUID propre
+        res3 = await client.get("/", headers={"X-Request-ID": "bad<script>id"})
+        assert res3.headers.get("x-request-id") != "bad<script>id"
+
+
+def test_voice_call_session_ttl_and_capacity_eviction():
+    """Vérifie que VoiceCallService évince les sessions expirées et plafonne la mémoire."""
+    from app.inbound.services.voice_call_service import VoiceCallService, _SESSION_TTL_SECONDS
+    from app.inbound.schemas import VoiceCallSessionRequest
+
+    svc = VoiceCallService()
+    resp1 = svc.start_call_session(VoiceCallSessionRequest(page_url="https://rockib-quenum.netlify.app/"))
+    sid1 = resp1.session_id
+    assert sid1 in svc._sessions
+
+    # Vieillir artificiellement la session au-delà du TTL
+    svc._sessions[sid1].created_at -= (_SESSION_TTL_SECONDS + 10)
+
+    # Le démarrage d'une nouvelle session doit purger sid1
+    resp2 = svc.start_call_session(VoiceCallSessionRequest(page_url="https://rockib-quenum.netlify.app/"))
+    assert sid1 not in svc._sessions
+    assert resp2.session_id in svc._sessions

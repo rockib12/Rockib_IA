@@ -80,6 +80,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+import re
+import uuid
+from fastapi import Request, Response
+from sqlalchemy import text
+from app.core.database import AsyncSessionLocal
+
+_SAFE_REQUEST_ID_RE = re.compile(r"^[a-zA-Z0-9._-]{1,64}$")
+
+
+@app.middleware("http")
+async def add_request_id_header(request: Request, call_next):
+    incoming_id = request.headers.get("x-request-id", "")
+    req_id = incoming_id if _SAFE_REQUEST_ID_RE.match(incoming_id) else str(uuid.uuid4())
+    request.state.request_id = req_id
+    response: Response = await call_next(request)
+    response.headers["X-Request-ID"] = req_id
+    return response
+
+
 # Authentification & Identity
 app.include_router(auth_router)
 
@@ -100,7 +119,22 @@ async def root():
     }
 
 
-# Prochaines étapes : Enregistrement des routeurs de chaque couche
-# app.include_router(identity_router, prefix="/api/v1/identity", tags=["Identity"])
-# app.include_router(memory_router, prefix="/api/v1/memory", tags=["Memory"])
-# app.include_router(decision_router, prefix="/api/v1/decision", tags=["Decision Engine"])
+@app.get("/api/v1/health")
+async def api_health_check():
+    """Sonde de santé profonde vérifiant la connectivité PostgreSQL."""
+    db_ok = False
+    try:
+        async with AsyncSessionLocal() as session:
+            await session.execute(text("SELECT 1"))
+            db_ok = True
+    except Exception:
+        db_ok = False
+
+    return {
+        "status": "healthy" if db_ok else "degraded",
+        "app_name": settings.APP_NAME,
+        "environment": settings.APP_ENV,
+        "components": {
+            "database": "up" if db_ok else "down",
+        },
+    }

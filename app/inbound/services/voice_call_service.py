@@ -55,6 +55,10 @@ class VoiceCallSession:
         self.lead_captured = False
 
 
+_SESSION_TTL_SECONDS = 900
+_MAX_ACTIVE_SESSIONS = 1000
+
+
 class VoiceCallService:
     """Orchestrates interactive voice call dialogues and phone callbacks."""
 
@@ -62,8 +66,21 @@ class VoiceCallService:
         self.provider = ai_provider or GroqProvider()
         self._sessions: Dict[str, VoiceCallSession] = {}
 
+    def _prune_expired_sessions(self) -> None:
+        now = time.time()
+        expired = [
+            sid for sid, sess in self._sessions.items()
+            if now - sess.created_at > _SESSION_TTL_SECONDS
+        ]
+        for sid in expired:
+            self._sessions.pop(sid, None)
+        while len(self._sessions) >= _MAX_ACTIVE_SESSIONS:
+            oldest_sid = next(iter(self._sessions))
+            self._sessions.pop(oldest_sid, None)
+
     def start_call_session(self, request: VoiceCallSessionRequest) -> VoiceCallSessionResponse:
         """Initializes a new live voice call session."""
+        self._prune_expired_sessions()
         session_id = str(uuid.uuid4())
         session = VoiceCallSession(session_id=session_id, page_url=request.page_url or "")
         self._sessions[session_id] = session

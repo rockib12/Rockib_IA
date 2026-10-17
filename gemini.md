@@ -65,10 +65,10 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
 ---
 
 ## 🧪 Statut des Tests
-- **674 tests unitaires et d'intégration réussis (100% verts)** :
+- **680 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
   - `tests/test_system_handlers.py` & `tests/test_connectors.py` ✅ *(Connecteurs production, dont `content.create` sandboxed, zero-spend)*
   - `tests/test_celery_tasks.py` & `tests/test_wake_runner.py` ✅ *(Boucle de réveil Celery Beat et workers)*
-  - `tests/test_security_hardening.py` ✅ *(25 tests : Hardening P0/P1 — Telegram Webhook Secret, SSRF & DNS resolution + immunité DNS Rebinding par épinglage IP socket, Credential Vault fail-fast, Auth & Multi-tenant isolation sur `/api/v1/decisions/`)*
+  - `tests/test_security_hardening.py` ✅ *(31 tests : Hardening P0/P1/P4/P5 — Telegram Webhook Secret, SSRF & DNS resolution + immunité DNS Rebinding par épinglage IP socket, Credential Vault fail-fast, Auth & Multi-tenant isolation sur `/api/v1/decisions/`, CSP Sandbox `/preview/`, Anti-Bruteforce Auth, `X-Request-ID` & TTL Sessions)*
   - `tests/test_goal_engine_auth.py` ✅ *(27 tests : Authentification OAuth2/JWT sur tous les endpoints Goal Engine, isolation stricte multi-tenant 403/404, URLs signées HMAC-SHA256 avec TTL 1h et domaine séparé, prévention anti-énumération)*
   - `tests/test_skill_system.py` ✅ *(47 tests : 107 Skills Catalog, scellement SHA-256, Core 5 immuables, Registry, Selector JIT, dépendances DAG, exclusion mutuelle, priorisation déterministe workspace/system, alignement enum SkillCategory)*
   - `tests/test_agent_connectors.py` & `tests/test_goal_manager.py` ✅ *(Autonomie hiérarchique bornée strictement : parent >= enfant, scénarios 1 à 5 + test adversarial)*
@@ -195,3 +195,11 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
    - **Éradication des Fautes d'Injection & d'Expiration Celery** : Correction des factories `app/core/dependencies.py` qui transmettaient des objets FastAPI `Depends` aux workers d'arrière-plan, et sécurisation de `reliable_executor.py` et `tasks.py` avec `AsyncSessionLocal` (`expire_on_commit=False`) éliminant définitivement les erreurs `MissingGreenlet`.
    - **Exécution Réelle E2E Certifiée** : Mission de script vidéo Motion Design exécutée avec succès (`confirmed`), livrant le fichier de pré-production dans le workspace.
    - **Validation de Non-Régression Globale** : Suite de tests portée à **674 tests unitaires et d'intégration réussis (100% verts)**.
+20. **Audit 360° & Durcissement Intégral de Production (Lots P1 à P5)** :
+   - **Lot P1 (Sécurité Applicative & Isolation)** : Isolation `Content-Security-Policy: sandbox` et `X-Content-Type-Options: nosniff` sur `/api/v1/workspaces/{id}/preview/{path}` ; liste blanche stricte `CORS_ORIGINS` ; liaison du port debug Uvicorn sur `127.0.0.1:8080:8000` (anti-spoofing `X-Forwarded-For`) ; masquage des exceptions 500 internes ; assainissement DOM (`createTextNode`) dans `rockib-concierge.js` ; et passage de `/api/v1/auth/me` sous `authFetch`.
+   - **Lot P2 (Performance SQL & Zéro Warning)** : Éradication des requêtes SQL $N+1$ sur `list_agents`, `list_goals`, `get_telemetry_events` et `get_goal_details` (chargement groupé `WHERE IN`) ; migration complète vers `datetime.now(timezone.utc)` (`_utcnow()`) ramenant les avertissements Pytest de **1 535 à 0**.
+   - **Lot P3 (DevSecOps & Bundling)** : Exécution non-root (`uid=10001 rockib`) pour `uvicorn`, `celery_worker` et `celery_beat` sous Supervisord ; découpage `manualChunks` Vite (`vendor-three`, `vendor-ui`) ; réduction de 90 % du contexte Docker via `.dockerignore`.
+   - **Lot P4 (Complétude API & Nginx Hardening)** : Implémentation de `GET /api/v1/decisions/{id}` et `GET /api/v1/decisions/` avec isolation multi-tenant et anti-énumération (404) ; ajout des en-têtes HTTP de sécurité Nginx (`server_tokens off`, `X-Frame-Options`, `X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`).
+   - **Lot P5 (Anti-Bruteforce, Observabilité & Résilience Mémoire)** : Rate-limiting IP glissant (429 + `Retry-After`) et protection anti-timing attack sur `/api/v1/auth/login` et `/register` ; middleware de traçabilité `X-Request-ID` validé par regex ; sonde de santé profonde `/api/v1/health` (vérification active PostgreSQL `SELECT 1`) ; et éviction automatique TTL/capacité des sessions d'appel vocal dans `VoiceCallService`.
+   - **Validation de Non-Régression Globale** : Suite de tests portée à **680 tests unitaires et d'intégration réussis (100% verts, 0 warning)**.
+
