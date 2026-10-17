@@ -52,6 +52,44 @@ async def system_read_handler(action: ActionRecord) -> ExecutionResult:
     )
 
 
+async def portfolio_ambassador_handler(action: ActionRecord) -> ExecutionResult:
+    """Handler déterministe pour (portfolio, read) et (prospection, read) — Portfolio Ambassador."""
+    if action.workspace_id is None:
+        raise ValueError("ActionRecord must have a non-null workspace_id")
+
+    payload = {
+        "status": "operational",
+        "agent_role": "Portfolio Ambassador & Lead Qualifier",
+        "target": "https://rockib-quenum.netlify.app/",
+        "tool": action.tool,
+        "operation": action.operation,
+        "gateway_endpoints": [
+            "POST /api/v1/inbound/portfolio/message",
+            "POST /api/v1/inbound/portfolio/voice/session",
+            "POST /api/v1/inbound/portfolio/voice/turn",
+            "POST /api/v1/inbound/portfolio/request-callback",
+        ],
+        "sealed_skills": ["portfolio_ambassador@1.0.0", "lead_qualification@1.0.0"],
+        "systems_covered": ["Rockib AI Engine", "MARTISTORE", "WaAuto", "Agence IIA"],
+        "workspace_id": str(action.workspace_id),
+        "agent_id": str(action.agent_id),
+        "action_id": str(action.id),
+        "task_id": str(action.task_id) if action.task_id else None,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+    return ExecutionResult(
+        success=True,
+        output=json.dumps(payload, separators=(",", ":")),
+        error=None,
+        error_code=None,
+        provider_reference="portfolio:ambassador",
+        cost_amount=Decimal("0.0"),
+        cost_unit="credits",
+        effect_unknown=False,
+    )
+
+
 def install_production_handlers() -> None:
     """Enregistre les handlers de production dans le registre officiel."""
     from app.connectors.fs_connector import fs_read_handler, fs_write_handler
@@ -81,6 +119,10 @@ def install_production_handlers() -> None:
     register_action_handler("fs", "write", fs_write_handler)
     register_action_handler("fs", "create", fs_write_handler)
     
+    # Portfolio Ambassador & Lead Qualification Handlers
+    register_action_handler("portfolio", "read", portfolio_ambassador_handler)
+    register_action_handler("prospection", "read", portfolio_ambassador_handler)
+    
     # Web Handlers
     register_action_handler("web", "search", web_search_handler)
     register_action_handler("web", "fetch", web_fetch_handler)
@@ -106,4 +148,5 @@ def install_production_handlers() -> None:
 
 # Alias pour compatibilité
 register_standard_system_handlers = install_production_handlers
+
 
