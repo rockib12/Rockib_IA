@@ -11,9 +11,9 @@ class DecisionRequest(BaseModel):
     # bloc classification incertaine profitent du meme correctif.
     workspace_id: uuid.UUID
     agent_id: uuid.UUID
-    objective: str = Field(..., description="Objectif de la d?cision")
-    situation: str = Field(default="", description="Situation actuelle")
-    proposed_action: str = Field(..., description="Action propos?e")
+    objective: str = Field(..., min_length=1, max_length=4000, description="Objectif de la décision")
+    situation: str = Field(default="", max_length=8000, description="Situation actuelle")
+    proposed_action: str = Field(..., min_length=1, max_length=4000, description="Action proposée")
     requested_autonomy_level: int | None = Field(default=None, ge=0, le=5, strict=True)
 
 class ClassificationResult(BaseModel):

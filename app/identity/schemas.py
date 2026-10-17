@@ -1,12 +1,12 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel, EmailStr, ConfigDict
+from pydantic import BaseModel, EmailStr, ConfigDict, Field
 
 
 class WorkspaceBase(BaseModel):
-    name: str
-    slug: str
+    name: str = Field(..., min_length=1, max_length=120)
+    slug: str = Field(..., min_length=1, max_length=120)
 
 
 class WorkspaceCreate(WorkspaceBase):
@@ -23,12 +23,12 @@ class WorkspaceRead(WorkspaceBase):
 
 class UserBase(BaseModel):
     email: EmailStr
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
+    first_name: Optional[str] = Field(default=None, max_length=120)
+    last_name: Optional[str] = Field(default=None, max_length=120)
 
 
 class UserCreate(UserBase):
-    password: str
+    password: str = Field(..., min_length=8, max_length=128)
 
 
 class UserRead(UserBase):
@@ -41,9 +41,10 @@ class UserRead(UserBase):
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(..., min_length=1, max_length=128)
 
 
 class Token(BaseModel):
     access_token: str
     token_type: str = "bearer"
+

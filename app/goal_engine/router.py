@@ -58,8 +58,8 @@ install_production_handlers()
 
 class CreateAgentRequest(BaseModel):
     workspace_id: uuid.UUID
-    name: str
-    role: Optional[str] = "Worker"
+    name: str = Field(..., min_length=1, max_length=120)
+    role: Optional[str] = Field(default="Worker", max_length=120)
     default_autonomy_level: int = Field(default=2, ge=0, le=5)
     parent_agent_id: Optional[uuid.UUID] = None
 
@@ -115,11 +115,11 @@ class GoalSummary(BaseModel):
 class CreateGoalRequest(BaseModel):
     workspace_id: uuid.UUID
     agent_id: uuid.UUID
-    objective: str
-    priority: int = 1
+    objective: str = Field(..., min_length=1, max_length=4000)
+    priority: int = Field(default=1, ge=1, le=100)
     requested_autonomy_level: int = Field(default=2, ge=0, le=5)
     parent_goal_id: Optional[uuid.UUID] = None
-    initial_tasks: Optional[List[str]] = None
+    initial_tasks: Optional[List[str]] = Field(default=None, max_length=50)
 
 
 class WakeGoalResponse(BaseModel):

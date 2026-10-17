@@ -738,4 +738,55 @@ async def test_deep_health_check_endpoint_returns_db_and_redis(db_session):
         app.dependency_overrides.clear()
 
 
+# ==============================================================================
+# LOT P7 : Validation Stricte des Schémas Pydantic (Mots de passe, Longueurs, Canaux)
+# ==============================================================================
 
+
+def test_user_create_rejects_short_or_oversized_passwords():
+    """Vérifie que UserCreate rejette les mots de passe < 8 ou > 128 caractères (anti-DoS Argon2)."""
+    from pydantic import ValidationError
+    from app.identity.schemas import UserCreate
+
+    with pytest.raises(ValidationError):
+        UserCreate(email="user@rockib.ai", password="short")
+
+    with pytest.raises(ValidationError):
+        UserCreate(email="user@rockib.ai", password="a" * 129)
+
+    valid = UserCreate(email="user@rockib.ai", password="StrongPassword123!")
+    assert len(valid.password) >= 8
+
+
+def test_decision_and_goal_schemas_reject_empty_or_oversized_fields():
+    """Vérifie que DecisionRequest et CreateGoalRequest bornent strictement les champs textuels."""
+    from pydantic import ValidationError
+    from app.decision_engine.schemas import DecisionRequest
+    from app.goal_engine.router import CreateGoalRequest
+
+    ws_id = uuid.uuid4()
+    ag_id = uuid.uuid4()
+
+    with pytest.raises(ValidationError):
+        DecisionRequest(workspace_id=ws_id, agent_id=ag_id, objective="", proposed_action="act")
+
+    with pytest.raises(ValidationError):
+        DecisionRequest(workspace_id=ws_id, agent_id=ag_id, objective="a" * 4001, proposed_action="act")
+
+    with pytest.raises(ValidationError):
+        CreateGoalRequest(workspace_id=ws_id, agent_id=ag_id, objective="", priority=1)
+
+    with pytest.raises(ValidationError):
+        CreateGoalRequest(workspace_id=ws_id, agent_id=ag_id, objective="Valid", priority=0)
+
+
+def test_callback_request_rejects_invalid_channel():
+    """Vérifie que CallMeBackRequest n'accepte que 'whatsapp' ou 'phone'."""
+    from pydantic import ValidationError
+    from app.inbound.schemas import CallMeBackRequest
+
+    with pytest.raises(ValidationError):
+        CallMeBackRequest(phone_number="+22901020304", channel="sms_injection")
+
+    valid = CallMeBackRequest(phone_number="+22901020304", channel="whatsapp")
+    assert valid.channel == "whatsapp"

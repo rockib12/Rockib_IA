@@ -47,12 +47,13 @@ async def register_user(
 ) -> Token:
     """Crée un utilisateur avec mot de passe haché."""
     _check_auth_rate_limit(request)
-    existing = (await db.execute(select(User).where(User.email == str(user.email)))).scalar_one_or_none()
+    normalized_email = str(user.email).strip().lower()
+    existing = (await db.execute(select(User).where(User.email == normalized_email))).scalar_one_or_none()
     if existing is not None:
         raise HTTPException(status_code=409, detail="Email déjà utilisé.")
 
     user_record = User(
-        email=str(user.email),
+        email=normalized_email,
         password_hash=hash_password(user.password),
         first_name=user.first_name,
         last_name=user.last_name,
@@ -85,7 +86,8 @@ async def login_user(
 ) -> Token:
     """Vérifie les identifiants et retourne un token JWT."""
     _check_auth_rate_limit(request)
-    result = await db.execute(select(User).where(User.email == str(credentials.email)))
+    normalized_email = str(credentials.email).strip().lower()
+    result = await db.execute(select(User).where(User.email == normalized_email))
     user = result.scalar_one_or_none()
     if user is None:
         # Mitigation d'attaque temporelle (timing side-channel)
