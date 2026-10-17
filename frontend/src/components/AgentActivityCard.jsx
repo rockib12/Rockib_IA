@@ -27,6 +27,7 @@ export default function AgentActivityCard({
   onClose,
   onWakeGoal,
   onSpawnSubAgent,
+  onOpenCreateGoal,
   onSelectAgent,
   isWaking = false,
 }) {
@@ -199,24 +200,39 @@ export default function AgentActivityCard({
           </div>
         </div>
 
-        {/* Section 5 : Empreinte d'exécution & Handlers */}
+        {/* Section 5 : Empreinte d'exécution & Connecteurs */}
         <div className="info-section">
-          <span className="info-section-title">Capacités & Diagnostic</span>
+          <span className="info-section-title">Connecteurs Sandboxed & Capacités</span>
           <div style={{ 
             background: 'rgba(0,0,0,0.35)', 
             padding: '10px 12px', 
             borderRadius: '8px', 
-            fontSize: '0.78rem',
+            fontSize: '0.75rem',
             display: 'flex',
+            flexWrap: 'wrap',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            gap: '6px',
             border: '1px solid var(--border-subtle)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Terminal size={14} color="var(--neon-emerald)" />
-              <span>Handler actif : <code className="mono" style={{ color: 'var(--neon-cyan)' }}>system.read</code></span>
-            </div>
-            <span className="mono" style={{ color: 'var(--neon-emerald)' }}>0.0 credits</span>
+            {['system.read', 'content.create', 'web.search', 'fs.write', 'api.request'].map((tool) => (
+              <span
+                key={tool}
+                className="mono"
+                style={{
+                  padding: '2px 7px',
+                  borderRadius: '4px',
+                  background: 'rgba(0, 240, 255, 0.08)',
+                  border: '1px solid rgba(0, 240, 255, 0.25)',
+                  color: 'var(--neon-cyan)',
+                  fontSize: '0.7rem',
+                }}
+              >
+                {tool}
+              </span>
+            ))}
+            <span className="mono" style={{ color: 'var(--neon-emerald)', marginLeft: 'auto', fontSize: '0.72rem' }}>
+              Zero-Spend Guard
+            </span>
           </div>
         </div>
 
@@ -285,14 +301,25 @@ export default function AgentActivityCard({
             style={{ flex: 1, justifyContent: 'center' }}
           >
             <Play size={16} />
-            {isWaking ? "Exécution en cours..." : "Wake & Execute (1 pas)"}
+            {isWaking ? "Exécution..." : "Wake (1 pas)"}
+          </button>
+        )}
+
+        {onOpenCreateGoal && (
+          <button
+            onClick={() => onOpenCreateGoal(agent.id)}
+            className="btn-cyber secondary"
+            style={{ padding: '8px 12px', borderColor: 'rgba(0, 240, 255, 0.35)' }}
+            title="Assigner une nouvelle mission DAG à cet agent"
+          >
+            + Mission
           </button>
         )}
 
         <button 
           onClick={() => onSpawnSubAgent(agent.id)}
           className="btn-cyber accent-purple"
-          style={{ padding: '8px 14px' }}
+          style={{ padding: '8px 12px' }}
           title="Créer un sous-agent relié"
         >
           <GitFork size={16} />
@@ -302,3 +329,4 @@ export default function AgentActivityCard({
     </div>
   );
 }
+

@@ -4,6 +4,8 @@ import CockpitHeader from './components/CockpitHeader';
 import AgentActivityCard from './components/AgentActivityCard';
 import TaskDAGPanel from './components/TaskDAGPanel';
 import SpawnAgentModal from './components/SpawnAgentModal';
+import CreateGoalModal from './components/CreateGoalModal';
+import GovernancePanel from './components/GovernancePanel';
 import AuthModal from './components/AuthModal';
 import DashboardPanel from './components/DashboardPanel';
 import CyberTerminal from './components/CyberTerminal';
@@ -20,19 +22,32 @@ export default function App() {
   const [selectedGoalId, setSelectedGoalId] = useState(null);
   const [goalDetails, setGoalDetails] = useState(null);
   const [telemetry, setTelemetry] = useState([]);
+  const [healthStatus, setHealthStatus] = useState({ status: 'healthy', database: 'up', redis: 'up' });
+  const [toasts, setToasts] = useState([]);
   const [isSplitView, setIsSplitView] = useState(false);
   const [isSpawnModalOpen, setIsSpawnModalOpen] = useState(false);
   const [spawnParentId, setSpawnParentId] = useState(null);
+  const [isCreateGoalOpen, setIsCreateGoalOpen] = useState(false);
+  const [goalAgentId, setGoalAgentId] = useState(null);
   const [spawnEvent, setSpawnEvent] = useState(null);
   const [isWaking, setIsWaking] = useState(false);
   const [workspaceId, setWorkspaceId] = useState(DEFAULT_WORKSPACE_ID);
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
-  // New panel states
+  // Panel states
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+  const [isGovernanceOpen, setIsGovernanceOpen] = useState(false);
+
+  const addToast = useCallback((message, type = 'info') => {
+    const id = `${Date.now()}-${Math.random()}`;
+    setToasts((prev) => [...prev.slice(-3), { id, message, type }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4200);
+  }, []);
 
   // Écouter l'événement 401 pour afficher le modal d'authentification
   useEffect(() => {
@@ -42,6 +57,23 @@ export default function App() {
     };
     window.addEventListener('rockib:unauthorized', handleUnauthorized);
     return () => window.removeEventListener('rockib:unauthorized', handleUnauthorized);
+  }, []);
+
+  // Sonde de santé profonde PostgreSQL & Redis
+  const fetchHealth = useCallback(async () => {
+    try {
+      const res = await fetch('/api/v1/health');
+      if (res.ok) {
+        const data = await res.json();
+        setHealthStatus({
+          status: data.status || 'healthy',
+          database: data.components?.database || 'up',
+          redis: data.components?.redis || 'up',
+        });
+      }
+    } catch {
+      setHealthStatus({ status: 'degraded', database: 'down', redis: 'down' });
+    }
   }, []);
 
   // Charger les agents depuis l'API
@@ -111,6 +143,12 @@ export default function App() {
 
   // Initialisation et boucle de rafraîchissement
   useEffect(() => {
+    fetchHealth();
+    const healthTimer = setInterval(fetchHealth, 12000);
+    return () => clearInterval(healthTimer);
+  }, [fetchHealth]);
+
+  useEffect(() => {
     const initData = async () => {
       const loadedAgents = await fetchAgents();
       await fetchGoals();
@@ -131,7 +169,6 @@ export default function App() {
           });
           if (createRes.ok) {
             const newAgent = await createRes.json();
-            // Créer un goal initial avec handler system.read
             await authFetch('/api/v1/goals', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -156,7 +193,6 @@ export default function App() {
       }
     };
 
-    // Vérifier si un token existe pour restaurer la session utilisateur
     const savedToken = localStorage.getItem('rockib_token');
     if (savedToken) {
       authFetch('/api/v1/auth/me')
@@ -170,7 +206,6 @@ export default function App() {
         .catch(() => {});
     }
 
-    // Ne lancer le polling que si un token existe
     if (savedToken) {
       const interval = setInterval(() => {
         fetchAgents();
@@ -182,12 +217,15 @@ export default function App() {
     }
   }, [currentUser]);
 
-  // Raccourci clavier Ctrl+` pour le terminal
+  // Raccourcis clavier (Ctrl+` pour Terminal, Ctrl+G pour Gouvernance)
   useEffect(() => {
     const handleKeyDown = (e) => {
       if (e.ctrlKey && e.key === '`') {
         e.preventDefault();
         setIsTerminalOpen((prev) => !prev);
+      } else if (e.ctrlKey && (e.key === 'g' || e.key === 'G')) {
+        e.preventDefault();
+        setIsGovernanceOpen((prev) => !prev);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -197,6 +235,9 @@ export default function App() {
   const handleLogout = () => {
     localStorage.removeItem('rockib_token');
     setCurrentUser(null);
+    setAgents([]);
+    setGoals([]);
+    addToast('Session déconnectée.', 'info');
   };
 
   // Mettre à jour les détails du goal actif
@@ -216,19 +257,54 @@ export default function App() {
       });
       if (res.ok) {
         const result = await res.json();
-        console.log("Résultat wake_goal:", result);
-        // Rafraîchissement immédiat
         await fetchAgents();
         await fetchGoals();
         const details = await fetchGoalDetails(goalId);
         await fetchTelemetry();
+        addToast(
+          `Cycle autonome exécuté : ${result.status} (${result.execution_effect || 'ok'})`,
+          result.status === 'EXECUTED' || result.status === 'GOAL_COMPLETED' ? 'success' : 'info'
+        );
         return { result, details };
+      } else {
+        addToast("Échec de l'exécution du cycle Wake.", 'error');
       }
     } catch (err) {
       console.error("Erreur lors de l'appel wake_goal:", err);
+      addToast("Erreur réseau lors de l'appel Wake.", 'error');
       throw err;
     } finally {
       setIsWaking(false);
+    }
+  };
+
+  // Action : Créer une nouvelle mission DAG
+  const handleCreateGoalModalSubmit = async (goalPayload) => {
+    const targetWorkspace = agents.length > 0 ? agents[0].workspace_id : DEFAULT_WORKSPACE_ID;
+    const res = await authFetch('/api/v1/goals', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        workspace_id: targetWorkspace,
+        agent_id: goalPayload.agent_id,
+        objective: goalPayload.objective,
+        priority: goalPayload.priority || 1,
+        requested_autonomy_level: goalPayload.requested_autonomy_level ?? 3,
+        initial_tasks: goalPayload.initial_tasks,
+      }),
+    });
+
+    if (res.ok) {
+      const created = await res.json();
+      setSelectedGoalId(created.id);
+      await fetchGoals();
+      await fetchGoalDetails(created.id);
+      await fetchAgents();
+      setIsSplitView(true);
+      addToast(`Mission DAG créée : "${created.objective.slice(0, 42)}..."`, 'success');
+      return created;
+    } else {
+      addToast("Erreur lors de la création de la mission DAG.", 'error');
     }
   };
 
@@ -251,7 +327,6 @@ export default function App() {
       if (res.ok) {
         const newAgent = await res.json();
 
-        // Si une mission est spécifiée, créer un Goal associé
         if (agentData.mission) {
           await authFetch('/api/v1/goals', {
             method: 'POST',
@@ -266,20 +341,22 @@ export default function App() {
           });
         }
 
-        // Déclencher l'effet d'explosion de particules et le laser 3D
         setSpawnEvent({
           agentId: newAgent.id,
           parentId: agentData.parent_agent_id,
           timestamp: Date.now(),
         });
 
-        // Mettre à jour l'état et sélectionner l'agent
         await fetchAgents();
         await fetchGoals();
         setSelectedAgentId(newAgent.id);
+        addToast(`Agent "${newAgent.name}" matérialisé dans l'espace 3D !`, 'success');
+      } else {
+        addToast("Impossible de déployer l'agent (vérifiez votre session).", 'error');
       }
     } catch (err) {
       console.error("Erreur spawn agent:", err);
+      addToast("Erreur lors du déploiement de l'agent.", 'error');
     }
   };
 
@@ -287,6 +364,11 @@ export default function App() {
   const handleOpenSpawnForParent = (parentId) => {
     setSpawnParentId(parentId);
     setIsSpawnModalOpen(true);
+  };
+
+  const handleOpenCreateGoalForAgent = (agId = null) => {
+    setGoalAgentId(agId || selectedAgentId || agents[0]?.id || null);
+    setIsCreateGoalOpen(true);
   };
 
   // Trouver l'agent sélectionné et ses sous-agents
@@ -305,12 +387,14 @@ export default function App() {
       <CockpitHeader
         agentsCount={agents.length}
         goalsCount={goals.length}
+        healthStatus={healthStatus}
         isSplitView={isSplitView}
         onToggleSplitView={() => setIsSplitView(!isSplitView)}
         onOpenSpawnModal={() => {
           setSpawnParentId(null);
           setIsSpawnModalOpen(true);
         }}
+        onOpenCreateGoalModal={() => handleOpenCreateGoalForAgent(selectedAgentId)}
         onWakeGlobal={() => handleWakeGoal(selectedGoalId || goals[0]?.id)}
         onResetCamera={() => setSelectedAgentId(null)}
         isWaking={isWaking}
@@ -323,10 +407,96 @@ export default function App() {
         onToggleTerminal={() => setIsTerminalOpen(!isTerminalOpen)}
         isTimelineOpen={isTimelineOpen}
         onToggleTimeline={() => setIsTimelineOpen(!isTimelineOpen)}
+        isGovernanceOpen={isGovernanceOpen}
+        onToggleGovernance={() => setIsGovernanceOpen(!isGovernanceOpen)}
       />
 
       {/* Zone de rendu 3D & HUD */}
       <main className="viewport-area">
+        {/* Notifications Toast Holographiques */}
+        {toasts.length > 0 && (
+          <div
+            style={{
+              position: 'fixed',
+              top: '76px',
+              right: '24px',
+              zIndex: 9999,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px',
+              pointerEvents: 'none',
+            }}
+          >
+            {toasts.map((t) => {
+              const borderColor =
+                t.type === 'success'
+                  ? '#10B981'
+                  : t.type === 'error'
+                  ? '#F43F5E'
+                  : t.type === 'warning'
+                  ? '#F59E0B'
+                  : 'var(--neon-cyan)';
+              return (
+                <div
+                  key={t.id}
+                  style={{
+                    background: 'rgba(8, 12, 24, 0.92)',
+                    backdropFilter: 'blur(14px)',
+                    border: `1px solid ${borderColor}`,
+                    borderLeft: `4px solid ${borderColor}`,
+                    borderRadius: '8px',
+                    padding: '10px 16px',
+                    color: '#F8FAFC',
+                    fontSize: '0.82rem',
+                    boxShadow: '0 8px 24px rgba(0, 0, 0, 0.45)',
+                    maxWidth: '380px',
+                  }}
+                >
+                  {t.message}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Bannière d'accueil si non authentifié */}
+        {!currentUser && (
+          <div
+            className="glass-panel hud-interactive"
+            style={{
+              position: 'absolute',
+              bottom: '28px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              zIndex: 30,
+              padding: '14px 24px',
+              borderRadius: '12px',
+              border: '1px solid rgba(0, 240, 255, 0.35)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '18px',
+              background: 'rgba(8, 12, 24, 0.88)',
+              boxShadow: '0 0 30px rgba(0, 240, 255, 0.15)',
+            }}
+          >
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', color: '#FFFFFF' }}>
+                Cockpit Spatial Rockib IA — Mode Visiteur
+              </div>
+              <div style={{ fontSize: '0.76rem', color: 'var(--text-muted)' }}>
+                Connectez-vous ou créez un compte opérateur pour déployer vos agents 3D, lancer des missions DAG et auditer l'Arbitrateur déterministe.
+              </div>
+            </div>
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              className="btn-cyber primary"
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              Se Connecter / Créer un Compte
+            </button>
+          </div>
+        )}
+
         {/* Scène 3D WebGL (Three.js) */}
         <ThreeCanvas
           agents={agents}
@@ -350,6 +520,7 @@ export default function App() {
             onClose={() => setSelectedAgentId(null)}
             onWakeGoal={handleWakeGoal}
             onSpawnSubAgent={handleOpenSpawnForParent}
+            onOpenCreateGoal={handleOpenCreateGoalForAgent}
             onSelectAgent={(id) => {
               setSelectedAgentId(id);
               const g = goals.find((x) => x.agent_id === id);
@@ -424,6 +595,24 @@ export default function App() {
         }}
       />
 
+      {/* Centre d'Arbitrage Déterministe & Décisions */}
+      <GovernancePanel
+        isOpen={isGovernanceOpen}
+        onClose={() => setIsGovernanceOpen(false)}
+        agents={agents}
+        workspaceId={agents[0]?.workspace_id || workspaceId}
+        onNotify={addToast}
+      />
+
+      {/* Modal de création d'une nouvelle mission DAG */}
+      <CreateGoalModal
+        isOpen={isCreateGoalOpen}
+        onClose={() => setIsCreateGoalOpen(false)}
+        agents={agents}
+        defaultAgentId={goalAgentId}
+        onCreateGoal={handleCreateGoalModalSubmit}
+      />
+
       {/* Modal de création / matérialisation d'agent */}
       <SpawnAgentModal
         isOpen={isSpawnModalOpen}
@@ -442,8 +631,10 @@ export default function App() {
           fetchAgents();
           fetchGoals();
           fetchTelemetry();
+          addToast(`Bienvenue dans le Cockpit 3D, ${userData.first_name || userData.email} !`, 'success');
         }}
       />
     </div>
   );
 }
+

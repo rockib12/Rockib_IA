@@ -12,6 +12,8 @@ import {
   BarChart3,
   Terminal,
   Clock,
+  Scale,
+  Target,
   Menu,
   X,
 } from 'lucide-react';
@@ -19,9 +21,11 @@ import {
 export default function CockpitHeader({
   agentsCount = 0,
   goalsCount = 0,
+  healthStatus = { status: 'healthy', database: 'up', redis: 'up' },
   isSplitView = false,
   onToggleSplitView,
   onOpenSpawnModal,
+  onOpenCreateGoalModal,
   onWakeGlobal,
   onResetCamera,
   isWaking = false,
@@ -34,8 +38,11 @@ export default function CockpitHeader({
   onToggleTerminal,
   isTimelineOpen = false,
   onToggleTimeline,
+  isGovernanceOpen = false,
+  onToggleGovernance,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const isHealthy = healthStatus?.status === 'healthy';
 
   return (
     <header className="cockpit-header">
@@ -54,10 +61,21 @@ export default function CockpitHeader({
 
       {/* Real-time Status & Metrics */}
       <div className="header-metrics">
-        <div className="metric-pill">
-          <span className="status-dot" />
-          <span>PostgreSQL & Engine :</span>
-          <strong>ONLINE</strong>
+        <div
+          className="metric-pill"
+          title={`PostgreSQL: ${healthStatus?.database || 'up'} | Redis: ${healthStatus?.redis || 'up'}`}
+        >
+          <span
+            className="status-dot"
+            style={{
+              backgroundColor: isHealthy ? 'var(--neon-emerald)' : '#F59E0B',
+              boxShadow: `0 0 8px ${isHealthy ? 'var(--neon-emerald)' : '#F59E0B'}`,
+            }}
+          />
+          <span>DB & Redis :</span>
+          <strong style={{ color: isHealthy ? 'var(--neon-emerald)' : '#F59E0B' }}>
+            {isHealthy ? 'ONLINE' : 'DEGRADED'}
+          </strong>
         </div>
 
         <div className="metric-pill">
@@ -107,6 +125,15 @@ export default function CockpitHeader({
         {/* Panel Toggles Group */}
         <div className="action-group">
           <button
+            onClick={onToggleGovernance}
+            className={`btn-cyber ${isGovernanceOpen ? 'active-panel' : 'secondary'}`}
+            title="Centre d'Arbitrage Déterministe & Décisions"
+          >
+            <Scale size={15} />
+            <span>Arbitrage</span>
+          </button>
+
+          <button
             onClick={onToggleDashboard}
             className={`btn-cyber ${isDashboardOpen ? 'active-panel' : 'secondary'}`}
             title="Tableau de bord temps réel"
@@ -136,6 +163,16 @@ export default function CockpitHeader({
 
         {/* Primary Actions Group */}
         <div className="action-group">
+          <button 
+            onClick={onOpenCreateGoalModal} 
+            className="btn-cyber secondary"
+            style={{ borderColor: 'rgba(0, 240, 255, 0.35)' }}
+            title="Assigner une nouvelle mission DAG à un agent"
+          >
+            <Target size={15} />
+            <span>+ Mission</span>
+          </button>
+
           <button 
             onClick={onOpenSpawnModal} 
             className="btn-cyber accent-purple"
@@ -193,3 +230,4 @@ export default function CockpitHeader({
     </header>
   );
 }
+
