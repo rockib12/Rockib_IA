@@ -27,6 +27,23 @@ logger = logging.getLogger(__name__)
 _SAFE_SITE_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{1,62}$")
 _DATA_FILE = Path(os.environ.get("CONCIERGE_SITES_PATH", "data/concierge_sites.json"))
 
+# Tokens that were once hardcoded / published publicly: never accepted again.
+_REVOKED_TOKENS = frozenset({"rockib-master-key", "martistore-secret-token"})
+
+
+def _get_master_key() -> Optional[str]:
+    """Master key is read ONLY from the environment. No default: disabled if unset."""
+    key = (os.environ.get("ROCKIB_MASTER_CONCIERGE_KEY") or "").strip()
+    if not key or key in _REVOKED_TOKENS or len(key) < 16:
+        return None
+    return key
+
+
+def _token_matches(provided: str, expected: Optional[str]) -> bool:
+    if not provided or not expected:
+        return False
+    return secrets.compare_digest(provided.encode("utf-8"), expected.encode("utf-8"))
+
 
 def normalize_site_key(raw_key: Optional[str]) -> str:
     """Normalizes a site_key or defaults to 'rockib-portfolio'."""
@@ -103,7 +120,7 @@ DEFAULT_SITES: Dict[str, dict] = {
         ),
         "contact_whatsapp": "+229 01 46 42 09 22",
         "contact_email": "rockibdev@gmail.com",
-        "client_token": "rockib-master-key",
+        "client_token": None,
     },
     "martistore": {
         "site_key": "martistore",
@@ -146,7 +163,7 @@ DEFAULT_SITES: Dict[str, dict] = {
         ),
         "contact_whatsapp": "+229 01 46 42 09 22",
         "contact_email": "contact@martistore.shop",
-        "client_token": "martistore-secret-token",
+        "client_token": None,
     },
 }
 
@@ -223,18 +240,22 @@ class SiteConfigService:
         """
         key = normalize_site_key(site_key)
         existing = self._sites.get(key)
-        master_key = os.environ.get("ROCKIB_MASTER_CONCIERGE_KEY", "rockib-master-key")
+        master_key = _get_master_key()
+        provided_token = (payload.client_token or "").strip()
 
         if existing:
-            expected_token = existing.get("client_token") or master_key
-            provided_token = (payload.client_token or "").strip()
-            if provided_token not in (expected_token, master_key):
+            stored_token = existing.get("client_token") or None
+            if stored_token in _REVOKED_TOKENS:
+                stored_token = None
+            if not (_token_matches(provided_token, stored_token) or _token_matches(provided_token, master_key)):
                 raise PermissionError(
                     "Clé d'édition client (client_token) invalide pour ce site_key."
                 )
-            token_to_save = expected_token
+            token_to_save = stored_token or f"tok_{secrets.token_urlsafe(18)}"
         else:
-            token_to_save = (payload.client_token or "").strip() or f"tok_{secrets.token_hex(8)}"
+            if provided_token and (provided_token in _REVOKED_TOKENS or len(provided_token) < 12):
+                raise ValueError("client_token trop faible : 12 caractères minimum.")
+            token_to_save = provided_token or f"tok_{secrets.token_urlsafe(18)}"
 
         record = {
             "site_key": key,

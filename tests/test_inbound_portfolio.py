@@ -127,3 +127,22 @@ async def test_multi_site_concierge_customization_and_knowledge_base():
         sent_messages = mock_provider.generate.call_args[0][0]
         assert "Imagerie IRM" in sent_messages[0]["content"]
 
+
+@pytest.mark.asyncio
+async def test_leaked_master_key_is_rejected():
+    """The formerly public 'rockib-master-key' must never allow editing a site."""
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        payload = {
+            "business_name": "Hijack attempt",
+            "welcome_message": "Site pirate !!!",
+            "voice_greeting": "Site pirate !!!",
+            "assistant_role": "pirate",
+            "knowledge_base": "contenu malveillant injecte",
+            "client_token": "rockib-master-key",
+        }
+        resp = await client.put("/api/v1/inbound/sites/rockib-portfolio/config", json=payload)
+        assert resp.status_code == 403
+        cfg = (await client.get("/api/v1/inbound/sites/rockib-portfolio/config")).json()
+        assert cfg["business_name"] != "Hijack attempt"
+
