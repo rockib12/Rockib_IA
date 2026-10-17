@@ -6,9 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_async_db
 from app.core.security import hash_password, verify_password, create_access_token
-from app.identity.models import User, Workspace, workspace_memberships
+from app.identity.models import User, UserRole, Workspace, workspace_memberships
 from app.identity.schemas import Token, UserCreate, UserLogin, UserRead
-from app.core.dependencies import get_current_user
+from app.core.dependencies import get_current_user, get_user_workspace_ids
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -62,7 +62,7 @@ async def register_user(
     await db.flush()
     await db.refresh(user_record)
 
-    # Création d'un workspace personnel pour l'utilisateur
+    # Création d'un workspace personnel pour l'utilisateur avec rôle admin
     workspace = Workspace(name=user_record.email, slug=user_record.email[:50])
     db.add(workspace)
     await db.flush()
@@ -70,6 +70,7 @@ async def register_user(
         workspace_memberships.insert().values(
             workspace_id=workspace.id,
             user_id=user_record.id,
+            role=UserRole.admin,
         )
     )
     await db.commit()
@@ -105,7 +106,19 @@ async def login_user(
 @router.get("/me", response_model=UserRead)
 async def get_me(
     current_user: User = Depends(get_current_user),
-) -> User:
-    """Retourne l'utilisateur courant."""
-    return current_user
+    db: AsyncSession = Depends(get_async_db),
+) -> UserRead:
+    """Retourne l'utilisateur courant ainsi que son workspace par défaut."""
+    ws_ids = await get_user_workspace_ids(db, current_user)
+    default_ws = sorted(ws_ids, key=str)[0] if ws_ids else None
+    return UserRead(
+        id=current_user.id,
+        email=current_user.email,
+        first_name=current_user.first_name,
+        last_name=current_user.last_name,
+        is_active=current_user.is_active,
+        created_at=current_user.created_at,
+        default_workspace_id=default_ws,
+    )
+
 

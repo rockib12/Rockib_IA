@@ -149,19 +149,20 @@ export default function App() {
   }, [fetchHealth]);
 
   useEffect(() => {
-    const initData = async () => {
+    const initData = async (targetWsId) => {
+      const activeWs = targetWsId || workspaceId || DEFAULT_WORKSPACE_ID;
       const loadedAgents = await fetchAgents();
       await fetchGoals();
       await fetchTelemetry();
 
-      // Si la base est encore vide d'agents, créons un orchestrateur de démarrage
+      // Si la base est encore vide d'agents, créons un orchestrateur de démarrage dans le workspace de l'opérateur
       if (loadedAgents && loadedAgents.length === 0) {
         try {
           const createRes = await authFetch('/api/v1/agents', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              workspace_id: DEFAULT_WORKSPACE_ID,
+              workspace_id: activeWs,
               name: "Orchestrateur Suprême Rockib",
               role: "Master Orchestrator",
               default_autonomy_level: 3,
@@ -173,7 +174,7 @@ export default function App() {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                workspace_id: DEFAULT_WORKSPACE_ID,
+                workspace_id: activeWs,
                 agent_id: newAgent.id,
                 objective: "Contrôle d'intégrité globale et cartographie du réseau d'agents",
                 requested_autonomy_level: 3,
@@ -200,7 +201,10 @@ export default function App() {
         .then((userData) => {
           if (userData) {
             setCurrentUser(userData);
-            initData();
+            if (userData.default_workspace_id) {
+              setWorkspaceId(userData.default_workspace_id);
+            }
+            initData(userData.default_workspace_id);
           }
         })
         .catch(() => {});
@@ -215,7 +219,7 @@ export default function App() {
 
       return () => clearInterval(interval);
     }
-  }, [currentUser]);
+  }, [currentUser?.id]);
 
   // Raccourcis clavier (Ctrl+` pour Terminal, Ctrl+G pour Gouvernance)
   useEffect(() => {
@@ -280,7 +284,7 @@ export default function App() {
 
   // Action : Créer une nouvelle mission DAG
   const handleCreateGoalModalSubmit = async (goalPayload) => {
-    const targetWorkspace = agents.length > 0 ? agents[0].workspace_id : DEFAULT_WORKSPACE_ID;
+    const targetWorkspace = agents.length > 0 ? agents[0].workspace_id : (workspaceId || DEFAULT_WORKSPACE_ID);
     const res = await authFetch('/api/v1/goals', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -311,7 +315,7 @@ export default function App() {
   // Action : Matérialiser / Spawner un agent dans la matrice 3D
   const handleSpawnAgent = async (agentData) => {
     try {
-      const targetWorkspace = agents.length > 0 ? agents[0].workspace_id : DEFAULT_WORKSPACE_ID;
+      const targetWorkspace = agents.length > 0 ? agents[0].workspace_id : (workspaceId || DEFAULT_WORKSPACE_ID);
       const res = await authFetch('/api/v1/agents', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -575,7 +579,7 @@ export default function App() {
           if (g) setSelectedGoalId(g.id);
         }}
         onCreateGoal={async (agentId, objective) => {
-           const targetWorkspace = agents.length > 0 ? agents[0].workspace_id : DEFAULT_WORKSPACE_ID;
+           const targetWorkspace = agents.length > 0 ? agents[0].workspace_id : (workspaceId || DEFAULT_WORKSPACE_ID);
            const res = await authFetch('/api/v1/goals', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -627,6 +631,9 @@ export default function App() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onLoginSuccess={(userData) => {
+          if (userData?.default_workspace_id) {
+            setWorkspaceId(userData.default_workspace_id);
+          }
           setCurrentUser(userData);
           fetchAgents();
           fetchGoals();
@@ -637,4 +644,5 @@ export default function App() {
     </div>
   );
 }
+
 

@@ -35,6 +35,7 @@ class UserRead(UserBase):
     id: uuid.UUID
     is_active: bool
     created_at: datetime
+    default_workspace_id: Optional[uuid.UUID] = None
 
     model_config = ConfigDict(from_attributes=True)
 
