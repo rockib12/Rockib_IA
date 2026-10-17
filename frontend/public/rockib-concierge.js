@@ -19,7 +19,24 @@
       : 'https://dion-beaverlike-preceptively.ngrok-free.dev'
   );
 
-  const STORAGE_KEY = 'rq_concierge_conv_id';
+  function detectInitialSiteKey() {
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('concierge_site')) return urlParams.get('concierge_site').trim();
+    } catch (e) {}
+    if (window.ROCKIB_SITE_KEY) return String(window.ROCKIB_SITE_KEY).trim();
+    const scriptTag = document.currentScript || document.querySelector('script[data-site-key]') || document.querySelector('script[src*="rockib-concierge"]');
+    if (scriptTag && scriptTag.getAttribute('data-site-key')) {
+      return scriptTag.getAttribute('data-site-key').trim();
+    }
+    return 'rockib-portfolio';
+  }
+
+  let currentSiteKey = detectInitialSiteKey();
+  let sitePrimaryRgb = '0, 240, 255';
+  let currentSiteConfig = null;
+
+  const STORAGE_KEY = 'rq_concierge_conv_id_' + currentSiteKey;
   let conversationId = sessionStorage.getItem(STORAGE_KEY) || null;
   let isOpen = false;
   let activeTab = 'chat'; // 'chat' | 'voice' | 'callback'
@@ -32,6 +49,10 @@
 
   // 1. Scoped CSS
   const styles = `
+    :root {
+      --rq-accent: #00F0FF;
+      --rq-accent-rgb: 0, 240, 255;
+    }
     .rq-launcher {
       position: fixed;
       bottom: 24px;
@@ -41,16 +62,20 @@
       align-items: center;
       gap: 10px;
       background: #05070B;
-      border: 1px solid #00F0FF;
+      border: 1px solid var(--rq-accent);
       color: #EDF5FF;
       padding: 10px 18px;
       border-radius: 9999px;
       cursor: pointer;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 16px rgba(0, 240, 255, 0.35);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.8), 0 0 16px rgba(var(--rq-accent-rgb), 0.35);
       font-family: 'Plex Mono', monospace;
       font-size: 13px;
       font-weight: 600;
       transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .rq-launcher.rq-pos-left {
+      right: auto;
+      left: 24px;
     }
     .rq-launcher:hover {
       transform: translateY(-2px);
@@ -78,12 +103,12 @@
       height: 560px;
       max-height: calc(100vh - 120px);
       background: #060912;
-      border: 1px solid rgba(0, 240, 255, 0.28);
+      border: 1px solid rgba(var(--rq-accent-rgb), 0.32);
       border-radius: 14px;
       display: flex;
       flex-direction: column;
       z-index: 999999;
-      box-shadow: 0 16px 45px rgba(0, 0, 0, 0.9), 0 0 30px rgba(0, 240, 255, 0.18);
+      box-shadow: 0 16px 45px rgba(0, 0, 0, 0.9), 0 0 30px rgba(var(--rq-accent-rgb), 0.18);
       font-family: 'Plex Mono', monospace;
       color: #EDF5FF;
       overflow: hidden;
@@ -91,6 +116,10 @@
       opacity: 0;
       pointer-events: none;
       transform: translateY(12px) scale(0.98);
+    }
+    .rq-window.rq-pos-left {
+      right: auto;
+      left: 24px;
     }
     .rq-window.rq-open {
       opacity: 1;
@@ -100,7 +129,7 @@
     .rq-header {
       padding: 12px 16px;
       background: #0A101C;
-      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+      border-bottom: 1px solid rgba(var(--rq-accent-rgb), 0.15);
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -108,11 +137,11 @@
     .rq-title {
       font-size: 13px;
       font-weight: 700;
-      color: #00F0FF;
+      color: var(--rq-accent);
       display: flex;
       align-items: center;
       gap: 6px;
-      text-shadow: 0 0 10px rgba(0, 240, 255, 0.4);
+      text-shadow: 0 0 10px rgba(var(--rq-accent-rgb), 0.4);
     }
     .rq-subtitle {
       font-size: 10px;
@@ -130,12 +159,12 @@
       transition: color 0.2s;
     }
     .rq-close:hover {
-      color: #00F0FF;
+      color: var(--rq-accent);
     }
     .rq-tabs {
       display: flex;
       background: #070B14;
-      border-bottom: 1px solid rgba(0, 240, 255, 0.15);
+      border-bottom: 1px solid rgba(var(--rq-accent-rgb), 0.15);
     }
     .rq-tab-btn {
       flex: 1;
@@ -155,10 +184,10 @@
       transition: all 0.2s;
     }
     .rq-tab-btn.rq-active {
-      color: #00F0FF;
-      border-bottom-color: #00F0FF;
+      color: var(--rq-accent);
+      border-bottom-color: var(--rq-accent);
       background: #0A101C;
-      text-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+      text-shadow: 0 0 8px rgba(var(--rq-accent-rgb), 0.4);
     }
     .rq-tab-btn:hover {
       color: #EDF5FF;
@@ -193,16 +222,16 @@
     .rq-msg-assistant {
       align-self: flex-start;
       background: #0A101E;
-      border: 1px solid rgba(0, 240, 255, 0.15);
+      border: 1px solid rgba(var(--rq-accent-rgb), 0.18);
       color: #EDF5FF;
-      border-left: 2px solid #00F0FF;
+      border-left: 2px solid var(--rq-accent);
     }
     .rq-msg-user {
       align-self: flex-end;
-      background: linear-gradient(135deg, #00F0FF 0%, #00FF9D 100%);
+      background: linear-gradient(135deg, var(--rq-accent) 0%, #00FF9D 100%);
       color: #03070E;
       font-weight: 700;
-      box-shadow: 0 0 14px rgba(0, 240, 255, 0.35);
+      box-shadow: 0 0 14px rgba(var(--rq-accent-rgb), 0.35);
     }
     .rq-suggestions {
       display: flex;
@@ -212,7 +241,7 @@
     }
     .rq-chip {
       background: #080D1A;
-      border: 1px solid rgba(0, 240, 255, 0.15);
+      border: 1px solid rgba(var(--rq-accent-rgb), 0.18);
       color: #94A3B8;
       font-size: 11px;
       padding: 7px 10px;
@@ -223,22 +252,22 @@
       transition: all 0.2s;
     }
     .rq-chip:hover {
-      background: rgba(0, 240, 255, 0.08);
-      border-color: #00F0FF;
-      color: #00F0FF;
-      box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+      background: rgba(var(--rq-accent-rgb), 0.1);
+      border-color: var(--rq-accent);
+      color: var(--rq-accent);
+      box-shadow: 0 0 10px rgba(var(--rq-accent-rgb), 0.2);
     }
     .rq-input-area {
       padding: 12px;
       background: #0A101C;
-      border-top: 1px solid rgba(0, 240, 255, 0.15);
+      border-top: 1px solid rgba(var(--rq-accent-rgb), 0.15);
       display: flex;
       gap: 8px;
     }
     .rq-input {
       flex: 1;
       background: #05070B;
-      border: 1px solid rgba(0, 240, 255, 0.2);
+      border: 1px solid rgba(var(--rq-accent-rgb), 0.22);
       border-radius: 6px;
       color: #EDF5FF;
       font-family: inherit;
@@ -248,11 +277,11 @@
       transition: border-color 0.2s, box-shadow 0.2s;
     }
     .rq-input:focus {
-      border-color: #00F0FF;
-      box-shadow: 0 0 10px rgba(0, 240, 255, 0.25);
+      border-color: var(--rq-accent);
+      box-shadow: 0 0 10px rgba(var(--rq-accent-rgb), 0.25);
     }
     .rq-send {
-      background: linear-gradient(135deg, #00F0FF 0%, #00FF9D 100%);
+      background: linear-gradient(135deg, var(--rq-accent) 0%, #00FF9D 100%);
       border: none;
       color: #03070E;
       font-weight: 700;
@@ -261,11 +290,11 @@
       cursor: pointer;
       font-size: 13px;
       transition: all 0.2s;
-      box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+      box-shadow: 0 0 12px rgba(var(--rq-accent-rgb), 0.3);
     }
     .rq-send:hover {
       transform: translateY(-1px);
-      box-shadow: 0 0 18px rgba(0, 240, 255, 0.5);
+      box-shadow: 0 0 18px rgba(var(--rq-accent-rgb), 0.5);
     }
     .rq-loading {
       align-self: flex-start;
@@ -664,6 +693,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
           message: userMsg,
           conversation_id: conversationId,
           page_url: window.location.href,
+          site_key: currentSiteKey,
         }),
       });
 
@@ -787,17 +817,17 @@ Quelle est votre activité ou votre idée de projet ?</div>
       orbLevel = orbLevel * 0.78 + rawEnergy * 0.22;
       phase += 0.045 + orbLevel * 0.09;
 
-      // Color palette by state (ChatGPT Voice style)
-      let c1 = '0, 240, 255';   // Cyan
+      // Color palette by state (ChatGPT Voice style, using client's primary color)
+      let c1 = sitePrimaryRgb;  // Client Accent (default Cyan)
       let c2 = '99, 102, 241';  // Indigo
       if (orbState === 'user_speaking') {
         c1 = '0, 255, 157';     // Emerald
-        c2 = '0, 240, 255';
+        c2 = sitePrimaryRgb;
       } else if (orbState === 'thinking') {
         c1 = '168, 85, 247';    // Violet
-        c2 = '0, 240, 255';
+        c2 = sitePrimaryRgb;
       } else if (orbState === 'ai_speaking') {
-        c1 = '56, 189, 248';    // Sky Blue (ChatGPT Voice signature)
+        c1 = sitePrimaryRgb;
         c2 = '237, 245, 255';   // Luminous White-Cyan
       }
 
@@ -1136,7 +1166,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
       const resp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
-        body: JSON.stringify({ page_url: window.location.href }),
+        body: JSON.stringify({ page_url: window.location.href, site_key: currentSiteKey }),
       });
       const data = await resp.json();
       voiceSessionId = data.session_id;
@@ -1371,7 +1401,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
         const sResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/session`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
-          body: JSON.stringify({ page_url: window.location.href }),
+          body: JSON.stringify({ page_url: window.location.href, site_key: currentSiteKey }),
         });
         const sData = await sResp.json();
         voiceSessionId = sData.session_id;
@@ -1383,6 +1413,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
         body: JSON.stringify({
           session_id: voiceSessionId,
           user_speech_transcript: userText.trim(),
+          site_key: currentSiteKey,
         }),
       });
 
@@ -1421,19 +1452,22 @@ Quelle est votre activité ou votre idée de projet ?</div>
     });
   }
 
-  chatWindow.querySelectorAll('.rq-voice-topic-chip').forEach((chip) => {
-    chip.addEventListener('click', async () => {
-      const prompt = chip.getAttribute('data-prompt');
-      if (!prompt) return;
-      if (isSpeaking) interruptAiSpeaking();
-      if (!isCalling) {
-        isCalling = true;
-        btnToggleCall.classList.add('rq-btn-hangup');
-        btnToggleCall.innerHTML = '<span>✕ Terminer</span>';
-      }
-      await processVoiceTurn(prompt);
+  function bindVoiceTopicChips() {
+    chatWindow.querySelectorAll('.rq-voice-topic-chip').forEach((chip) => {
+      chip.onclick = async () => {
+        const prompt = chip.getAttribute('data-prompt');
+        if (!prompt) return;
+        if (isSpeaking) interruptAiSpeaking();
+        if (!isCalling) {
+          isCalling = true;
+          btnToggleCall.classList.add('rq-btn-hangup');
+          btnToggleCall.innerHTML = '<span>✕ Terminer</span>';
+        }
+        await processVoiceTurn(prompt);
+      };
     });
-  });
+  }
+  bindVoiceTopicChips();
 
   if (btnMute) {
     btnMute.addEventListener('click', () => {
@@ -1504,10 +1538,10 @@ Quelle est votre activité ou votre idée de projet ?</div>
   if (btnTestVoice) {
     btnTestVoice.addEventListener('click', () => {
       const profile = (voiceProfileSelect && voiceProfileSelect.value) || 'henri';
+      const bizName = (currentSiteConfig && currentSiteConfig.business_name) || 'Rockib Quenum';
       const sampleText =
-        profile === 'vivienne' || profile === 'denise'
-          ? "Bonjour ! Je suis le concierge vocal temps réel de Rockib Quenum. Parlez-moi librement, comme avec ChatGPT."
-          : "Bonjour ! Je suis le concierge vocal temps réel de Rockib Quenum. Parlez-moi librement, je vous écoute.";
+        (currentSiteConfig && currentSiteConfig.voice_greeting) ||
+        `Bonjour ! Je suis le concierge vocal temps réel de ${bizName}. Parlez-moi librement, je vous écoute.`;
       setVoiceTranscript('Concierge (Aperçu HD)', sampleText);
       speakReply(sampleText, () => {
         if (!isCalling) setOrbUiState('idle', 'Prêt à discuter', 'Touchez la sphère pour démarrer');
@@ -1541,6 +1575,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
           topic: cbTopic.value.trim() || undefined,
           channel: channel,
           preferred_time: 'immediate',
+          site_key: currentSiteKey,
         }),
       });
 
@@ -1555,5 +1590,131 @@ Quelle est votre activité ou votre idée de projet ?</div>
       submitBtn.innerHTML = '<span>📲 Me faire appeler</span>';
     }
   });
+
+  // --- Multi-Tenant Site Configuration & Branding Loader ---
+  function hexToRgbString(hex) {
+    if (!hex || typeof hex !== 'string') return '0, 240, 255';
+    let h = hex.replace('#', '').trim();
+    if (h.length === 3) {
+      h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+    }
+    if (h.length !== 6) return '0, 240, 255';
+    const r = parseInt(h.substring(0, 2), 16);
+    const g = parseInt(h.substring(2, 4), 16);
+    const b = parseInt(h.substring(4, 6), 16);
+    if (isNaN(r) || isNaN(g) || isNaN(b)) return '0, 240, 255';
+    return `${r}, ${g}, ${b}`;
+  }
+
+  function applySiteConfig(cfg, resetConversation) {
+    if (!cfg) return;
+    currentSiteConfig = cfg;
+    if (cfg.site_key) {
+      currentSiteKey = cfg.site_key;
+    }
+
+    // 1. Primary Color & CSS Custom Properties
+    const primaryColor = cfg.primary_color || '#00F0FF';
+    sitePrimaryRgb = hexToRgbString(primaryColor);
+    document.documentElement.style.setProperty('--rq-accent', primaryColor);
+    document.documentElement.style.setProperty('--rq-accent-rgb', sitePrimaryRgb);
+
+    // 2. Position (left / right)
+    if (cfg.position === 'left') {
+      launcher.classList.add('rq-pos-left');
+      chatWindow.classList.add('rq-pos-left');
+    } else {
+      launcher.classList.remove('rq-pos-left');
+      chatWindow.classList.remove('rq-pos-left');
+    }
+
+    // 3. Header Title, Subtitle & Launcher Label
+    const titleEl = chatWindow.querySelector('.rq-title');
+    const subEl = chatWindow.querySelector('.rq-subtitle');
+    const launcherSpan = launcher.querySelector('span');
+    if (titleEl && cfg.business_name) titleEl.textContent = cfg.business_name;
+    if (subEl && cfg.subtitle) subEl.textContent = cfg.subtitle;
+    if (launcherSpan && cfg.launcher_label) launcherSpan.textContent = cfg.launcher_label;
+
+    // 4. Default Voice Profile
+    if (voiceProfileSelect && cfg.default_voice) {
+      voiceProfileSelect.value = cfg.default_voice;
+    }
+
+    // 5. Welcome Message & Quick Chips
+    if (resetConversation) {
+      conversationId = null;
+      voiceSessionId = null;
+      messagesContainer.innerHTML = '';
+      const welcomeEl = document.createElement('div');
+      welcomeEl.className = 'rq-msg rq-msg-assistant';
+      welcomeEl.textContent = cfg.welcome_message || 'Bonjour ! Comment puis-je vous aider ?';
+      messagesContainer.appendChild(welcomeEl);
+      messagesContainer.appendChild(suggestionsContainer);
+      suggestionsContainer.style.display = 'flex';
+    } else {
+      const firstAssistantMsg = messagesContainer.querySelector('.rq-msg-assistant');
+      if (firstAssistantMsg && cfg.welcome_message && messagesContainer.querySelectorAll('.rq-msg').length === 1) {
+        firstAssistantMsg.textContent = cfg.welcome_message;
+      }
+    }
+
+    if (Array.isArray(cfg.quick_chips) && cfg.quick_chips.length > 0 && suggestionsContainer) {
+      suggestionsContainer.innerHTML = cfg.quick_chips
+        .map((chipText) => {
+          const clean = String(chipText).replace(/"/g, '&quot;');
+          return `<button class="rq-chip" data-query="${clean}">${clean}</button>`;
+        })
+        .join('');
+    }
+
+    // 6. Voice Topic Chips
+    const voiceTopicsWrap = chatWindow.querySelector('#rq-panel-voice .rq-voice-topic-chip')?.parentElement;
+    if (voiceTopicsWrap && Array.isArray(cfg.voice_topic_chips) && cfg.voice_topic_chips.length > 0) {
+      voiceTopicsWrap.innerHTML = cfg.voice_topic_chips
+        .map((vc) => {
+          const lbl = String(vc.label || '').replace(/"/g, '&quot;');
+          const prm = String(vc.prompt || vc.label || '').replace(/"/g, '&quot;');
+          return `<button type="button" class="rq-voice-topic-chip" data-prompt="${prm}" style="background:rgba(${sitePrimaryRgb},0.1); border:1px solid rgba(${sitePrimaryRgb},0.35); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">${lbl}</button>`;
+        })
+        .join('');
+      bindVoiceTopicChips();
+    }
+  }
+
+  async function loadSiteConfig(siteKeyToLoad, resetConv) {
+    const targetKey = (siteKeyToLoad || currentSiteKey || 'rockib-portfolio').trim();
+    currentSiteKey = targetKey;
+    try {
+      const resp = await fetch(`${API_BASE}/api/v1/inbound/sites/${encodeURIComponent(targetKey)}/config`, {
+        headers: { 'ngrok-skip-browser-warning': 'true' },
+      });
+      if (resp.ok) {
+        const cfg = await resp.json();
+        applySiteConfig(cfg, Boolean(resetConv));
+        return cfg;
+      }
+    } catch (e) {}
+    return null;
+  }
+
+  // Auto-load site config on startup if custom site or always sync
+  loadSiteConfig(currentSiteKey, false);
+
+  // Expose public API for live studio customization & external triggers
+  window.RockibConcierge = {
+    reloadSite: (newSiteKey) => loadSiteConfig(newSiteKey, true),
+    applyConfig: (cfgObject) => applySiteConfig(cfgObject, true),
+    open: (tab) => {
+      toggleChat(true);
+      if (tab && panels[tab]) {
+        const btn = chatWindow.querySelector(`.rq-tab-btn[data-tab="${tab}"]`);
+        if (btn) btn.click();
+      }
+    },
+    close: () => toggleChat(false),
+    getSiteKey: () => currentSiteKey,
+    getApiBase: () => API_BASE,
+  };
 
 })();

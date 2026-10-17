@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Rockib Concierge Studio — Personnalisation & Base de Connaissances Multi-Sites</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #050811;
+      --surface: #0B1120;
+      --surface-2: #111A2E;
+      --border: rgba(0, 240, 255, 0.18);
+      --cyan: #00F0FF;
+      --emerald: #00FF9D;
+      --violet: #A855F7;
+      --amber: #F59E0B;
+      --text: #F1F5F9;
+      --muted: #94A3B8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: radial-gradient(circle at 15% 10%, rgba(0, 240, 255, 0.08), transparent 40%),
+                  radial-gradient(circle at 85% 80%, rgba(0, 255, 157, 0.06), transparent 40%),
+                  var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+      padding-bottom: 100px;
+    }
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(5, 8, 17, 0.88);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 14px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-family: 'Space Grotesk', sans-serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--text);
+      text-decoration: none;
+    }
+    .brand-badge {
+      background: linear-gradient(135deg, var(--cyan), var(--emerald));
+      color: #030712;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 9px;
+      border-radius: 999px;
+    }
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .btn {
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      padding: 9px 16px;
+      border-radius: 8px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      color: var(--text);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn:hover {
+      border-color: var(--cyan);
+      color: var(--cyan);
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--cyan) 0%, var(--emerald) 100%);
+      color: #030712;
+      border: none;
+      font-weight: 700;
+      box-shadow: 0 0 20px rgba(0, 240, 255, 0.3);
+    }
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      color: #030712;
+      box-shadow: 0 0 28px rgba(0, 255, 157, 0.5);
+    }
+    .container {
+      max-width: 1260px;
+      margin: 32px auto;
+      padding: 0 24px;
+    }
+    .hero-banner {
+      background: linear-gradient(135deg, rgba(11, 17, 32, 0.95), rgba(17, 26, 46, 0.9));
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      margin-bottom: 28px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+    }
+    .hero-banner h1 {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 26px;
+      margin-bottom: 6px;
+    }
+    .hero-banner p {
+      color: var(--muted);
+      font-size: 14px;
+      max-width: 720px;
+    }
+    .site-selector-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 16px 20px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1.15fr 0.85fr;
+      gap: 24px;
+    }
+    @media (max-width: 960px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 22px;
+      margin-bottom: 22px;
+    }
+    .card-title {
+      font-family: 'Space Grotesk', sans-serif;
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--cyan);
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .card-sub {
+      font-size: 12.5px;
+      color: var(--muted);
+      margin-bottom: 18px;
+    }
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin-bottom: 14px;
+    }
+    @media (max-width: 640px) {
+      .form-row { grid-template-columns: 1fr; }
+    }
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 14px;
+    }
+    label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #CBD5E1;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    input[type="text"], input[type="password"], select, textarea {
+      width: 100%;
+      background: #060A14;
+      border: 1px solid rgba(148, 163, 184, 0.25);
+      border-radius: 8px;
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      padding: 10px 12px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    textarea {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      resize: vertical;
+    }
+    input:focus, select:focus, textarea:focus {
+      border-color: var(--cyan);
+      box-shadow: 0 0 12px rgba(0, 240, 255, 0.2);
+    }
+    .color-picker-wrap {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .color-swatch {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid rgba(255,255,255,0.25);
+      transition: transform 0.15s;
+    }
+    .color-swatch:hover { transform: scale(1.15); }
+    .template-pills {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 12px;
+    }
+    .template-pill {
+      font-size: 11.5px;
+      padding: 6px 11px;
+      border-radius: 999px;
+      background: rgba(0, 240, 255, 0.08);
+      border: 1px solid rgba(0, 240, 255, 0.28);
+      color: var(--text);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .template-pill:hover {
+      background: rgba(0, 240, 255, 0.2);
+      border-color: var(--cyan);
+    }
+    .code-box {
+      background: #03060C;
+      border: 1px solid rgba(0, 255, 157, 0.3);
+      border-radius: 10px;
+      padding: 14px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--emerald);
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .status-toast {
+      padding: 12px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 16px;
+      display: none;
+    }
+    .status-ok {
+      display: block;
+      background: rgba(0, 255, 157, 0.12);
+      border: 1px solid rgba(0, 255, 157, 0.45);
+      color: var(--emerald);
+    }
+    .status-err {
+      display: block;
+      background: rgba(239, 68, 68, 0.14);
+      border: 1px solid rgba(239, 68, 68, 0.45);
+      color: #FCA5A5;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="topbar">
+    <a href="index.html" class="brand">
+      <span>⚡ Rockib Concierge Studio</span>
+      <span class="brand-badge">Multi-Sites SaaS</span>
+    </a>
+    <div class="topbar-actions">
+      <a href="index.html" class="btn">← Retour au Portfolio</a>
+      <button type="button" class="btn" id="btn-open-voice-preview">🎙️ Tester l'Appel Vocal en Direct</button>
+      <button type="button" class="btn btn-primary" id="btn-save-top">💾 Enregistrer & Publier</button>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero-banner">
+      <div>
+        <h1>Personnalisez le Concierge IA & sa Base de Connaissances par Site</h1>
+        <p>
+          Chaque client dispose de son propre identifiant (<code>site_key</code>), de son design sur mesure (couleurs, nom, voix HD) et de sa propre <strong>Base de Connaissances</strong> (catalogue, tarifs, FAQ, horaires). Testez les modifications en direct sur cette page puis copiez la balise <code>&lt;script&gt;</code> unique du client.
+        </p>
+      </div>
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button type="button" class="btn" id="btn-new-client">➕ Créer un Nouveau Site Client</button>
+      </div>
+    </section>
+
+    <!-- Site Selector Bar -->
+    <div class="site-selector-bar">
+      <span style="font-size:13px; font-weight:600; color:var(--cyan);">🌐 Site Client actif :</span>
+      <select id="select-existing-site" style="max-width:260px;">
+        <option value="rockib-portfolio">rockib-portfolio (Portfolio Rockib)</option>
+        <option value="martistore">martistore (Boutique MARTISTORE)</option>
+      </select>
+      <span style="font-size:12px; color:var(--muted);">ou saisir un ID de site (<code>site_key</code>) :</span>
+      <input type="text" id="input-site-key" value="rockib-portfolio" placeholder="ex: clinique-espoir, hotel-benin..." style="max-width:220px; font-family:'JetBrains Mono',monospace;" />
+      <button type="button" class="btn" id="btn-load-site">🔄 Charger ce site</button>
+    </div>
+
+    <div id="status-banner" class="status-toast"></div>
+
+    <form id="studio-form" class="grid">
+      <!-- Left Column: Knowledge Base & AI Behavior -->
+      <div>
+        <div class="card">
+          <div class="card-title">
+            <span>🧠 1. Base de Connaissances Dédiée au Site</span>
+            <span style="font-size:11px; color:var(--emerald); font-family:'JetBrains Mono',monospace;">Injectée en temps réel (Chat + Vocal)</span>
+          </div>
+          <p class="card-sub">
+            Inscrivez ici toutes les connaissances propres à ce site : produits, services, horaires, adresse, livraison, FAQ ou arguments commerciaux. Vous pouvez aussi charger un modèle sectoriel en 1 clic :
+          </p>
+
+          <div class="template-pills">
+            <button type="button" class="template-pill" data-tpl="ecommerce">🛍️ Modèle Boutique / E-Commerce</button>
+            <button type="button" class="template-pill" data-tpl="clinique">🏥 Modèle Clinique / Cabinet Médical</button>
+            <button type="button" class="template-pill" data-tpl="immobilier">🏢 Modèle Agence Immobilière</button>
+            <button type="button" class="template-pill" data-tpl="restaurant">🍽️ Modèle Restaurant / Hôtel</button>
+          </div>
+
+          <div class="form-group">
+            <label for="field-assistant-role">Rôle & Personnalité de l'Assistant IA</label>
+            <input type="text" id="field-assistant-role" placeholder="ex: Conseiller Commercial & Assistant Vocal de la boutique..." required />
+          </div>
+
+          <div class="form-group">
+            <label for="field-knowledge-base">
+              <span>Base de Connaissances Complète du Client (Produits, Services, FAQ, Infos)</span>
+              <span id="kb-char-count" style="font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--cyan);">0 caractères</span>
+            </label>
+            <textarea id="field-knowledge-base" rows="13" placeholder="Décrivez ici les produits, services, horaires, questions fréquentes..." required></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="field-pricing-rule">Règle sur les Prix, Devis et Redirection Humaine</label>
+            <textarea id="field-pricing-rule" rows="3" placeholder="Comment l'IA doit-elle gérer les questions de prix ou de commande ?"></textarea>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>💬 2. Messages d'Accueil & Suggestions Rapides</span>
+          </div>
+          <p class="card-sub">Personnalisez la première phrase écrite, la phrase d'accueil vocale et les boutons de suggestion.</p>
+
+          <div class="form-group">
+            <label for="field-welcome-message">Message d'accueil écrit (Onglet Chat)</label>
+            <textarea id="field-welcome-message" rows="4"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="field-voice-greeting">Phrase d'accueil parlée (Onglet Appel Vocal Live)</label>
+            <textarea id="field-voice-greeting" rows="3"></textarea>
+          </div>
+
+          <div class="form-group">
+            <label for="field-quick-chips">Suggestions rapides du Chat (1 suggestion par ligne)</label>
+            <textarea id="field-quick-chips" rows="4" placeholder="💡 Quels sont vos services ?&#10;📦 Comment passer commande ?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right Column: Visual Branding, Security Token & Embed Code -->
+      <div>
+        <div class="card">
+          <div class="card-title">
+            <span>🎨 3. Identité Visuelle, Couleur & Voix du Client</span>
+          </div>
+          <p class="card-sub">Toute modification ici met immédiatement à jour le widget en bas de votre écran.</p>
+
+          <div class="form-group">
+            <label for="field-business-name">Titre de l'En-tête du Widget</label>
+            <input type="text" id="field-business-name" placeholder="ex: MARTISTORE · Conseiller & Vendeur IA" required />
+          </div>
+
+          <div class="form-group">
+            <label for="field-subtitle">Sous-titre sous le nom</label>
+            <input type="text" id="field-subtitle" placeholder="ex: Catalogue · Commandes WhatsApp · Vocal 24h/24" />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="field-launcher-label">Texte du Bouton Flottant</label>
+              <input type="text" id="field-launcher-label" placeholder="ex: 📞 Concierge & Appel IA" />
+            </div>
+            <div class="form-group">
+              <label for="field-position">Position sur le site</label>
+              <select id="field-position">
+                <option value="right">En bas à droite (Standard)</option>
+                <option value="left">En bas à gauche</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="field-primary-color">Couleur Principale (Néons & Sphère 3D)</label>
+              <div class="color-picker-wrap">
+                <input type="color" id="field-color-picker" value="#00F0FF" style="width:42px; height:38px; border:none; background:none; cursor:pointer;" />
+                <input type="text" id="field-primary-color" value="#00F0FF" style="max-width:110px; font-family:'JetBrains Mono',monospace;" />
+                <span class="color-swatch" data-color="#00F0FF" style="background:#00F0FF;" title="Cyan Rockib"></span>
+                <span class="color-swatch" data-color="#00FF9D" style="background:#00FF9D;" title="Émeraude"></span>
+                <span class="color-swatch" data-color="#F59E0B" style="background:#F59E0B;" title="Or / Ambre"></span>
+                <span class="color-swatch" data-color="#A855F7" style="background:#A855F7;" title="Violet"></span>
+                <span class="color-swatch" data-color="#EC4899" style="background:#EC4899;" title="Rose"></span>
+                <span class="color-swatch" data-color="#3B82F6" style="background:#3B82F6;" title="Bleu Royal"></span>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="field-default-voice">Voix Neural HD par défaut</label>
+              <select id="field-default-voice">
+                <option value="henri">🎙️ Henri HD (Masculine Pro)</option>
+                <option value="vivienne">🎙️ Vivienne HD (Féminine Multilingue)</option>
+                <option value="denise">🎙️ Denise HD (Féminine Chaleureuse)</option>
+                <option value="remy">🎙️ Rémy HD (Masculine Dynamique)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="field-whatsapp">Numéro WhatsApp du Client</label>
+              <input type="text" id="field-whatsapp" placeholder="ex: +229 01 97 00 00 00" />
+            </div>
+            <div class="form-group">
+              <label for="field-email">Email de Contact / Leads</label>
+              <input type="text" id="field-email" placeholder="ex: contact@client.com" />
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>🔐 4. Clé d'Édition Client & Sauvegarde</span>
+          </div>
+          <p class="card-sub">
+            Chaque client peut avoir son propre code secret (<code>client_token</code>) pour modifier sa base de connaissances sans toucher aux autres sites.
+          </p>
+          <div class="form-group">
+            <label for="field-client-token">Clé d'édition du site (ou clé maître Rockib)</label>
+            <input type="password" id="field-client-token" value="rockib-master-key" placeholder="Clé secrète du client" />
+          </div>
+          <div style="display:flex; gap:10px; flex-wrap:wrap;">
+            <button type="submit" class="btn btn-primary" style="flex:1; justify-content:center;">
+              💾 Enregistrer & Publier sur le Serveur IA
+            </button>
+            <button type="button" class="btn" id="btn-live-preview">
+              👁️ Simuler en Direct
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">
+            <span>🚀 5. Code d'Intégration à Copier sur le Site du Client</span>
+          </div>
+          <p class="card-sub">
+            Collez cette unique ligne avant <code>&lt;/body&gt;</code> sur le site WordPress, Shopify, React ou HTML du client :
+          </p>
+          <div class="code-box" id="embed-code-box"></div>
+          <div style="display:flex; gap:10px; margin-top:12px;">
+            <button type="button" class="btn" id="btn-copy-embed" style="width:100%; justify-content:center;">
+              📋 Copier le Code d'Intégration Client
+            </button>
+          </div>
+        </div>
+      </div>
+    </form>
+  </main>
+
+  <!-- Inject the live customizable widget right on the Studio page -->
+  <script src="rockib-concierge.js" defer></script>
+
+  <script>
+    (function () {
+      const API_BASE = window.ROCKIB_API_URL || (
+        window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+          ? window.location.origin
+          : 'https://dion-beaverlike-preceptively.ngrok-free.dev'
+      );
+
+      const selectExisting = document.getElementById('select-existing-site');
+      const inputSiteKey = document.getElementById('input-site-key');
+      const btnLoadSite = document.getElementById('btn-load-site');
+      const btnNewClient = document.getElementById('btn-new-client');
+      const statusBanner = document.getElementById('status-banner');
+
+      const fRole = document.getElementById('field-assistant-role');
+      const fKb = document.getElementById('field-knowledge-base');
+      const fPricing = document.getElementById('field-pricing-rule');
+      const fWelcome = document.getElementById('field-welcome-message');
+      const fVoiceGreeting = document.getElementById('field-voice-greeting');
+      const fQuickChips = document.getElementById('field-quick-chips');
+      const fBizName = document.getElementById('field-business-name');
+      const fSubtitle = document.getElementById('field-subtitle');
+      const fLauncher = document.getElementById('field-launcher-label');
+      const fPosition = document.getElementById('field-position');
+      const fColorPicker = document.getElementById('field-color-picker');
+      const fPrimaryColor = document.getElementById('field-primary-color');
+      const fDefaultVoice = document.getElementById('field-default-voice');
+      const fWhatsapp = document.getElementById('field-whatsapp');
+      const fEmail = document.getElementById('field-email');
+      const fToken = document.getElementById('field-client-token');
+      const kbCharCount = document.getElementById('kb-char-count');
+      const embedCodeBox = document.getElementById('embed-code-box');
+
+      const TEMPLATES = {
+        ecommerce: {
+          business_name: "Ma Boutique · Conseiller & Vendeur IA",
+          subtitle: "Catalogue Produits · Commandes WhatsApp · Vocal 24h/24",
+          launcher_label: "🛍️ Conseiller & Appel IA",
+          primary_color: "#00FF9D",
+          default_voice: "vivienne",
+          assistant_role: "Tu es le Conseiller Commercial et Vendeur IA officiel de notre boutique en ligne.",
+          welcome_message: "Bonjour et bienvenue ! Je suis le conseiller IA de la boutique.\n\nJe connais tout notre catalogue, nos délais de livraison et nos modes de paiement. Que recherchez-vous aujourd'hui ?",
+          voice_greeting: "Bonjour et bienvenue sur notre boutique ! Je suis votre conseiller vocal. Dites-moi quel article vous cherchez et je vous guide immédiatement.",
+          quick_chips: [
+            "🛍️ Quels sont vos articles les plus populaires ?",
+            "🚚 Comment fonctionne la livraison et en combien de temps ?",
+            "💳 Quels sont les moyens de paiement acceptés ?",
+            "📲 Commander directement sur WhatsApp"
+          ],
+          knowledge_base: "CATALOGUE & SERVICES DE LA BOUTIQUE :\n- Articles disponibles : Prêt-à-porter, accessoires, électronique et coffrets cadeaux.\n- Livraison express : Cotonou et environs en moins de 24h, expédition partout au Bénin et en Afrique de l'Ouest.\n- Paiement : Mobile Money (MTN MoMo, Moov Money, Celtiis), carte bancaire ou paiement à la livraison à Cotonou.\n- Service client : Disponible 7j/7 sur WhatsApp.",
+          pricing_rule: "Pour toute commande groupée ou demande de remise spéciale, invite le client à laisser son numéro WhatsApp pour recevoir le catalogue PDF et finaliser sa commande."
+        },
+        clinique: {
+          business_name: "Clinique Espoir · Accueil & Orientation IA",
+          subtitle: "Prise de Rendez-vous · Spécialités · Urgences 24h/24",
+          launcher_label: "🏥 Accueil Vocal & RDV",
+          primary_color: "#38BDF8",
+          default_voice: "denise",
+          assistant_role: "Tu es l'Assistante d'Accueil et d'Orientation Médicale de la Clinique.",
+          welcome_message: "Bonjour ! Je suis l'assistante d'accueil de la Clinique.\n\nJe peux vous renseigner sur nos spécialités médicales, nos horaires de consultation et préparer votre prise de rendez-vous.",
+          voice_greeting: "Bonjour et bienvenue à la Clinique. Je peux vous informer sur nos médecins spécialistes et organiser votre rendez-vous. Comment puis-je vous aider ?",
+          quick_chips: [
+            "📅 Prendre un rendez-vous de consultation",
+            "🩺 Quelles sont vos spécialités médicales ?",
+            "⏰ Quels sont vos horaires d'ouverture ?",
+            "📞 Demander à être rappelé par le secrétariat"
+          ],
+          knowledge_base: "INFORMATIONS DE LA CLINIQUE :\n- Spécialités : Médecine générale, Pédiatrie, Gynécologie, Cardiologie, Imagerie médicale et Laboratoire d'analyses 24h/24.\n- Horaires : Consultations du Lundi au Samedi de 07h30 à 20h00. Urgences ouvertes 24h/24 et 7j/7.\n- Localisation : Cotonou, Bénin.\n- Important : Ne pose jamais de diagnostic médical, oriente toujours vers une consultation.",
+          pricing_rule: "Explique que le tarif de consultation dépend de la spécialité et invite le patient à laisser son numéro de téléphone pour que le secrétariat confirme le rendez-vous et le tarif."
+        },
+        immobilier: {
+          business_name: "ImmoPro · Conseiller Immobilier IA",
+          subtitle: "Villas · Appartements · Terrains Titre Foncier",
+          launcher_label: "🏢 Conseiller Immobilier IA",
+          primary_color: "#F59E0B",
+          default_voice: "henri",
+          assistant_role: "Tu es le Conseiller Immobilier IA expert en location, achat et investissement foncier.",
+          welcome_message: "Bonjour ! Je suis votre conseiller immobilier IA.\n\nCherchez-vous à louer un appartement meublé, acheter une villa ou investir dans une parcelle sécurisée avec Titre Foncier ?",
+          voice_greeting: "Bonjour ! Je suis votre conseiller immobilier vocal. Dites-moi quel type de bien ou quel quartier vous intéresse pour que je vous propose nos meilleures opportunités.",
+          quick_chips: [
+            "🏠 Je cherche un appartement ou une villa à louer",
+            "📜 Parcelles avec Titre Foncier disponibles",
+            "📅 Organiser une visite avec un agent",
+            "🤝 Connaître les conditions et tarifs"
+          ],
+          knowledge_base: "CATALOGUE IMMOBILIER :\n- Locations : Appartements meublés et non meublés à Haie Vive, Fidjrossè, Cadjèhoun, Calavi.\n- Ventes : Villas modernes et parcelles sécurisées avec Titre Foncier (TF) vérifié.\n- Accompagnement : Visite guidée sous 24h, vérification notariale complète et gestion locative.",
+          pricing_rule: "Ne communique jamais de prix final sans visite : invite le prospect à laisser son numéro WhatsApp pour recevoir les fiches PDF avec photos et organiser une visite."
+        },
+        restaurant: {
+          business_name: "Le Gourmet · Concierge & Réservation IA",
+          subtitle: "Menu du Jour · Réservation de Table · Livraison",
+          launcher_label: "🍽️ Menu & Réservation IA",
+          primary_color: "#EC4899",
+          default_voice: "remy",
+          assistant_role: "Tu es le Maître d'Hôtel et Concierge IA du restaurant.",
+          welcome_message: "Bonjour et bienvenue ! Je suis le concierge IA du restaurant.\n\nSouhaitez-vous découvrir nos spécialités, réserver une table pour ce soir ou commander en livraison ?",
+          voice_greeting: "Bonjour et bienvenue ! Je peux vous présenter notre carte du jour, prendre votre réservation de table ou organiser une livraison. Que désirez-vous ?",
+          quick_chips: [
+            "🍽️ Quelles sont les spécialités du menu ?",
+            "🥂 Réserver une table pour ce soir",
+            "🛵 Commander en livraison à domicile",
+            "🎉 Privatisation et événements privés"
+          ],
+          knowledge_base: "CARTE & INFORMATIONS DU RESTAURANT :\n- Spécialités : Grillades au feu de bois, poissons braisés frais, cuisine africaine et européenne raffinée, cocktails maison.\n- Horaires : Mardi au Dimanche de 11h30 à 23h30.\n- Services : Terrasse climatisée, Wi-Fi haut débit, livraison rapide en 35 minutes, privatisation pour anniversaires et dîners d'affaires.",
+          pricing_rule: "Pour les réservations de groupe ou privatisations, demande le numéro WhatsApp du client pour que le responsable lui envoie le devis personnalisé."
+        }
+      };
+
+      function showToast(msg, isError) {
+        statusBanner.textContent = msg;
+        statusBanner.className = 'status-toast ' + (isError ? 'status-err' : 'status-ok');
+      }
+
+      function updateCharCount() {
+        kbCharCount.textContent = (fKb.value || '').length + ' caractères';
+      }
+
+      function updateEmbedSnippet() {
+        const key = (inputSiteKey.value || 'rockib-portfolio').trim();
+        embedCodeBox.textContent = `<script src="https://rockib-quenum.netlify.app/rockib-concierge.js" data-site-key="${key}" defer><\/script>`;
+      }
+
+      function buildCurrentFormConfig() {
+        const key = (inputSiteKey.value || 'rockib-portfolio').trim();
+        const chips = (fQuickChips.value || '')
+          .split('\n')
+          .map(s => s.trim())
+          .filter(Boolean);
+        return {
+          site_key: key,
+          business_name: fBizName.value.trim() || 'Concierge IA',
+          subtitle: fSubtitle.value.trim(),
+          launcher_label: fLauncher.value.trim() || '📞 Concierge & Appel IA',
+          primary_color: fPrimaryColor.value.trim() || '#00F0FF',
+          position: fPosition.value || 'right',
+          default_voice: fDefaultVoice.value || 'henri',
+          welcome_message: fWelcome.value.trim(),
+          voice_greeting: fVoiceGreeting.value.trim(),
+          quick_chips: chips,
+          voice_topic_chips: chips.slice(0, 3).map(c => ({ label: c.slice(0, 28), prompt: c })),
+          assistant_role: fRole.value.trim(),
+          knowledge_base: fKb.value.trim(),
+          pricing_rule: fPricing.value.trim(),
+          contact_whatsapp: fWhatsapp.value.trim(),
+          contact_email: fEmail.value.trim(),
+          client_token: fToken.value.trim() || 'rockib-master-key'
+        };
+      }
+
+      function populateForm(cfg) {
+        if (!cfg) return;
+        inputSiteKey.value = cfg.site_key || 'rockib-portfolio';
+        fBizName.value = cfg.business_name || '';
+        fSubtitle.value = cfg.subtitle || '';
+        fLauncher.value = cfg.launcher_label || '📞 Concierge & Appel IA';
+        fPosition.value = cfg.position || 'right';
+        fPrimaryColor.value = cfg.primary_color || '#00F0FF';
+        fColorPicker.value = (cfg.primary_color && cfg.primary_color.startsWith('#') && cfg.primary_color.length === 7)
+          ? cfg.primary_color
+          : '#00F0FF';
+        fDefaultVoice.value = cfg.default_voice || 'henri';
+        fWelcome.value = cfg.welcome_message || '';
+        fVoiceGreeting.value = cfg.voice_greeting || '';
+        fQuickChips.value = Array.isArray(cfg.quick_chips) ? cfg.quick_chips.join('\n') : '';
+        fRole.value = cfg.assistant_role || '';
+        fKb.value = cfg.knowledge_base || '';
+        fPricing.value = cfg.pricing_rule || '';
+        fWhatsapp.value = cfg.contact_whatsapp || '';
+        fEmail.value = cfg.contact_email || '';
+        updateCharCount();
+        updateEmbedSnippet();
+        if (window.RockibConcierge && window.RockibConcierge.applyConfig) {
+          window.RockibConcierge.applyConfig(cfg);
+        }
+      }
+
+      async function refreshSitesDropdown(selectedKey) {
+        try {
+          const resp = await fetch(`${API_BASE}/api/v1/inbound/sites`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            if (Array.isArray(data.sites) && data.sites.length > 0) {
+              selectExisting.innerHTML = data.sites
+                .map(s => `<option value="${s.site_key}">${s.site_key} (${s.business_name})</option>`)
+                .join('');
+              if (selectedKey) selectExisting.value = selectedKey;
+            }
+          }
+        } catch (e) {}
+      }
+
+      async function loadSiteFromServer(siteKey) {
+        const key = (siteKey || inputSiteKey.value || 'rockib-portfolio').trim();
+        inputSiteKey.value = key;
+        try {
+          const resp = await fetch(`${API_BASE}/api/v1/inbound/sites/${encodeURIComponent(key)}/config`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+          });
+          if (resp.ok) {
+            const cfg = await resp.json();
+            populateForm(cfg);
+            showToast(`✅ Configuration et base de connaissances du site "${key}" chargées avec succès.`, false);
+          }
+        } catch (err) {
+          showToast(`⚠️ Impossible de joindre le serveur IA pour charger "${key}".`, true);
+        }
+      }
+
+      selectExisting.addEventListener('change', () => {
+        inputSiteKey.value = selectExisting.value;
+        loadSiteFromServer(selectExisting.value);
+      });
+
+      btnLoadSite.addEventListener('click', () => {
+        loadSiteFromServer(inputSiteKey.value);
+      });
+
+      btnNewClient.addEventListener('click', () => {
+        const newKey = prompt("Entrez l'identifiant unique du nouveau site client (ex: boutique-kofi, clinique-espoir) :", "client-demo");
+        if (!newKey) return;
+        const cleanKey = newKey.toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+        inputSiteKey.value = cleanKey;
+        const tpl = Object.assign({}, TEMPLATES.ecommerce, { site_key: cleanKey });
+        populateForm(tpl);
+        if (window.RockibConcierge) window.RockibConcierge.open('chat');
+        showToast(`✨ Nouveau profil client "${cleanKey}" initialisé ! Personnalisez sa base de connaissances puis cliquez sur Enregistrer.`, false);
+      });
+
+      document.querySelectorAll('.template-pill').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const tplKey = btn.getAttribute('data-tpl');
+          const tpl = TEMPLATES[tplKey];
+          if (!tpl) return;
+          const merged = Object.assign({}, tpl, { site_key: inputSiteKey.value.trim() || 'client-demo' });
+          populateForm(merged);
+          if (window.RockibConcierge) window.RockibConcierge.open('chat');
+          showToast(`✨ Modèle "${btn.textContent.trim()}" appliqué en direct ! N'oubliez pas d'enregistrer pour sauvegarder sur le serveur.`, false);
+        });
+      });
+
+      fColorPicker.addEventListener('input', () => {
+        fPrimaryColor.value = fColorPicker.value.toUpperCase();
+        if (window.RockibConcierge) window.RockibConcierge.applyConfig(buildCurrentFormConfig());
+      });
+
+      fPrimaryColor.addEventListener('input', () => {
+        if (fPrimaryColor.value.startsWith('#') && fPrimaryColor.value.length === 7) {
+          fColorPicker.value = fPrimaryColor.value;
+        }
+        if (window.RockibConcierge) window.RockibConcierge.applyConfig(buildCurrentFormConfig());
+      });
+
+      document.querySelectorAll('.color-swatch').forEach(sw => {
+        sw.addEventListener('click', () => {
+          const c = sw.getAttribute('data-color');
+          fPrimaryColor.value = c;
+          fColorPicker.value = c;
+          if (window.RockibConcierge) window.RockibConcierge.applyConfig(buildCurrentFormConfig());
+        });
+      });
+
+      fKb.addEventListener('input', updateCharCount);
+      inputSiteKey.addEventListener('input', updateEmbedSnippet);
+
+      document.getElementById('btn-live-preview').addEventListener('click', () => {
+        const cfg = buildCurrentFormConfig();
+        if (window.RockibConcierge) {
+          window.RockibConcierge.applyConfig(cfg);
+          window.RockibConcierge.open('chat');
+        }
+        showToast('👁️ Aperçu visuel mis à jour en direct dans le widget en bas de page !', false);
+      });
+
+      document.getElementById('btn-open-voice-preview').addEventListener('click', () => {
+        if (window.RockibConcierge) {
+          window.RockibConcierge.applyConfig(buildCurrentFormConfig());
+          window.RockibConcierge.open('voice');
+        }
+      });
+
+      async function saveConfiguration(e) {
+        if (e) e.preventDefault();
+        const cfg = buildCurrentFormConfig();
+        try {
+          const resp = await fetch(`${API_BASE}/api/v1/inbound/sites/${encodeURIComponent(cfg.site_key)}/config`, {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              'ngrok-skip-browser-warning': 'true'
+            },
+            body: JSON.stringify(cfg)
+          });
+          const data = await resp.json();
+          if (!resp.ok) {
+            showToast(`❌ Erreur (${resp.status}) : ${data.detail || 'Impossible de sauvegarder'}`, true);
+            return;
+          }
+          await refreshSitesDropdown(cfg.site_key);
+          if (window.RockibConcierge) {
+            await window.RockibConcierge.reloadSite(cfg.site_key);
+            window.RockibConcierge.open('chat');
+          }
+          showToast(`✅ ${data.message} Testez-le immédiatement dans le widget ouvert en bas de l'écran !`, false);
+        } catch (err) {
+          showToast('❌ Erreur réseau lors de la sauvegarde sur le serveur IA.', true);
+        }
+      }
+
+      document.getElementById('studio-form').addEventListener('submit', saveConfiguration);
+      document.getElementById('btn-save-top').addEventListener('click', saveConfiguration);
+
+      document.getElementById('btn-copy-embed').addEventListener('click', () => {
+        updateEmbedSnippet();
+        navigator.clipboard.writeText(embedCodeBox.textContent);
+        showToast('📋 Code d\'intégration copié dans le presse-papiers !', false);
+      });
+
+      // Initial load
+      window.addEventListener('DOMContentLoaded', async () => {
+        await refreshSitesDropdown('rockib-portfolio');
+        await loadSiteFromServer('rockib-portfolio');
+      });
+    })();
+  </script>
+</body>
+</html>

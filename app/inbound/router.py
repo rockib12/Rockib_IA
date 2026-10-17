@@ -13,6 +13,9 @@ from app.telegram.services.telegram_service import telegram_service
 from app.inbound.schemas import (
     CallMeBackRequest,
     CallMeBackResponse,
+    ConciergeSiteConfigPublic,
+    ConciergeSiteConfigUpsertRequest,
+    ConciergeSiteConfigUpsertResponse,
     PortfolioInboundMessageRequest,
     PortfolioInboundResponse,
     VoiceCallSessionRequest,
@@ -22,11 +25,68 @@ from app.inbound.schemas import (
     VoiceTTSRequest,
 )
 from app.inbound.services.portfolio_handler import PortfolioConciergeService
+from app.inbound.services.site_config_service import site_config_service
 from app.inbound.services.voice_call_service import VoiceCallService
 
 router = APIRouter(prefix="/inbound", tags=["Inbound Portfolio"])
 concierge_service = PortfolioConciergeService()
 voice_service = VoiceCallService()
+
+
+@router.get("/sites")
+async def list_concierge_sites():
+    """Lists all available customizable site concierges."""
+    return {"sites": site_config_service.list_public_configs(), "status": "ok"}
+
+
+@router.get("/sites/{site_key}/config", response_model=ConciergeSiteConfigPublic)
+async def get_concierge_site_config(site_key: str) -> ConciergeSiteConfigPublic:
+    """Returns the public customization & knowledge base config for a specific client site_key."""
+    return site_config_service.get_public_config(site_key)
+
+
+@router.put("/sites/{site_key}/config", response_model=ConciergeSiteConfigUpsertResponse)
+async def upsert_concierge_site_config(
+    site_key: str,
+    body: ConciergeSiteConfigUpsertRequest,
+    request: Request,
+) -> ConciergeSiteConfigUpsertResponse:
+    """Creates or updates a client site's customizable concierge & knowledge base."""
+    from app.inbound.services.portfolio_handler import is_rate_limited
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    if is_rate_limited(client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Trop de modifications en peu de temps. Veuillez patienter une minute.",
+            headers={"Retry-After": "60"},
+        )
+
+    try:
+        public_cfg, saved_token = site_config_service.upsert_site_config(site_key, body)
+        snippet = f'<script src="https://rockib-quenum.netlify.app/rockib-concierge.js" data-site-key="{public_cfg.site_key}" defer></script>'
+        return ConciergeSiteConfigUpsertResponse(
+            status="saved",
+            message=f"Concierge et base de connaissances du site '{public_cfg.site_key}' enregistrés avec succès !",
+            config=public_cfg,
+            client_token=saved_token,
+            embed_script=snippet,
+            embed_snippet=snippet,
+        )
+    except PermissionError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=str(exc),
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(exc),
+        )
 
 
 @router.post("/portfolio/message", response_model=PortfolioInboundResponse)

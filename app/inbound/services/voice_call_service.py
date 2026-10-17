@@ -25,6 +25,7 @@ from app.inbound.schemas import (
     VoiceCallTurnResponse,
 )
 from app.inbound.services.portfolio_handler import is_rate_limited
+from app.inbound.services.site_config_service import site_config_service
 from app.intelligence.services.providers.groq_provider import GroqProvider
 
 logger = logging.getLogger(__name__)
@@ -47,9 +48,10 @@ END_CALL_PHRASES = [
 class VoiceCallSession:
     """In-memory tracking for an active voice call dialogue."""
 
-    def __init__(self, session_id: str, page_url: str):
+    def __init__(self, session_id: str, page_url: str, site_key: str = "rockib-portfolio"):
         self.session_id = session_id
         self.page_url = page_url
+        self.site_key = site_key or "rockib-portfolio"
         self.created_at = time.time()
         self.history: List[dict[str, str]] = []
         self.lead_captured = False
@@ -154,10 +156,12 @@ class VoiceCallService:
         """Initializes a new live voice call session."""
         self._prune_expired_sessions()
         session_id = str(uuid.uuid4())
-        session = VoiceCallSession(session_id=session_id, page_url=request.page_url or "")
+        site_key = request.site_key or "rockib-portfolio"
+        session = VoiceCallSession(session_id=session_id, page_url=request.page_url or "", site_key=site_key)
         self._sessions[session_id] = session
 
-        greeting = (
+        site_cfg = site_config_service.get_site_dict(site_key)
+        greeting = site_cfg.get("voice_greeting") or (
             "Bonjour ! Je suis l'assistant IA de Rockib Quenum. "
             "Je peux vous présenter ses réalisations, vous proposer des idées d'applications ou d'automatisations IA pour votre activité, "
             "et concevoir votre architecture. Dans quel domaine êtes-vous ou quel projet avez-vous en tête ?"
@@ -172,33 +176,8 @@ class VoiceCallService:
             max_duration_seconds=300,
         )
 
-    def _build_voice_system_prompt(self) -> str:
-        return (
-            "Tu es l'Assistant IA Vocal, Conseiller en Innovation et Co-Architecte de Rockib Quenum "
-            "(Lead Software Architect & Autonomous AI Systems Engineer basé à Cotonou, Bénin).\n\n"
-            "TON RÔLE ET TON COMPORTEMENT (TRÈS IMPORTANT) :\n"
-            "1. PROPOSER DES IDÉES DE PROJETS, DE FONCTIONNALITÉS ET D'ARCHITECTURES :\n"
-            "   - Sois force de proposition ! Quand un visiteur te parle de son secteur (commerce, service, entreprise, startup) ou cherche l'inspiration, "
-            "propose-lui proactivement des idées concrètes et rentables : par exemple un vendeur IA sur WhatsApp capable de reconnaître les produits par photo, "
-            "un agent IA autonome qui qualifie les clients 24 heures sur 24, une plateforme SaaS sur mesure, ou un portail client automatisé.\n"
-            "   - Quand il a déjà une idée, enrichis-la avec des fonctionnalités innovantes et propose-lui une architecture technique claire et solide "
-            "(React, Next.js, FastAPI, Django, PostgreSQL, Redis, Celery, IA Groq ou Vision CLIP).\n\n"
-            "2. ILLUSTRER AVEC LES PROJETS RÉELS DE ROCKIB EN PRODUCTION :\n"
-            "   - Appuie tes idées sur ce que Rockib a déjà construit et mis en production :\n"
-            "     * Rockib AI Engine : Moteur d'orchestration multi-agents autonome avec gouvernance déterministe, exécution transactionnelle ACID et 107 compétences scellées.\n"
-            "     * MARTISTORE (martistore.shop) : Vendeur IA WhatsApp et e-commerce avec reconnaissance visuelle par photo OpenAI CLIP Vision et prise de commande automatisée 24h/24.\n"
-            "     * WaAuto Commercial : Plateforme SaaS B2B multi-tenant d'automatisation WhatsApp.\n"
-            "     * Agence IIA : Portail client Django et React avec suivi temps réel par webhooks Git, paiement Mobile Money FedaPay et Stripe, et protection des livrables.\n\n"
-            "3. RÈGLE STRICTE SUR LES PRIX, TARIFS ET DEVIS — TOUJOURS GUIDER VERS ROCKIB :\n"
-            "   - Ne donne JAMAIS de prix, de tarif chiffré ou d'estimation financière toi-même.\n"
-            "   - Dès que l'interlocuteur parle de prix, de budget, de coût ou de devis (ou dès que l'idée de projet lui plaît), "
-            "explique que le tarif dépend du périmètre exact et guide-le immédiatement vers Rockib Quenum en personne :\n"
-            "     * Demande-lui simplement de te dicter ou d'écrire son numéro WhatsApp ou son adresse email pour que Rockib le contacte directement,\n"
-            "     * Ou invite-le à utiliser l'onglet Rappel du widget ou à écrire à rockibdev@gmail.com.\n\n"
-            "4. STYLE VOCAL FLUIDE (COMME CHATGPT) :\n"
-            "   - Parle de façon naturelle, dynamique et chaleureuse, en 3 à 5 phrases fluides, et termine souvent par une question ou une idée stimulante pour faire avancer l'échange.\n"
-            "   - N'utilise JAMAIS de symboles Markdown (aucun astérisque, aucun dièse, aucune liste à puces) car ta réponse est lue à haute voix."
-        )
+    def _build_voice_system_prompt(self, site_key: str = "rockib-portfolio") -> str:
+        return site_config_service.build_voice_system_prompt(site_key)
 
     async def handle_voice_turn(
         self,
@@ -206,11 +185,14 @@ class VoiceCallService:
         client_ip: str = "127.0.0.1",
     ) -> VoiceCallTurnResponse:
         """Processes a speech utterance transcribed from the caller's mic."""
+        req_site_key = turn.site_key or "rockib-portfolio"
         session = self._sessions.get(turn.session_id)
         if not session:
             # Recreate session if expired
-            session = VoiceCallSession(session_id=turn.session_id, page_url="")
+            session = VoiceCallSession(session_id=turn.session_id, page_url="", site_key=req_site_key)
             self._sessions[turn.session_id] = session
+        elif turn.site_key and turn.site_key != "rockib-portfolio":
+            session.site_key = turn.site_key
 
         if is_rate_limited(client_ip):
             return VoiceCallTurnResponse(
@@ -239,15 +221,15 @@ class VoiceCallService:
         if detected_email or detected_phone:
             session.lead_captured = True
             await self._dispatch_lead(
-                contact_name="Appelant Vocal Portfolio",
+                contact_name=f"Appelant Vocal ({session.site_key})",
                 email=detected_email or "vocal-lead@portfolio.com",
                 need=user_text,
                 phone=detected_phone,
             )
 
-        # Assemble LLM history
+        # Assemble LLM history with site-specific knowledge base
         session.history.append({"role": "user", "content": user_text})
-        messages = [{"role": "system", "content": self._build_voice_system_prompt()}]
+        messages = [{"role": "system", "content": self._build_voice_system_prompt(session.site_key)}]
         # Keep last 14 dialogue turns for deep architectural & multi-turn discussions
         messages.extend(session.history[-14:])
 

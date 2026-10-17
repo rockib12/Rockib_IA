@@ -18,6 +18,7 @@ from typing import Optional
 import httpx
 
 from app.inbound.schemas import PortfolioInboundMessageRequest, PortfolioInboundResponse
+from app.inbound.services.site_config_service import site_config_service
 from app.intelligence.services.providers.groq_provider import GroqProvider
 from app.skills.catalog import get_default_catalogue
 
@@ -74,31 +75,8 @@ class PortfolioConciergeService:
         # Cache catalog manifests
         self._skills = {m.identity.id: m for m in get_default_catalogue()}
 
-    def _build_system_prompt(self) -> str:
-        prompt_lines = [
-            "Tu es l'Assistant IA, Conseiller en Innovation et Co-Architecte de Rockib Quenum (Lead Software Architect & Autonomous AI Systems Engineer basé à Cotonou, Bénin) sur son portfolio (https://rockib-quenum.netlify.app/).",
-            "",
-            "TON RÔLE ET TON COMPORTEMENT (TRÈS IMPORTANT) :",
-            "1. PROPOSER DES IDÉES DE PROJETS, D'AUTOMATISATIONS IA ET D'ARCHITECTURES :",
-            "  * Sois force de proposition ! Quand un visiteur te parle de son activité (boutique, entreprise, service, startup) ou cherche ce qu'il pourrait automatiser, propose-lui proactivement des idées concrètes et à fort impact :",
-            "    - Un vendeur IA sur WhatsApp capable de reconnaître les produits par photo et de prendre les commandes 24h/24,",
-            "    - Un agent IA autonome qui qualifie ses prospects, répond aux clients et automatise ses tâches répétitives,",
-            "    - Une plateforme web ou SaaS sur mesure avec tableau de bord temps réel et encaissement Mobile Money / Carte bancaire.",
-            "  * Lorsqu'il a une idée de projet, enrichis-la avec des fonctionnalités pertinentes et propose-lui une architecture technique claire (React 19 / Next.js, FastAPI / Django 5.2, PostgreSQL, Redis, Celery, IA Groq / Vision CLIP, Docker).",
-            "",
-            "2. ILLUSTRER AVEC LES PROJETS EN PRODUCTION DE ROCKIB QUENUM :",
-            "  * Rockib AI Engine : Moteur d'orchestration multi-agents autonome avec gouvernance déterministe (`DeterministicArbitrator`), exécution transactionnelle ACID (`ReliableExecutor`), coffre-fort AES-256-GCM et 107 skills scellés SHA-256.",
-            "  * MARTISTORE (martistore.shop) : Vendeur IA WhatsApp + boutique en ligne (100+ articles, reconnaissance photo OpenAI CLIP Vision, Meta Cloud API, Groq, Celery, PostgreSQL).",
-            "  * WaAuto Commercial (waauto-commercial.vercel.app) : Plateforme SaaS B2B multi-tenant d'automatisation WhatsApp en 4 écrans.",
-            "  * Agence IIA : Portail client et facturation automatisée (Django 5.2, React 19, suivi temps réel par webhooks Git HMAC, paiements FedaPay Mobile Money & Stripe, protection HTTP 402 des livrables).",
-            "",
-            "3. RÈGLE STRICTE SUR LES PRIX, TARIFS ET DEVIS — TOUJOURS GUIDER VERS ROCKIB :",
-            "  * Ne donne JAMAIS de prix, de tarif chiffré ou d'estimation financière toi-même.",
-            "  * Dès que le visiteur pose une question sur le prix, le coût, le budget ou un devis (ou dès qu'une des idées proposées l'intéresse), explique que chaque chiffrage est ajusté sur mesure par Rockib et guide-le directement vers Rockib Quenum :",
-            "    - Invite-le à laisser son numéro WhatsApp ou son adresse email directement dans la conversation pour que Rockib le recontacte personnellement,",
-            "    - Ou oriente-le vers l'onglet « 📲 Rappel » du widget ou l'adresse rockibdev@gmail.com.",
-        ]
-        return "\n".join(prompt_lines)
+    def _build_system_prompt(self, site_key: str = "rockib-portfolio") -> str:
+        return site_config_service.build_chat_system_prompt(site_key)
 
     async def handle_message(
         self,
@@ -107,6 +85,7 @@ class PortfolioConciergeService:
     ) -> PortfolioInboundResponse:
         """Processes a visitor message and returns a tailored AI response."""
         conversation_id = request.conversation_id or str(uuid.uuid4())
+        site_key = request.site_key or "rockib-portfolio"
 
         # Check rate limit
         if is_rate_limited(client_ip):
@@ -130,7 +109,7 @@ class PortfolioConciergeService:
         # Dispatch lead to Agence IIA if captured
         if lead_captured:
             await self._dispatch_lead_to_agency(
-                contact_name=request.sender_name or "Visiteur Portfolio",
+                contact_name=request.sender_name or f"Visiteur ({site_key})",
                 email=detected_email or "non-fourni@portfolio.lead",
                 need=request.message,
                 phone=detected_phone,
@@ -143,8 +122,8 @@ class PortfolioConciergeService:
         history = _conversation_store.setdefault(conversation_id, [])
         history.append({"role": "user", "content": request.message})
 
-        # Call LLM with conversation history
-        messages = [{"role": "system", "content": self._build_system_prompt()}]
+        # Call LLM with conversation history and site-specific knowledge base
+        messages = [{"role": "system", "content": self._build_system_prompt(site_key)}]
         messages.extend(history[-12:])
 
         try:
