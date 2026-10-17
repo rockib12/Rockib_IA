@@ -453,45 +453,46 @@
   chatWindow.innerHTML = `
     <div class="rq-header">
       <div>
-        <div class="rq-title">Rockib Quenum · Concierge IA</div>
-        <div class="rq-subtitle">En production, pas en démo · Cotonou</div>
+        <div class="rq-title">Rockib Quenum · Co-Architecte & Assistant IA</div>
+        <div class="rq-subtitle">Projets en production · Conception d'Architecture · Vocal Temps Réel</div>
       </div>
       <button class="rq-close" title="Fermer">✕</button>
     </div>
     <div class="rq-tabs">
-      <button class="rq-tab-btn rq-active" data-tab="chat">💬 Chat</button>
-      <button class="rq-tab-btn" data-tab="voice">🎙️ Appel Vocal</button>
-      <button class="rq-tab-btn" data-tab="callback">📲 Me faire appeler</button>
+      <button class="rq-tab-btn rq-active" data-tab="chat">💬 Assistant & Archi</button>
+      <button class="rq-tab-btn" data-tab="voice">🎙️ Vocal Live</button>
+      <button class="rq-tab-btn" data-tab="callback">📲 Rappel</button>
     </div>
 
     <!-- Panel 1: Chat -->
     <div class="rq-panel rq-active" id="rq-panel-chat">
       <div class="rq-messages" id="rq-messages-container">
-        <div class="rq-msg rq-msg-assistant">Bonjour ! Je suis le concierge IA de Rockib Quenum.
+        <div class="rq-msg rq-msg-assistant">Bonjour ! Je suis l'Assistant IA et Co-Architecte Logiciel de Rockib Quenum.
 
-Je peux répondre à vos questions sur ses systèmes en production réelle (comme le vendeur IA WhatsApp de MARTISTORE ou le portail client de l'Agence IIA), ou vous aider à cadrer votre projet.
+Je peux vous détailler ses systèmes en production (Rockib AI Engine, MARTISTORE avec vision CLIP, WaAuto, Agence IIA), concevoir l'architecture technique complète de votre projet, rédiger du code ou vous assister sur n'importe quel sujet.
 
-Que souhaitez-vous savoir ?</div>
+De quoi souhaitez-vous discuter ?</div>
         <div class="rq-suggestions" id="rq-suggestions-container">
-          <button class="rq-chip" data-query="Comment fonctionne le vendeur IA WhatsApp ?">💬 Comment fonctionne le vendeur IA WhatsApp ?</button>
-          <button class="rq-chip" data-query="Quels services propose l'Agence IIA ?">🏢 Quels services propose l'Agence IIA ?</button>
-          <button class="rq-chip" data-query="Je voudrais un devis pour un projet">⚡ Je voudrais un devis pour un projet</button>
+          <button class="rq-chip" data-query="Présente-moi en détail tous les projets en production de Rockib (Rockib AI, MARTISTORE, WaAuto, Agence IIA).">🚀 Découvrir les projets en production de Rockib</button>
+          <button class="rq-chip" data-query="Propose-moi une architecture technique complète et moderne pour lancer une plateforme SaaS ou E-commerce avec IA.">🏗️ Proposer une architecture pour mon projet</button>
+          <button class="rq-chip" data-query="Comment fonctionne l'architecture d'arbitrage déterministe de Rockib AI Engine ?">🤖 Architecture interne de Rockib AI Engine</button>
+          <button class="rq-chip" data-query="Je voudrais estimer le budget, les délais et la stack technique pour mon projet.">⚡ Estimer la stack et le budget de mon projet</button>
         </div>
       </div>
       <form class="rq-input-area" id="rq-chat-form">
-        <input type="text" class="rq-input" id="rq-input-field" placeholder="Posez une question ou laissez un contact..." autocomplete="off" />
+        <input type="text" class="rq-input" id="rq-input-field" placeholder="Décrivez votre idée d'architecture, posez une question..." autocomplete="off" />
         <button type="submit" class="rq-send">➤</button>
       </form>
     </div>
 
     <!-- Panel 2: Live Voice Calling (ChatGPT Advanced Voice Mode UI) -->
     <div class="rq-panel" id="rq-panel-voice">
-      <div class="rq-voice-container" style="justify-content:space-between; padding:18px 20px;">
+      <div class="rq-voice-container" style="justify-content:space-between; padding:14px 18px;">
         <!-- Top Voice Selector Bar -->
         <div style="display:flex; align-items:center; justify-content:space-between; width:100%; gap:6px;">
           <div style="display:flex; align-items:center; gap:6px;">
             <span id="rq-voice-badge" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#64748B;"></span>
-            <span id="rq-voice-mode-label" style="font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:0.08em;">Mode Vocal Temps Réel</span>
+            <span id="rq-voice-mode-label" style="font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:0.08em;">Co-Architecte Vocal</span>
           </div>
           <div style="display:flex; align-items:center; gap:5px;">
             <select id="rq-voice-profile" class="rq-input" style="padding:4px 7px; font-size:10px; border-radius:999px; background:#0A101E;">
@@ -505,34 +506,39 @@ Que souhaitez-vous savoir ?</div>
         </div>
 
         <!-- Center ChatGPT Fluid Morphing Orb -->
-        <div style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; margin:4px 0;">
-          <canvas id="rq-voice-canvas" width="190" height="190" style="width:190px; height:190px; cursor:pointer;" title="Touchez la sphère pour parler ou interrompre"></canvas>
+        <div style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; margin:2px 0;">
+          <canvas id="rq-voice-canvas" width="176" height="176" style="width:176px; height:176px; cursor:pointer;" title="Touchez la sphère pour parler ou interrompre"></canvas>
           <div id="rq-voice-orb" style="display:none;"></div>
           <div id="rq-voice-wave" style="display:none;"></div>
-          <div class="rq-voice-status" id="rq-voice-status" style="margin-top:6px; font-size:14px; font-weight:700; color:#EDF5FF; letter-spacing:0.01em;">Touchez pour démarrer</div>
-          <div class="rq-voice-sub" id="rq-voice-sub" style="margin-top:2px; font-size:11px; color:#7E90A6;">Conversation fluide mains-libres · Interruption instantanée</div>
+          <div class="rq-voice-status" id="rq-voice-status" style="margin-top:4px; font-size:13.5px; font-weight:700; color:#EDF5FF; letter-spacing:0.01em;">Touchez pour démarrer</div>
+          <div class="rq-voice-sub" id="rq-voice-sub" style="margin-top:2px; font-size:10.5px; color:#7E90A6;">Projets · Architectures sur mesure · Assistant IA complet</div>
         </div>
 
         <!-- Live Subtitle / Caption Box -->
-        <div class="rq-voice-transcript" id="rq-voice-transcript" style="width:100%; min-height:46px; max-height:76px; overflow-y:auto; text-align:center; font-size:11.5px; border-radius:12px; background:rgba(10,16,28,0.85);">
-          <em>Parlez librement comme avec ChatGPT : je détecte automatiquement quand vous parlez et quand vous faites une pause.</em>
+        <div class="rq-voice-transcript" id="rq-voice-transcript" style="width:100%; min-height:48px; max-height:94px; overflow-y:auto; text-align:center; font-size:11.5px; border-radius:12px; background:rgba(10,16,28,0.85);">
+          <em>Demandez-lui de présenter les projets de Rockib, de concevoir l'architecture de votre application ou posez n'importe quelle question !</em>
         </div>
 
-        <!-- Bottom ChatGPT-style Control Dock + Optional Text Bar -->
-        <div style="display:flex; flex-direction:column; gap:10px; width:100%; align-items:center;">
-          <div style="display:flex; align-items:center; justify-content:center; gap:16px; width:100%;">
-            <button type="button" id="rq-btn-mute" title="Couper / Activer le micro" style="display:none; width:44px; height:44px; border-radius:50%; border:1px solid rgba(255,255,255,0.18); background:#111827; color:#EDF5FF; font-size:17px; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
+        <!-- Quick Voice Topics + Bottom Control Dock -->
+        <div style="display:flex; flex-direction:column; gap:8px; width:100%; align-items:center;">
+          <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center; width:100%;">
+            <button type="button" class="rq-voice-topic-chip" data-prompt="Présente-moi en détail tous les projets en production de Rockib Quenum et leur architecture." style="background:rgba(0,240,255,0.08); border:1px solid rgba(0,240,255,0.3); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🚀 Ses Projets</button>
+            <button type="button" class="rq-voice-topic-chip" data-prompt="Propose-moi une architecture logicielle et IA complète pour lancer une plateforme e-commerce et WhatsApp moderne." style="background:rgba(0,255,157,0.08); border:1px solid rgba(0,255,157,0.3); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🏗️ Proposer une Architecture</button>
+            <button type="button" class="rq-voice-topic-chip" data-prompt="Explique-moi comment fonctionne le moteur d'arbitrage déterministe Rockib AI Engine." style="background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.35); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🤖 Rockib AI</button>
+          </div>
+          <div style="display:flex; align-items:center; justify-content:center; gap:14px; width:100%;">
+            <button type="button" id="rq-btn-mute" title="Couper / Activer le micro" style="display:none; width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,0.18); background:#111827; color:#EDF5FF; font-size:16px; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
               🎙️
             </button>
-            <button type="button" class="rq-btn-call" id="rq-btn-toggle-call" style="border-radius:999px; padding:11px 24px; font-size:12.5px;">
+            <button type="button" class="rq-btn-call" id="rq-btn-toggle-call" style="border-radius:999px; padding:10px 22px; font-size:12px;">
               <span>📞 Démarrer la conversation</span>
             </button>
-            <button type="button" id="rq-btn-send-speech" title="Forcer l'envoi immédiat" style="display:none; width:44px; height:44px; border-radius:50%; border:1px solid rgba(0,255,157,0.5); background:rgba(0,255,157,0.12); color:#00FF9D; font-size:16px; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
+            <button type="button" id="rq-btn-send-speech" title="Forcer l'envoi immédiat" style="display:none; width:40px; height:40px; border-radius:50%; border:1px solid rgba(0,255,157,0.5); background:rgba(0,255,157,0.12); color:#00FF9D; font-size:15px; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
               ✓
             </button>
           </div>
           <form id="rq-voice-quick-form" style="display:flex; gap:6px; width:100%;">
-            <input type="text" id="rq-voice-quick-input" class="rq-input" placeholder="Ou écrivez un message au Concierge vocal..." style="font-size:11px; padding:6px 12px; border-radius:999px;" autocomplete="off" />
+            <input type="text" id="rq-voice-quick-input" class="rq-input" placeholder="Ou écrivez votre sujet d'architecture / question ici..." style="font-size:11px; padding:6px 12px; border-radius:999px;" autocomplete="off" />
             <button type="submit" class="rq-send" title="Envoyer" style="padding:0 12px; font-size:11px; border-radius:999px;">➤</button>
           </form>
         </div>
@@ -1414,6 +1420,20 @@ Que souhaitez-vous savoir ?</div>
       await processVoiceTurn(val);
     });
   }
+
+  chatWindow.querySelectorAll('.rq-voice-topic-chip').forEach((chip) => {
+    chip.addEventListener('click', async () => {
+      const prompt = chip.getAttribute('data-prompt');
+      if (!prompt) return;
+      if (isSpeaking) interruptAiSpeaking();
+      if (!isCalling) {
+        isCalling = true;
+        btnToggleCall.classList.add('rq-btn-hangup');
+        btnToggleCall.innerHTML = '<span>✕ Terminer</span>';
+      }
+      await processVoiceTurn(prompt);
+    });
+  });
 
   if (btnMute) {
     btnMute.addEventListener('click', () => {

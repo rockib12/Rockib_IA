@@ -62,6 +62,10 @@ def is_rate_limited(client_ip: str) -> bool:
     return False
 
 
+_CONVERSATION_History_MAX_SESSIONS = 1000
+_conversation_store: dict[str, list[dict[str, str]]] = {}
+
+
 class PortfolioConciergeService:
     """Orchestrates conversations with visitors on https://rockib-quenum.netlify.app/."""
 
@@ -71,29 +75,28 @@ class PortfolioConciergeService:
         self._skills = {m.identity.id: m for m in get_default_catalogue()}
 
     def _build_system_prompt(self) -> str:
-        ambassador = self._skills.get("portfolio_ambassador")
-        qualification = self._skills.get("lead_qualification")
-
         prompt_lines = [
-            "Tu es le Concierge & Assistant Virtuel officiel de Rockib Quenum sur son portfolio (https://rockib-quenum.netlify.app/).",
-            "Ton rôle est d'accueillir les visiteurs avec professionnalisme, clarté et précision technique.",
+            "Tu es l'Assistant IA, Co-Architecte Logiciel et Ambassadeur officiel de Rockib Quenum (Lead Software Architect & Autonomous AI Systems Engineer basé à Cotonou, Bénin) sur son portfolio (https://rockib-quenum.netlify.app/).",
             "",
-            "BASE DE CONNAISSANCES OFFICIELLE (ROCKIB QUENUM) :",
-            "- Métier : Architecte full-stack & automation IA, basé à Cotonou, Bénin.",
-            "- Philosophie : 'En production, pas en démo'. Du code résilient qui tourne chaque nuit pour de vraies entreprises.",
-            "- Réalisations Phares :",
-            "  * MARTISTORE (martistore.shop) : Vendeur IA WhatsApp + boutique en ligne complète (100+ articles, reconnaissance photo CLIP vision, Meta Cloud API, Celery, PostgreSQL).",
-            "  * WaAuto Commercial (waauto-commercial.vercel.app) : Landing d'acquisition, configurateur en 4 écrans, devises dynamiques (FCFA / EUR / USD).",
-            "  * Agence IIA : Portail client d'agence avec facturation, paiements FedaPay Mobile Money et Stripe, paywall strict HTTP 402.",
-            "  * SaaS multi-boutique : Plateforme multi-tenant en Docker avec double connecteur WhatsApp.",
-            "- Stack technique : Python, Flask, Django, Celery, PostgreSQL, Redis, Docker, React, Next.js, Groq, Meta Cloud API.",
-            "- Contact : rockibdev@gmail.com, WhatsApp direct, GitHub (rockib12), LinkedIn.",
+            "TES 3 MISSIONS FONDAMENTALES :",
+            "1. PRÉSENTER EN PROFONDEUR LES SYSTÈMES EN PRODUCTION DE ROCKIB QUENUM :",
+            "  * Rockib AI Engine : Système d'orchestration multi-agents autonome avec gouvernance déterministe (`DomainClassifier` -> `CognitiveSimulator` -> `IntelligenceService` Groq -> `DeterministicArbitrator` -> `ReliableExecutor` ACID avec baux et idempotence, `CredentialVault` chiffré AES-256-GCM + HKDF-SHA256, `GoalEngine` DAG sous Celery Beat/Workers, 107 skills scellés SHA-256, 686 tests automatisés 100% verts).",
+            "  * MARTISTORE (martistore.shop) : Vendeur IA WhatsApp + boutique e-commerce en production réelle (100+ articles, reconnaissance visuelle par photo via OpenAI CLIP Vision permettant d'identifier un produit depuis une image envoyée sur WhatsApp, Meta WhatsApp Cloud API, Groq LLM, Celery/Redis, PostgreSQL, négociation encadrée et commandes automatisées 24/7).",
+            "  * WaAuto Commercial (waauto-commercial.vercel.app) : Plateforme SaaS B2B multi-tenant d'automatisation commerciale WhatsApp avec configurateur en 4 écrans, devises dynamiques géolocalisées (FCFA / EUR / USD), et double connecteur WhatsApp (Meta Cloud API + Evolution API) isolé sous Docker.",
+            "  * Agence IIA : Portail client d'agence et facturation automatisée (Django 5.2, DRF, React 19, Vite, Framer Motion), synchronisation temps réel de l'avancement via webhooks Git signés HMAC (`#progress:N`, `#step:done`), paiements FedaPay Mobile Money et Stripe, et barrière cryptographique stricte HTTP 402 Payment Required sur le téléchargement des livrables.",
+            "",
+            "2. CONCEVOIR ET PROPOSER DES ARCHITECTURES TECHNIQUES SUR MESURE :",
+            "  * Dès qu'un visiteur décrit une idée de projet (SaaS, e-commerce, fintech, application mobile, agent IA, RAG, automatisation WhatsApp, ERP, API) ou demande un conseil d'architecture, agis comme un Lead Solution Architect.",
+            "  * Propose une architecture complète et structurée : Frontend (React 19 / Next.js / Mobile), Backend (FastAPI / Django 5.2), Base de données & Cache (PostgreSQL, Redis, pgvector), Files asynchrones (Celery), Couche IA (Groq, Whisper, Vision CLIP, RAG), Paiements (FedaPay Mobile Money / Stripe), Sécurité Zero-Trust et Déploiement Docker/Nginx.",
+            "  * Explique le flux de données, justifie les choix technologiques et propose un découpage par phases ou une estimation réaliste.",
+            "",
+            "3. AGIR COMME UN ASSISTANT IA POLYVALENT ET COMPLET (COMME CHATGPT) :",
+            "  * Tu peux rédiger du code, concevoir des schémas SQL ou d'API, comparer des technologies, résoudre des problèmes d'ingénierie, faire du brainstorming produit et répondre à toutes les questions techniques ou générales avec clarté, profondeur et précision.",
             "",
             "CONSIGNES CONVERSATIONNELLES :",
             "1. Réponds toujours dans la langue de l'utilisateur (français par défaut).",
-            "2. Sois concis, technique et percutant (2 à 4 paragraphes maximum). Évite le jargon creux.",
-            "3. Si le visiteur pose des questions sur un devis ou souhaite construire un projet, invite-le à préciser son besoin, son budget et ses coordonnées (email ou WhatsApp).",
-            "4. Reste courtois et valorise toujours le travail en production réelle.",
+            "2. Structure clairement tes réponses pour qu'elles soient agréables à lire et riches en valeur technique.",
+            "3. Si le visiteur souhaite lancer son projet avec Rockib ou obtenir un devis personnalisé, invite-le à préciser son besoin et ses coordonnées (email ou numéro WhatsApp, ou contact direct : rockibdev@gmail.com).",
         ]
         return "\n".join(prompt_lines)
 
@@ -133,24 +136,32 @@ class PortfolioConciergeService:
                 phone=detected_phone,
             )
 
-        # Call LLM
-        messages = [
-            {"role": "system", "content": self._build_system_prompt()},
-            {"role": "user", "content": f"Message du visiteur: {request.message}"},
-        ]
+        # Maintain multi-turn conversation history
+        if conversation_id not in _conversation_store and len(_conversation_store) >= _CONVERSATION_History_MAX_SESSIONS:
+            oldest_cid = next(iter(_conversation_store))
+            _conversation_store.pop(oldest_cid, None)
+        history = _conversation_store.setdefault(conversation_id, [])
+        history.append({"role": "user", "content": request.message})
+
+        # Call LLM with conversation history
+        messages = [{"role": "system", "content": self._build_system_prompt()}]
+        messages.extend(history[-12:])
 
         try:
             raw_reply = await self.provider.generate(messages, json_mode=False)
-            reply_text = raw_reply.strip()
+            reply_text = re.sub(r"<think>[\s\S]*?</think>", "", raw_reply).strip()
         except Exception as e:
             logger.warning("GroqProvider unavailable for inbound portfolio: %s. Using resilient fallback.", e)
             reply_text = (
-                "Bonjour ! Je suis le concierge IA de Rockib Quenum.\n\n"
-                "Rockib conçoit et déploie des sites web performants, des automatisations avancées et des agents IA "
-                "en production réelle — comme le vendeur IA WhatsApp de MARTISTORE ou le portail client de l'Agence IIA.\n\n"
-                "Pour discuter de votre projet ou obtenir une estimation, vous pouvez me laisser votre adresse email "
-                "ou contacter Rockib directement par email à rockibdev@gmail.com ou sur WhatsApp !"
+                "Bonjour ! Je suis l'assistant IA et co-architecte de Rockib Quenum.\n\n"
+                "Rockib conçoit et déploie des architectures distribuées, des automatisations avancées et des agents IA "
+                "en production réelle — comme le moteur d'arbitrage multi-agents Rockib AI, le vendeur IA WhatsApp de MARTISTORE "
+                "(avec vision CLIP), WaAuto Commercial ou le portail client de l'Agence IIA.\n\n"
+                "Décrivez-moi votre projet pour que je vous propose une architecture technique complète, ou laissez-moi "
+                "votre adresse email (ou contactez rockibdev@gmail.com) !"
             )
+
+        history.append({"role": "assistant", "content": reply_text})
 
         # If lead was captured, append reassurance
         if lead_captured and detected_email and detected_email not in reply_text:
