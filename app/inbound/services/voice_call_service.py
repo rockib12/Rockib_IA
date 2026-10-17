@@ -122,7 +122,19 @@ class VoiceCallService:
                 logger.warning("Groq Whisper STT HTTP %s: %s", resp.status_code, resp.text[:200])
                 return ""
             payload = resp.json()
-            return (payload.get("text") or "").strip()
+            raw_text = (payload.get("text") or "").strip()
+            low = raw_text.lower()
+            hallucinations = (
+                "sous-titres",
+                "amara.org",
+                "merci d'avoir regardé",
+                "abonnez-vous",
+                "transcription by",
+                "merci.",
+            )
+            if any(h in low for h in hallucinations) or len(raw_text.strip(" .,!?-")) < 2:
+                return ""
+            return raw_text
 
 
 
@@ -147,7 +159,7 @@ class VoiceCallService:
 
         greeting = (
             "Bonjour ! Je suis le concierge vocal de Rockib Quenum. "
-            "Je vous écoute : parlez-moi de votre projet de site, d'automatisation ou de boutique WhatsApp !"
+            "Je vous écoute, de quel projet souhaitez-vous parler ?"
         )
         session.history.append({"role": "assistant", "content": greeting})
 
@@ -161,14 +173,14 @@ class VoiceCallService:
 
     def _build_voice_system_prompt(self) -> str:
         return (
-            "Tu es le Concierge VOCAL officiel de Rockib Quenum (Cotonou, Bénin) en appel direct avec un visiteur.\n"
-            "DIRECTIVES VOCALES CRITIQUES (TEXT-TO-SPEECH) :\n"
-            "1. Tes réponses vont être lues à voix haute par un moteur de synthèse vocale. Écris dans un style parlé naturel, vivant et fluide.\n"
-            "2. N'utilise JAMAIS de mise en forme Markdown : aucun astérisque (*), aucun dièse (#), aucune puce (-), aucun lien markdown.\n"
-            "3. Fais des phrases courtes (2 à 3 phrases maximum par réponse) pour permettre un échange dynamique.\n"
-            "4. Si l'interlocuteur souhaite un devis ou une estimation, demande-lui son adresse email ou son numéro de téléphone.\n"
-            "5. BASE DE CONNAISSANCES : Rockib conçoit des systèmes en production réelle (le vendeur IA WhatsApp MARTISTORE, l'Agence IIA, WaAuto Commercial). Contact : rockibdev@gmail.com.\n"
-            "6. Si l'interlocuteur dit au revoir ou veut raccrocher, salue-le chaleureusement et souhaite-lui une excellente journée."
+            "Tu es le Concierge VOCAL temps réel de Rockib Quenum (Cotonou, Bénin), inspiré du mode vocal fluide de ChatGPT.\n"
+            "DIRECTIVES VOCALES CRITIQUES (CONVERSATION TEMPS RÉEL) :\n"
+            "1. Réponds TOUJOURS en 1 à 2 phrases très courtes et percutantes (maximum 35 mots) pour garder un rythme de dialogue ultra-rapide et naturel.\n"
+            "2. N'utilise JAMAIS de mise en forme Markdown : aucun astérisque (*), aucun dièse (#), aucune puce (-), aucun lien.\n"
+            "3. Parle de façon chaleureuse, directe et humaine, comme au téléphone.\n"
+            "4. Si l'interlocuteur souhaite un devis ou travailler avec Rockib, demande-lui simplement son email ou son numéro WhatsApp.\n"
+            "5. BASE DE CONNAISSANCES : Rockib est Lead Software Architect & AI Systems Engineer (Rockib AI Engine, vendeur IA WhatsApp MARTISTORE, WaAuto Commercial, Agence IIA). Contact : rockibdev@gmail.com.\n"
+            "6. Si l'interlocuteur dit au revoir ou veut raccrocher, salue-le chaleureusement."
         )
 
     async def handle_voice_turn(

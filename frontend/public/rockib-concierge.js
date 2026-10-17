@@ -484,47 +484,57 @@ Que souhaitez-vous savoir ?</div>
       </form>
     </div>
 
-    <!-- Panel 2: Live Voice Calling -->
+    <!-- Panel 2: Live Voice Calling (ChatGPT Advanced Voice Mode UI) -->
     <div class="rq-panel" id="rq-panel-voice">
-      <div class="rq-voice-container">
-        <div class="rq-voice-orb-wrapper">
-          <div class="rq-voice-orb" id="rq-voice-orb">🎙️</div>
+      <div class="rq-voice-container" style="justify-content:space-between; padding:18px 20px;">
+        <!-- Top Voice Selector Bar -->
+        <div style="display:flex; align-items:center; justify-content:space-between; width:100%; gap:6px;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span id="rq-voice-badge" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#64748B;"></span>
+            <span id="rq-voice-mode-label" style="font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:0.08em;">Mode Vocal Temps Réel</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:5px;">
+            <select id="rq-voice-profile" class="rq-input" style="padding:4px 7px; font-size:10px; border-radius:999px; background:#0A101E;">
+              <option value="henri">🎙️ Henri HD</option>
+              <option value="vivienne">🎙️ Vivienne HD</option>
+              <option value="denise">🎙️ Denise HD</option>
+              <option value="remy">🎙️ Rémy HD</option>
+            </select>
+            <button type="button" id="rq-btn-test-voice" title="Écouter cette voix" style="background:#0A101E; border:1px solid rgba(0,240,255,0.35); color:#00F0FF; border-radius:999px; padding:4px 8px; font-size:10px; cursor:pointer;">🔊</button>
+          </div>
         </div>
-        <div class="rq-voice-wave" id="rq-voice-wave">
-          <div class="rq-wave-bar"></div>
-          <div class="rq-wave-bar"></div>
-          <div class="rq-wave-bar"></div>
-          <div class="rq-wave-bar"></div>
-          <div class="rq-wave-bar"></div>
+
+        <!-- Center ChatGPT Fluid Morphing Orb -->
+        <div style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; margin:4px 0;">
+          <canvas id="rq-voice-canvas" width="190" height="190" style="width:190px; height:190px; cursor:pointer;" title="Touchez la sphère pour parler ou interrompre"></canvas>
+          <div id="rq-voice-orb" style="display:none;"></div>
+          <div id="rq-voice-wave" style="display:none;"></div>
+          <div class="rq-voice-status" id="rq-voice-status" style="margin-top:6px; font-size:14px; font-weight:700; color:#EDF5FF; letter-spacing:0.01em;">Touchez pour démarrer</div>
+          <div class="rq-voice-sub" id="rq-voice-sub" style="margin-top:2px; font-size:11px; color:#7E90A6;">Conversation fluide mains-libres · Interruption instantanée</div>
         </div>
-        <div>
-          <div class="rq-voice-status" id="rq-voice-status">Appel vocal en direct</div>
-          <div class="rq-voice-sub" id="rq-voice-sub">Parlez directement avec le Concierge IA (Voix Neuronale HD).</div>
+
+        <!-- Live Subtitle / Caption Box -->
+        <div class="rq-voice-transcript" id="rq-voice-transcript" style="width:100%; min-height:46px; max-height:76px; overflow-y:auto; text-align:center; font-size:11.5px; border-radius:12px; background:rgba(10,16,28,0.85);">
+          <em>Parlez librement comme avec ChatGPT : je détecte automatiquement quand vous parlez et quand vous faites une pause.</em>
         </div>
-        <div style="display:flex; align-items:center; gap:6px; width:100%; justify-content:center; flex-wrap:wrap;">
-          <label for="rq-voice-profile" style="font-size:10px; color:#7E90A6;">Voix HD :</label>
-          <select id="rq-voice-profile" class="rq-input" style="padding:5px 8px; font-size:11px; max-width:195px;">
-            <option value="henri">Henri Neural HD (Homme)</option>
-            <option value="vivienne">Vivienne Neural HD (Femme)</option>
-            <option value="denise">Denise Neural HD (Femme)</option>
-            <option value="remy">Rémy Neural HD (Homme)</option>
-          </select>
-          <button type="button" id="rq-btn-test-voice" title="Écouter un extrait de cette voix" style="background:#0A101E; border:1px solid #00F0FF; color:#00F0FF; border-radius:6px; padding:5px 9px; font-size:11px; font-family:inherit; cursor:pointer;">🔊 Tester</button>
-        </div>
-        <div class="rq-voice-transcript" id="rq-voice-transcript" style="width: 100%;">
-          <em>Appuyez sur "Démarrer l'appel" pour discuter à voix haute...</em>
-        </div>
-        <form id="rq-voice-quick-form" style="display:flex; gap:6px; width:100%;">
-          <input type="text" id="rq-voice-quick-input" class="rq-input" placeholder="Parlez au micro ou écrivez ici..." style="font-size:11px; padding:6px 10px;" autocomplete="off" />
-          <button type="submit" class="rq-send" title="Envoyer au Concierge Vocal" style="padding:0 10px; font-size:11px;">➤</button>
-        </form>
-        <div style="display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap;">
-          <button type="button" class="rq-btn-call" id="rq-btn-toggle-call">
-            <span>📞 Démarrer l'appel vocal</span>
-          </button>
-          <button type="button" id="rq-btn-send-speech" style="display:none; background:#0A101E; border:1px solid #00FF9D; color:#00FF9D; border-radius:8px; padding:9px 14px; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;">
-            ✅ J'ai fini de parler
-          </button>
+
+        <!-- Bottom ChatGPT-style Control Dock + Optional Text Bar -->
+        <div style="display:flex; flex-direction:column; gap:10px; width:100%; align-items:center;">
+          <div style="display:flex; align-items:center; justify-content:center; gap:16px; width:100%;">
+            <button type="button" id="rq-btn-mute" title="Couper / Activer le micro" style="display:none; width:44px; height:44px; border-radius:50%; border:1px solid rgba(255,255,255,0.18); background:#111827; color:#EDF5FF; font-size:17px; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
+              🎙️
+            </button>
+            <button type="button" class="rq-btn-call" id="rq-btn-toggle-call" style="border-radius:999px; padding:11px 24px; font-size:12.5px;">
+              <span>📞 Démarrer la conversation</span>
+            </button>
+            <button type="button" id="rq-btn-send-speech" title="Forcer l'envoi immédiat" style="display:none; width:44px; height:44px; border-radius:50%; border:1px solid rgba(0,255,157,0.5); background:rgba(0,255,157,0.12); color:#00FF9D; font-size:16px; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
+              ✓
+            </button>
+          </div>
+          <form id="rq-voice-quick-form" style="display:flex; gap:6px; width:100%;">
+            <input type="text" id="rq-voice-quick-input" class="rq-input" placeholder="Ou écrivez un message au Concierge vocal..." style="font-size:11px; padding:6px 12px; border-radius:999px;" autocomplete="off" />
+            <button type="submit" class="rq-send" title="Envoyer" style="padding:0 12px; font-size:11px; border-radius:999px;">➤</button>
+          </form>
         </div>
       </div>
     </div>
@@ -676,14 +686,37 @@ Que souhaitez-vous savoir ?</div>
     if (chip) sendChatMessage(chip.getAttribute('data-query'));
   });
 
-  // --- Voice Calling Section ---
+  // --- ChatGPT-Style Advanced Voice Mode Section ---
   const orb = chatWindow.querySelector('#rq-voice-orb');
   const wave = chatWindow.querySelector('#rq-voice-wave');
+  const voiceCanvas = chatWindow.querySelector('#rq-voice-canvas');
+  const voiceBadge = chatWindow.querySelector('#rq-voice-badge');
+  const voiceModeLabel = chatWindow.querySelector('#rq-voice-mode-label');
   const voiceStatus = chatWindow.querySelector('#rq-voice-status');
+  const voiceSub = chatWindow.querySelector('#rq-voice-sub');
   const voiceTranscript = chatWindow.querySelector('#rq-voice-transcript');
   const btnToggleCall = chatWindow.querySelector('#rq-btn-toggle-call');
+  const btnMute = chatWindow.querySelector('#rq-btn-mute');
+  const btnSendSpeech = chatWindow.querySelector('#rq-btn-send-speech');
   const voiceProfileSelect = chatWindow.querySelector('#rq-voice-profile');
+  const voiceQuickForm = chatWindow.querySelector('#rq-voice-quick-form');
+  const voiceQuickInput = chatWindow.querySelector('#rq-voice-quick-input');
+
   let currentAudio = null;
+  let micStream = null;
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let audioCtx = null;
+  let micSource = null;
+  let micAnalyser = null;
+  let micTimeData = null;
+  let aiAnalyser = null;
+  let aiTimeData = null;
+  let vadInterval = null;
+  let isProcessingTurn = false;
+  let isMuted = false;
+  let orbState = 'idle'; // 'idle' | 'listening' | 'user_speaking' | 'thinking' | 'ai_speaking'
+  let orbLevel = 0; // 0..1 smoothed audio energy
 
   if (voiceProfileSelect) {
     const savedVoice = localStorage.getItem('rq_voice_profile');
@@ -693,11 +726,174 @@ Que souhaitez-vous savoir ?</div>
     });
   }
 
-  // Preload browser voices for instant Option 2 fallback
+  // Preload browser voices for instant fallback
   if (window.speechSynthesis && typeof window.speechSynthesis.onvoiceschanged !== 'undefined') {
     window.speechSynthesis.onvoiceschanged = function () {
       window.speechSynthesis.getVoices();
     };
+  }
+
+  // --- 60 FPS ChatGPT Fluid Sphere Renderer ---
+  (function initFluidOrbCanvas() {
+    if (!voiceCanvas) return;
+    const ctx = voiceCanvas.getContext('2d');
+    let phase = 0;
+
+    function computeRmsFromTimeData(analyser, buf) {
+      if (!analyser || !buf) return 0;
+      try {
+        analyser.getByteTimeDomainData(buf);
+        let sumSq = 0;
+        for (let i = 0; i < buf.length; i++) {
+          const d = buf[i] - 128;
+          sumSq += d * d;
+        }
+        return Math.sqrt(sumSq / buf.length); // 0..128
+      } catch (e) {
+        return 0;
+      }
+    }
+
+    function renderOrb() {
+      requestAnimationFrame(renderOrb);
+      if (!isOpen || activeTab !== 'voice') return;
+
+      const w = voiceCanvas.width;
+      const h = voiceCanvas.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      ctx.clearRect(0, 0, w, h);
+
+      // Measure real-time audio energy from either AI voice or User mic
+      let rawEnergy = 0;
+      if (orbState === 'ai_speaking' && aiAnalyser && aiTimeData) {
+        rawEnergy = Math.min(1, computeRmsFromTimeData(aiAnalyser, aiTimeData) / 26);
+      } else if (orbState === 'ai_speaking') {
+        rawEnergy = 0.25 + 0.2 * Math.sin(phase * 3.5);
+      } else if ((orbState === 'listening' || orbState === 'user_speaking') && micAnalyser && micTimeData && !isMuted) {
+        rawEnergy = Math.min(1, computeRmsFromTimeData(micAnalyser, micTimeData) / 20);
+      } else if (orbState === 'thinking') {
+        rawEnergy = 0.3 + 0.15 * Math.sin(phase * 5);
+      } else {
+        rawEnergy = 0.06 * (0.5 + 0.5 * Math.sin(phase * 1.4));
+      }
+
+      orbLevel = orbLevel * 0.78 + rawEnergy * 0.22;
+      phase += 0.045 + orbLevel * 0.09;
+
+      // Color palette by state (ChatGPT Voice style)
+      let c1 = '0, 240, 255';   // Cyan
+      let c2 = '99, 102, 241';  // Indigo
+      if (orbState === 'user_speaking') {
+        c1 = '0, 255, 157';     // Emerald
+        c2 = '0, 240, 255';
+      } else if (orbState === 'thinking') {
+        c1 = '168, 85, 247';    // Violet
+        c2 = '0, 240, 255';
+      } else if (orbState === 'ai_speaking') {
+        c1 = '56, 189, 248';    // Sky Blue (ChatGPT Voice signature)
+        c2 = '237, 245, 255';   // Luminous White-Cyan
+      }
+
+      const baseR = 46 + orbLevel * 22;
+
+      // Outer atmospheric glow
+      const outerGrad = ctx.createRadialGradient(cx, cy, baseR * 0.3, cx, cy, baseR * 1.75);
+      outerGrad.addColorStop(0, `rgba(${c1}, ${0.32 + orbLevel * 0.35})`);
+      outerGrad.addColorStop(0.55, `rgba(${c2}, ${0.14 + orbLevel * 0.18})`);
+      outerGrad.addColorStop(1, 'rgba(6, 9, 18, 0)');
+      ctx.fillStyle = outerGrad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, baseR * 1.75, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 3 Fluid morphing organic lobes
+      for (let layer = 0; layer < 3; layer++) {
+        ctx.beginPath();
+        const pts = 64;
+        const layerOffset = layer * 2.1;
+        const layerR = baseR * (1 - layer * 0.08);
+        const amp = (3.5 + orbLevel * 13) * (1 - layer * 0.2);
+
+        for (let i = 0; i <= pts; i++) {
+          const angle = (i / pts) * Math.PI * 2;
+          const wave1 = Math.sin(angle * 3 + phase + layerOffset) * amp;
+          const wave2 = Math.cos(angle * 4 - phase * 1.3 + layerOffset) * (amp * 0.55);
+          const r = layerR + wave1 + wave2;
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          if (i === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+
+        const grad = ctx.createRadialGradient(
+          cx - 10 * Math.cos(phase * 0.7),
+          cy - 10 * Math.sin(phase * 0.7),
+          layerR * 0.1,
+          cx,
+          cy,
+          layerR * 1.25
+        );
+        if (layer === 0) {
+          grad.addColorStop(0, `rgba(${c2}, 0.55)`);
+          grad.addColorStop(1, `rgba(${c1}, 0.22)`);
+        } else if (layer === 1) {
+          grad.addColorStop(0, `rgba(255, 255, 255, ${0.45 + orbLevel * 0.35})`);
+          grad.addColorStop(0.6, `rgba(${c1}, 0.75)`);
+          grad.addColorStop(1, `rgba(${c2}, 0.35)`);
+        } else {
+          grad.addColorStop(0, '#FFFFFF');
+          grad.addColorStop(0.45, `rgba(${c1}, 0.92)`);
+          grad.addColorStop(1, `rgba(${c2}, 0.75)`);
+        }
+        ctx.fillStyle = grad;
+        ctx.fill();
+      }
+    }
+
+    requestAnimationFrame(renderOrb);
+  })();
+
+  function setOrbUiState(state, statusText, subText) {
+    orbState = state;
+    if (voiceStatus && statusText) voiceStatus.textContent = statusText;
+    if (voiceSub && subText !== undefined) voiceSub.textContent = subText;
+    if (voiceBadge && voiceModeLabel) {
+      if (state === 'listening' || state === 'user_speaking') {
+        voiceBadge.style.background = '#00FF9D';
+        voiceBadge.style.boxShadow = '0 0 8px #00FF9D';
+        voiceModeLabel.textContent = state === 'user_speaking' ? 'Vous parlez...' : 'Micro Actif · Mains-Libres';
+      } else if (state === 'thinking') {
+        voiceBadge.style.background = '#A855F7';
+        voiceBadge.style.boxShadow = '0 0 8px #A855F7';
+        voiceModeLabel.textContent = 'Réflexion IA...';
+      } else if (state === 'ai_speaking') {
+        voiceBadge.style.background = '#00F0FF';
+        voiceBadge.style.boxShadow = '0 0 8px #00F0FF';
+        voiceModeLabel.textContent = 'Concierge en train de parler';
+      } else {
+        voiceBadge.style.background = '#64748B';
+        voiceBadge.style.boxShadow = 'none';
+        voiceModeLabel.textContent = 'Mode Vocal Temps Réel';
+      }
+    }
+  }
+
+  function ensureMicAudioGraph(stream) {
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass || !stream) return;
+    try {
+      if (!audioCtx) audioCtx = new AudioContextClass();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      if (!micAnalyser) {
+        micSource = audioCtx.createMediaStreamSource(stream);
+        micAnalyser = audioCtx.createAnalyser();
+        micAnalyser.fftSize = 512;
+        micSource.connect(micAnalyser);
+        micTimeData = new Uint8Array(micAnalyser.fftSize);
+      }
+    } catch (e) {}
   }
 
   function pickBestBrowserFrenchVoice(preferredGender) {
@@ -734,111 +930,11 @@ Que souhaitez-vous savoir ?</div>
   function setVoiceTranscript(speaker, text) {
     voiceTranscript.textContent = '';
     const strong = document.createElement('strong');
+    strong.style.color = speaker.startsWith('Vous') ? '#00FF9D' : '#00F0FF';
     strong.textContent = speaker + ' : ';
     voiceTranscript.appendChild(strong);
     voiceTranscript.appendChild(document.createTextNode(text || ''));
   }
-
-  function speakWithBrowserFallback(text, finishCallback, preferredGender) {
-    if (!window.speechSynthesis) {
-      finishCallback();
-      return;
-    }
-    window.speechSynthesis.cancel();
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = 'fr-FR';
-    utterance.rate = 1.0;
-    utterance.pitch = preferredGender === 'female' ? 1.02 : 0.98;
-
-    const bestVoice = pickBestBrowserFrenchVoice(preferredGender);
-    if (bestVoice) utterance.voice = bestVoice;
-
-    utterance.onend = finishCallback;
-    utterance.onerror = finishCallback;
-
-    var wordCount = (text || '').split(/\s+/).length;
-    var maxWaitMs = Math.max(3500, (wordCount / 2.1) * 1000 + 2500);
-    setTimeout(function () {
-      if (isSpeaking) finishCallback();
-    }, maxWaitMs);
-
-    setTimeout(function () {
-      window.speechSynthesis.speak(utterance);
-    }, 50);
-  }
-
-  async function speakReply(text, onComplete) {
-    if (currentAudio) {
-      try {
-        currentAudio.pause();
-        currentAudio.src = '';
-      } catch (e) {}
-      currentAudio = null;
-    }
-    if (window.speechSynthesis) window.speechSynthesis.cancel();
-
-    isSpeaking = true;
-    wave.classList.add('rq-wave-active');
-    voiceStatus.textContent = 'Le Concierge vous parle (Voix HD)...';
-
-    var hasEnded = false;
-    function finish() {
-      if (hasEnded) return;
-      hasEnded = true;
-      isSpeaking = false;
-      wave.classList.remove('rq-wave-active');
-      if (isCalling) voiceStatus.textContent = 'À votre écoute...';
-      if (onComplete) onComplete();
-    }
-
-    const selectedProfile = (voiceProfileSelect && voiceProfileSelect.value) || 'henri';
-    const preferredGender = (selectedProfile === 'vivienne' || selectedProfile === 'denise') ? 'female' : 'male';
-
-    // Option 1: Try Neural HD Server TTS first
-    try {
-      const ttsResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/tts`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
-        body: JSON.stringify({ text: text, voice: selectedProfile }),
-      });
-
-      if (ttsResp.ok) {
-        const audioBlob = await ttsResp.blob();
-        if (audioBlob && audioBlob.size > 200) {
-          const audioUrl = URL.createObjectURL(audioBlob);
-          const audio = new Audio(audioUrl);
-          currentAudio = audio;
-          audio.onended = () => {
-            URL.revokeObjectURL(audioUrl);
-            currentAudio = null;
-            finish();
-          };
-          audio.onerror = () => {
-            URL.revokeObjectURL(audioUrl);
-            currentAudio = null;
-            speakWithBrowserFallback(text, finish, preferredGender);
-          };
-          await audio.play();
-          return;
-        }
-      }
-    } catch (e) {
-      // Fallback to Option 2 (Ranked Browser Neural Voice)
-    }
-
-    // Option 2: Smart Ranked Browser Neural Voice Fallback
-    speakWithBrowserFallback(text, finish, preferredGender);
-  }
-
-  const btnSendSpeech = chatWindow.querySelector('#rq-btn-send-speech');
-  const voiceQuickForm = chatWindow.querySelector('#rq-voice-quick-form');
-  const voiceQuickInput = chatWindow.querySelector('#rq-voice-quick-input');
-  let micStream = null;
-  let mediaRecorder = null;
-  let audioChunks = [];
-  let audioCtx = null;
-  let vadInterval = null;
-  let isProcessingTurn = false;
 
   function stopActiveListening() {
     if (vadInterval) {
@@ -860,8 +956,162 @@ Que souhaitez-vous savoir ?</div>
     if (btnSendSpeech) btnSendSpeech.style.display = 'none';
   }
 
+  function interruptAiSpeaking() {
+    if (!isSpeaking) return;
+    isSpeaking = false;
+    if (currentAudio) {
+      try {
+        currentAudio.pause();
+        currentAudio.src = '';
+      } catch (e) {}
+      currentAudio = null;
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+    if (isCalling) {
+      listenToUser();
+    }
+  }
+
+  function speakWithBrowserFallback(text, finishCallback, preferredGender) {
+    if (!window.speechSynthesis) {
+      finishCallback();
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = 'fr-FR';
+    utterance.rate = 1.02;
+    utterance.pitch = preferredGender === 'female' ? 1.02 : 0.98;
+
+    const bestVoice = pickBestBrowserFrenchVoice(preferredGender);
+    if (bestVoice) utterance.voice = bestVoice;
+
+    utterance.onend = finishCallback;
+    utterance.onerror = finishCallback;
+
+    var wordCount = (text || '').split(/\s+/).length;
+    var maxWaitMs = Math.max(3500, (wordCount / 2.2) * 1000 + 2500);
+    setTimeout(function () {
+      if (isSpeaking) finishCallback();
+    }, maxWaitMs);
+
+    setTimeout(function () {
+      window.speechSynthesis.speak(utterance);
+    }, 40);
+  }
+
+  async function speakReply(text, onComplete) {
+    stopActiveListening();
+    if (currentAudio) {
+      try {
+        currentAudio.pause();
+        currentAudio.src = '';
+      } catch (e) {}
+      currentAudio = null;
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
+
+    isSpeaking = true;
+    setOrbUiState(
+      'ai_speaking',
+      'Le Concierge vous répond...',
+      isCalling ? 'Touchez la sphère (ou parlez) pour l’interrompre' : 'Lecture de la voix Neuronale HD'
+    );
+
+    var bargeInCheckInterval = null;
+    var hasEnded = false;
+    function finish() {
+      if (hasEnded) return;
+      hasEnded = true;
+      isSpeaking = false;
+      if (bargeInCheckInterval) {
+        clearInterval(bargeInCheckInterval);
+        bargeInCheckInterval = null;
+      }
+      if (onComplete) onComplete();
+    }
+
+    // Monitor microphone during AI speech for hands-free Barge-In (interruption)
+    if (isCalling && micAnalyser && micTimeData && !isMuted) {
+      let loudFrames = 0;
+      bargeInCheckInterval = setInterval(() => {
+        if (!isSpeaking || isMuted) return;
+        micAnalyser.getByteTimeDomainData(micTimeData);
+        let sumSq = 0;
+        for (let i = 0; i < micTimeData.length; i++) {
+          const d = micTimeData[i] - 128;
+          sumSq += d * d;
+        }
+        const rms = Math.sqrt(sumSq / micTimeData.length);
+        if (rms > 18) {
+          loudFrames++;
+          if (loudFrames >= 4) {
+            clearInterval(bargeInCheckInterval);
+            bargeInCheckInterval = null;
+            interruptAiSpeaking();
+          }
+        } else {
+          loudFrames = Math.max(0, loudFrames - 1);
+        }
+      }, 90);
+    }
+
+    const selectedProfile = (voiceProfileSelect && voiceProfileSelect.value) || 'henri';
+    const preferredGender = (selectedProfile === 'vivienne' || selectedProfile === 'denise') ? 'female' : 'male';
+
+    // Option 1: Server Neural HD TTS
+    try {
+      const ttsResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify({ text: text, voice: selectedProfile }),
+      });
+
+      if (ttsResp.ok && isSpeaking) {
+        const audioBlob = await ttsResp.blob();
+        if (audioBlob && audioBlob.size > 200 && isSpeaking) {
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          currentAudio = audio;
+
+          // Connect AI audio to AnalyserNode so the fluid sphere dances to the AI's voice
+          try {
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (AudioContextClass) {
+              if (!audioCtx) audioCtx = new AudioContextClass();
+              if (audioCtx.state === 'suspended') audioCtx.resume();
+              const elemSource = audioCtx.createMediaElementSource(audio);
+              aiAnalyser = audioCtx.createAnalyser();
+              aiAnalyser.fftSize = 512;
+              elemSource.connect(aiAnalyser);
+              aiAnalyser.connect(audioCtx.destination);
+              aiTimeData = new Uint8Array(aiAnalyser.fftSize);
+            }
+          } catch (graphErr) {}
+
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            currentAudio = null;
+            finish();
+          };
+          audio.onerror = () => {
+            URL.revokeObjectURL(audioUrl);
+            currentAudio = null;
+            speakWithBrowserFallback(text, finish, preferredGender);
+          };
+          await audio.play();
+          return;
+        }
+      }
+    } catch (e) {}
+
+    if (isSpeaking) {
+      speakWithBrowserFallback(text, finish, preferredGender);
+    }
+  }
+
   async function startVoiceCall() {
-    // 1. Immediately request microphone access on the user click gesture!
+    // 1. Unlock microphone immediately on user click gesture
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         if (!micStream || !micStream.active) {
@@ -869,13 +1119,14 @@ Que souhaitez-vous savoir ?</div>
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
           });
         }
+        ensureMicAudioGraph(micStream);
       }
     } catch (micErr) {
-      voiceStatus.textContent = 'Microphone bloqué';
-      voiceTranscript.textContent = "Veuillez autoriser l'accès au microphone dans la barre d'adresse du navigateur (ou écrivez dans le champ ci-dessous).";
+      setOrbUiState('idle', 'Microphone non autorisé', "Autorisez le micro dans la barre d'adresse ou écrivez ci-dessous.");
     }
 
     try {
+      setOrbUiState('thinking', 'Connexion vocale...', 'Initialisation de la session temps réel');
       const resp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/session`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
@@ -886,19 +1137,21 @@ Que souhaitez-vous savoir ?</div>
 
       isCalling = true;
       isProcessingTurn = false;
-      orb.classList.add('rq-calling');
+      isMuted = false;
+      if (btnMute) {
+        btnMute.style.display = 'inline-flex';
+        btnMute.textContent = '🎙️';
+        btnMute.style.borderColor = 'rgba(0, 255, 157, 0.5)';
+      }
       btnToggleCall.classList.add('rq-btn-hangup');
-      btnToggleCall.innerHTML = '<span>🔴 Raccrocher</span>';
-      voiceStatus.textContent = 'Appel en cours';
+      btnToggleCall.innerHTML = '<span>✕ Terminer</span>';
       setVoiceTranscript('Concierge', data.greeting_text);
 
-      // Speak greeting then listen
       speakReply(data.greeting_text, () => {
         if (isCalling) listenToUser();
       });
     } catch (err) {
-      voiceStatus.textContent = 'Erreur de connexion';
-      voiceTranscript.textContent = "Impossible de joindre le serveur vocal.";
+      setOrbUiState('idle', 'Erreur de connexion', 'Impossible de joindre le serveur vocal.');
     }
   }
 
@@ -906,7 +1159,12 @@ Que souhaitez-vous savoir ?</div>
     if (!isCalling || isSpeaking || isProcessingTurn) return;
     stopActiveListening();
 
-    voiceStatus.textContent = '🟢 À votre écoute... Parlez maintenant !';
+    if (isMuted) {
+      setOrbUiState('idle', 'Micro coupé', 'Touchez 🎙️ pour réactiver votre micro');
+      return;
+    }
+
+    setOrbUiState('listening', 'Je vous écoute...', 'Parlez naturellement, je détecte vos pauses automatiquement');
     if (btnSendSpeech) btnSendSpeech.style.display = 'inline-flex';
 
     var capturedSpeech = '';
@@ -923,7 +1181,7 @@ Que souhaitez-vous savoir ?</div>
       processVoiceTurn(cleaned);
     }
 
-    // Engine A: Browser Web Speech API (if supported)
+    // Engine A: Browser Web Speech API (instant live captions + fast trigger)
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRec) {
       try {
@@ -933,6 +1191,7 @@ Que souhaitez-vous savoir ?</div>
         recognition.interimResults = true;
 
         recognition.onresult = function (event) {
+          if (isMuted) return;
           var interim = '';
           var finalTxt = '';
           for (var i = 0; i < event.results.length; ++i) {
@@ -945,11 +1204,12 @@ Que souhaitez-vous savoir ?</div>
           var spoken = (finalTxt + interim).trim();
           if (spoken) {
             capturedSpeech = spoken;
+            setOrbUiState('user_speaking', 'Je vous écoute...', 'En train de capter votre voix...');
             setVoiceTranscript('Vous (en direct)', spoken);
             clearTimeout(finishTimeout);
             finishTimeout = setTimeout(function () {
               submitRecognizedText(capturedSpeech);
-            }, 1500);
+            }, 1050);
           }
         };
 
@@ -959,16 +1219,14 @@ Que souhaitez-vous savoir ?</div>
           }
         };
 
-        recognition.onerror = function () {
-          // Handled seamlessly by Engine B (MediaRecorder + Groq Whisper)
-        };
-
+        recognition.onerror = function () {};
         recognition.start();
       } catch (e) {}
     }
 
-    // Engine B: MediaRecorder + Web Audio Silence Detection -> Groq Whisper STT
+    // Engine B: Calibrated Time-Domain RMS VAD + Groq Whisper STT (works on 100% of browsers)
     if (micStream && micStream.active && typeof window.MediaRecorder !== 'undefined') {
+      ensureMicAudioGraph(micStream);
       try {
         audioChunks = [];
         var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
@@ -981,19 +1239,19 @@ Que souhaitez-vous savoir ?</div>
         };
 
         mediaRecorder.onstop = async function () {
-          if (turnSubmitted || !isCalling || isSpeaking || isProcessingTurn) return;
+          if (turnSubmitted || !isCalling || isSpeaking || isProcessingTurn || isMuted) return;
           if (capturedSpeech.trim().length > 1) {
             submitRecognizedText(capturedSpeech);
             return;
           }
           var blob = new Blob(audioChunks, { type: mimeType || 'audio/webm' });
-          if (blob.size < 1000) {
+          if (blob.size < 800) {
             if (isCalling && !isSpeaking && !isProcessingTurn) {
-              setTimeout(listenToUser, 300);
+              setTimeout(listenToUser, 200);
             }
             return;
           }
-          voiceStatus.textContent = 'Transcription vocale HD (Whisper)...';
+          setOrbUiState('thinking', 'Transcription...', 'Analyse vocale ultra-rapide');
           try {
             var sttResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/stt`, {
               method: 'POST',
@@ -1015,47 +1273,52 @@ Que souhaitez-vous savoir ?</div>
             }
           } catch (err) {}
           if (isCalling && !isSpeaking && !isProcessingTurn) {
-            setTimeout(listenToUser, 400);
+            setTimeout(listenToUser, 250);
           }
         };
 
-        mediaRecorder.start(250);
+        mediaRecorder.start(200);
 
-        // Web Audio API Voice Activity Detection (VAD)
-        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-        if (AudioContextClass) {
-          if (!audioCtx) audioCtx = new AudioContextClass();
-          if (audioCtx.state === 'suspended') audioCtx.resume();
-          const source = audioCtx.createMediaStreamSource(micStream);
-          const analyser = audioCtx.createAnalyser();
-          analyser.fftSize = 512;
-          source.connect(analyser);
-          const dataArray = new Uint8Array(analyser.frequencyBinCount);
-
+        // Calibrated Time-Domain RMS Voice Activity Detection
+        if (micAnalyser && micTimeData) {
+          var speechFrames = 0;
           var hasSpokenAudio = false;
           var silenceStart = 0;
-          var listenStart = Date.now();
+          var noiseFloor = 1.4;
+          var cycleStart = Date.now();
 
           vadInterval = setInterval(function () {
-            if (!isCalling || isSpeaking || turnSubmitted) {
+            if (!isCalling || isSpeaking || turnSubmitted || isMuted) {
               clearInterval(vadInterval);
               vadInterval = null;
               return;
             }
-            analyser.getByteFrequencyData(dataArray);
-            var sum = 0;
-            for (var i = 0; i < dataArray.length; i++) sum += dataArray[i];
-            var avgVolume = sum / dataArray.length;
+            micAnalyser.getByteTimeDomainData(micTimeData);
+            var sumSq = 0;
+            for (var i = 0; i < micTimeData.length; i++) {
+              var d = micTimeData[i] - 128;
+              sumSq += d * d;
+            }
+            var rms = Math.sqrt(sumSq / micTimeData.length);
+            var threshold = Math.max(3.2, Math.min(9.0, noiseFloor * 2.2));
 
-            if (avgVolume > 14) {
-              hasSpokenAudio = true;
+            if (rms > threshold) {
+              speechFrames++;
               silenceStart = 0;
-              wave.classList.add('rq-wave-active');
+              if (speechFrames >= 2) {
+                hasSpokenAudio = true;
+                setOrbUiState('user_speaking', 'Je vous écoute...', 'Parlez librement...');
+              }
             } else {
-              wave.classList.remove('rq-wave-active');
+              if (!hasSpokenAudio) {
+                noiseFloor = noiseFloor * 0.92 + rms * 0.08;
+              }
+              speechFrames = Math.max(0, speechFrames - 1);
               if (hasSpokenAudio) {
-                if (!silenceStart) silenceStart = Date.now();
-                else if (Date.now() - silenceStart > 1400) {
+                if (!silenceStart) {
+                  silenceStart = Date.now();
+                } else if (Date.now() - silenceStart > 920) {
+                  // 920ms pause after speaking -> auto-send turn like ChatGPT!
                   clearInterval(vadInterval);
                   vadInterval = null;
                   if (capturedSpeech.trim().length > 1) {
@@ -1064,11 +1327,13 @@ Que souhaitez-vous savoir ?</div>
                     try { mediaRecorder.stop(); } catch (e) {}
                   }
                 }
-              } else if (Date.now() - listenStart > 12000 && mediaRecorder && mediaRecorder.state === 'recording') {
-                listenStart = Date.now();
+              } else if (Date.now() - cycleStart > 15000) {
+                // Keep buffer fresh during long silence
+                cycleStart = Date.now();
+                audioChunks = [];
               }
             }
-          }, 120);
+          }, 85);
         }
       } catch (recErr) {}
     }
@@ -1093,7 +1358,7 @@ Que souhaitez-vous savoir ?</div>
     isProcessingTurn = true;
     stopActiveListening();
     setVoiceTranscript('Vous', userText.trim());
-    voiceStatus.textContent = 'Traitement de votre parole...';
+    setOrbUiState('thinking', 'Réflexion...', 'Formulation de la réponse vocale');
 
     try {
       if (!voiceSessionId) {
@@ -1128,7 +1393,7 @@ Que souhaitez-vous savoir ?</div>
       });
     } catch (err) {
       isProcessingTurn = false;
-      voiceStatus.textContent = 'Erreur réseau';
+      setOrbUiState('idle', 'Erreur réseau', 'Vérifiez votre connexion');
       speakReply("Désolé, une coupure est survenue. Pouvez-vous répéter ?", () => {
         if (isCalling) listenToUser();
       });
@@ -1143,11 +1408,27 @@ Que souhaitez-vous savoir ?</div>
       voiceQuickInput.value = '';
       if (!isCalling) {
         isCalling = true;
-        orb.classList.add('rq-calling');
         btnToggleCall.classList.add('rq-btn-hangup');
-        btnToggleCall.innerHTML = '<span>🔴 Raccrocher</span>';
+        btnToggleCall.innerHTML = '<span>✕ Terminer</span>';
       }
       await processVoiceTurn(val);
+    });
+  }
+
+  if (btnMute) {
+    btnMute.addEventListener('click', () => {
+      if (!isCalling) return;
+      isMuted = !isMuted;
+      if (isMuted) {
+        btnMute.textContent = '🔇';
+        btnMute.style.borderColor = 'rgba(239, 68, 68, 0.6)';
+        stopActiveListening();
+        setOrbUiState('idle', 'Micro en sourdine', 'Touchez 🔇 pour reprendre la parole');
+      } else {
+        btnMute.textContent = '🎙️';
+        btnMute.style.borderColor = 'rgba(0, 255, 157, 0.5)';
+        if (!isSpeaking && !isProcessingTurn) listenToUser();
+      }
     });
   }
 
@@ -1155,12 +1436,15 @@ Que souhaitez-vous savoir ?</div>
     isCalling = false;
     isSpeaking = false;
     isProcessingTurn = false;
+    isMuted = false;
     stopActiveListening();
     if (micStream) {
       try {
         micStream.getTracks().forEach((t) => t.stop());
       } catch (e) {}
       micStream = null;
+      micAnalyser = null;
+      micSource = null;
     }
     if (currentAudio) {
       try {
@@ -1171,11 +1455,10 @@ Que souhaitez-vous savoir ?</div>
     }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
 
-    orb.classList.remove('rq-calling');
-    wave.classList.remove('rq-wave-active');
+    if (btnMute) btnMute.style.display = 'none';
     btnToggleCall.classList.remove('rq-btn-hangup');
-    btnToggleCall.innerHTML = "<span>📞 Démarrer l'appel vocal</span>";
-    voiceStatus.textContent = 'Appel terminé';
+    btnToggleCall.innerHTML = '<span>📞 Démarrer la conversation</span>';
+    setOrbUiState('idle', 'Conversation terminée', 'Touchez la sphère pour relancer');
   }
 
   btnToggleCall.addEventListener('click', () => {
@@ -1186,9 +1469,16 @@ Que souhaitez-vous savoir ?</div>
     }
   });
 
-  orb.addEventListener('click', () => {
-    if (!isCalling) startVoiceCall();
-  });
+  if (voiceCanvas) {
+    voiceCanvas.addEventListener('click', () => {
+      if (!isCalling) {
+        startVoiceCall();
+      } else if (isSpeaking) {
+        // ChatGPT-style tap-to-interrupt!
+        interruptAiSpeaking();
+      }
+    });
+  }
 
   const btnTestVoice = chatWindow.querySelector('#rq-btn-test-voice');
   if (btnTestVoice) {
@@ -1196,11 +1486,11 @@ Que souhaitez-vous savoir ?</div>
       const profile = (voiceProfileSelect && voiceProfileSelect.value) || 'henri';
       const sampleText =
         profile === 'vivienne' || profile === 'denise'
-          ? "Bonjour ! Je suis le concierge vocal haute définition de Rockib Quenum. Je peux vous présenter MARTISTORE, WaAuto et l'Agence IIA."
-          : "Bonjour ! Je suis le concierge vocal haute définition de Rockib Quenum. Parlez-moi de votre projet d'architecture ou d'automatisation IA.";
-      setVoiceTranscript('Concierge (Test HD)', sampleText);
+          ? "Bonjour ! Je suis le concierge vocal temps réel de Rockib Quenum. Parlez-moi librement, comme avec ChatGPT."
+          : "Bonjour ! Je suis le concierge vocal temps réel de Rockib Quenum. Parlez-moi librement, je vous écoute.";
+      setVoiceTranscript('Concierge (Aperçu HD)', sampleText);
       speakReply(sampleText, () => {
-        if (!isCalling) voiceStatus.textContent = 'Prêt pour votre appel vocal';
+        if (!isCalling) setOrbUiState('idle', 'Prêt à discuter', 'Touchez la sphère pour démarrer');
       });
     });
   }
