@@ -26,6 +26,7 @@ logger = logging.getLogger(__name__)
 # In-memory sliding window rate limiter: IP -> deque of timestamps
 _RATE_LIMIT_WINDOW_SECONDS = 60
 _MAX_REQUESTS_PER_WINDOW = 20
+_MAX_TRACKED_IPS = 2000
 _ip_request_history: dict[str, deque[float]] = defaultdict(deque)
 
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
@@ -35,6 +36,19 @@ PHONE_REGEX = re.compile(r"(\+?[0-9]{1,4}[\s-]?)?(\(?[0-9]{2,4}\)?[\s-]?)?[0-9]{
 def is_rate_limited(client_ip: str) -> bool:
     """Returns True if the IP has exceeded allowed requests in the last window."""
     now = time.time()
+
+    # Bound total tracked IPs to prevent memory exhaustion on spoofed IP floods
+    if client_ip not in _ip_request_history and len(_ip_request_history) >= _MAX_TRACKED_IPS:
+        stale_ips = [
+            ip for ip, q in _ip_request_history.items()
+            if not q or (now - q[-1] > _RATE_LIMIT_WINDOW_SECONDS)
+        ]
+        for ip in stale_ips:
+            _ip_request_history.pop(ip, None)
+        while len(_ip_request_history) >= _MAX_TRACKED_IPS:
+            oldest_ip = next(iter(_ip_request_history))
+            _ip_request_history.pop(oldest_ip, None)
+
     history = _ip_request_history[client_ip]
 
     # Evict timestamps older than window

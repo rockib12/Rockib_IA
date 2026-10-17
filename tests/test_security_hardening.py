@@ -582,13 +582,18 @@ async def test_preview_workspace_file_includes_csp_sandbox_header(tmp_path, monk
 
 
 @pytest.mark.asyncio
-async def test_auth_login_rate_limiting_blocks_bruteforce():
+async def test_auth_login_rate_limiting_blocks_bruteforce(db_session):
     """Vérifie que plus de 15 tentatives de login en 60s depuis une même IP renvoient HTTP 429."""
+    from app.core.database import get_async_db
     from app.identity.router import _auth_ip_attempts, _AUTH_MAX_ATTEMPTS
 
     test_ip = "203.0.113.99"
     _auth_ip_attempts.pop(test_ip, None)
 
+    async def _override_db():
+        yield db_session
+
+    app.dependency_overrides[get_async_db] = _override_db
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             for _ in range(_AUTH_MAX_ATTEMPTS):
@@ -609,6 +614,7 @@ async def test_auth_login_rate_limiting_blocks_bruteforce():
             assert res_blocked.headers.get("retry-after") == "60"
     finally:
         _auth_ip_attempts.pop(test_ip, None)
+        app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio
@@ -647,3 +653,89 @@ def test_voice_call_session_ttl_and_capacity_eviction():
     resp2 = svc.start_call_session(VoiceCallSessionRequest(page_url="https://rockib-quenum.netlify.app/"))
     assert sid1 not in svc._sessions
     assert resp2.session_id in svc._sessions
+
+
+# ==============================================================================
+# LOT P6 : Rate-Limiting Vocal Inbound, Éviction IP Bornée & Healthcheck DB/Redis
+# ==============================================================================
+
+
+@pytest.mark.asyncio
+async def test_inbound_voice_session_and_callback_rate_limited():
+    """Vérifie que /portfolio/voice/session et /request-callback appliquent le rate-limit IP (429)."""
+    from app.inbound.services.portfolio_handler import _ip_request_history, _MAX_REQUESTS_PER_WINDOW
+
+    test_ip = "198.51.100.77"
+    _ip_request_history.pop(test_ip, None)
+
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            for _ in range(_MAX_REQUESTS_PER_WINDOW):
+                res = await client.post(
+                    "/api/v1/inbound/portfolio/voice/session",
+                    json={"page_url": "https://rockib-quenum.netlify.app/"},
+                    headers={"X-Forwarded-For": test_ip},
+                )
+                assert res.status_code == 200
+
+            # La requête suivante doit être rejetée en 429
+            res_session_blocked = await client.post(
+                "/api/v1/inbound/portfolio/voice/session",
+                json={"page_url": "https://rockib-quenum.netlify.app/"},
+                headers={"X-Forwarded-For": test_ip},
+            )
+            assert res_session_blocked.status_code == 429
+
+            res_cb_blocked = await client.post(
+                "/api/v1/inbound/portfolio/voice/request-callback",
+                json={
+                    "phone_number": "+22901020304",
+                    "channel": "whatsapp",
+                    "preferred_time": "immediate",
+                    "topic": "Projet IA",
+                },
+                headers={"X-Forwarded-For": test_ip},
+            )
+            assert res_cb_blocked.status_code == 429
+    finally:
+        _ip_request_history.pop(test_ip, None)
+
+
+def test_inbound_rate_limiter_evicts_stale_ips_on_capacity(monkeypatch):
+    """Vérifie que _ip_request_history plafonne le nombre d'IP suivies en mémoire."""
+    import app.inbound.services.portfolio_handler as ph
+
+    monkeypatch.setattr(ph, "_MAX_TRACKED_IPS", 5)
+    saved = dict(ph._ip_request_history)
+    ph._ip_request_history.clear()
+    try:
+        for i in range(8):
+            assert ph.is_rate_limited(f"192.0.2.{i}") is False
+        assert len(ph._ip_request_history) <= 5
+    finally:
+        ph._ip_request_history.clear()
+        ph._ip_request_history.update(saved)
+
+
+@pytest.mark.asyncio
+async def test_deep_health_check_endpoint_returns_db_and_redis(db_session):
+    """Vérifie que GET /api/v1/health interroge PostgreSQL et Redis."""
+    from app.core.database import get_async_db
+
+    async def _override_db():
+        yield db_session
+
+    app.dependency_overrides[get_async_db] = _override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            res = await client.get("/api/v1/health")
+            assert res.status_code == 200
+            data = res.json()
+            assert data["status"] == "healthy"
+            assert data["components"]["database"] == "up"
+            assert data["components"]["redis"] == "up"
+    finally:
+        app.dependency_overrides.clear()
+
+
+

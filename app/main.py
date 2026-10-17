@@ -62,6 +62,12 @@ async def lifespan(app: FastAPI):
         except Exception:
             pass
 
+    try:
+        from app.core.database import async_engine
+        await async_engine.dispose()
+    except Exception:
+        pass
+
 
 app = FastAPI(
     title=settings.APP_NAME,
@@ -82,9 +88,9 @@ app.add_middleware(
 
 import re
 import uuid
-from fastapi import Request, Response
+from fastapi import Depends, Request, Response
 from sqlalchemy import text
-from app.core.database import AsyncSessionLocal
+from app.core.database import AsyncSessionLocal, get_async_db
 
 _SAFE_REQUEST_ID_RE = re.compile(r"^[a-zA-Z0-9._-]{1,64}$")
 
@@ -120,21 +126,32 @@ async def root():
 
 
 @app.get("/api/v1/health")
-async def api_health_check():
-    """Sonde de santé profonde vérifiant la connectivité PostgreSQL."""
+async def api_health_check(db=Depends(get_async_db)):
+    """Sonde de santé profonde vérifiant la connectivité PostgreSQL et Redis."""
     db_ok = False
     try:
-        async with AsyncSessionLocal() as session:
-            await session.execute(text("SELECT 1"))
-            db_ok = True
+        await db.execute(text("SELECT 1"))
+        db_ok = True
     except Exception:
         db_ok = False
 
+    redis_ok = False
+    try:
+        import redis.asyncio as aioredis
+        r_client = aioredis.from_url(settings.REDIS_URL, socket_connect_timeout=1.5)
+        try:
+            redis_ok = bool(await r_client.ping())
+        finally:
+            await r_client.aclose()
+    except Exception:
+        redis_ok = False
+
     return {
-        "status": "healthy" if db_ok else "degraded",
+        "status": "healthy" if (db_ok and redis_ok) else "degraded",
         "app_name": settings.APP_NAME,
         "environment": settings.APP_ENV,
         "components": {
             "database": "up" if db_ok else "down",
+            "redis": "up" if redis_ok else "down",
         },
     }

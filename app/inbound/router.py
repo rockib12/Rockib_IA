@@ -49,8 +49,22 @@ async def post_portfolio_message(
 @router.post("/portfolio/voice/session", response_model=VoiceCallSessionResponse)
 async def start_voice_call_session(
     body: VoiceCallSessionRequest,
+    request: Request,
 ) -> VoiceCallSessionResponse:
     """Initiates an in-browser live voice calling session."""
+    from app.inbound.services.portfolio_handler import is_rate_limited
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    if is_rate_limited(client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Trop de sessions vocales ouvertes. Veuillez patienter une minute.",
+            headers={"Retry-After": "60"},
+        )
     return voice_service.start_call_session(body)
 
 
@@ -71,8 +85,22 @@ async def handle_voice_turn(
 @router.post("/portfolio/voice/request-callback", response_model=CallMeBackResponse)
 async def request_callback(
     body: CallMeBackRequest,
+    request: Request,
 ) -> CallMeBackResponse:
     """Schedules a direct phone call or WhatsApp call from Rockib or an agency agent."""
+    from app.inbound.services.portfolio_handler import is_rate_limited
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    if is_rate_limited(client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Trop de demandes de rappel. Veuillez patienter une minute.",
+            headers={"Retry-After": "60"},
+        )
     return await voice_service.schedule_callback(body)
 
 
