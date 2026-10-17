@@ -72,3 +72,9 @@ class CallMeBackResponse(BaseModel):
     message: str
     estimated_wait_minutes: int = 5
 
+
+class VoiceTTSRequest(BaseModel):
+    """Request payload for Neural HD Text-To-Speech synthesis."""
+    text: str = Field(..., min_length=1, max_length=1200, description="Clean spoken text to synthesize")
+    voice: str = Field(default="henri", max_length=40, description="Voice profile ('henri', 'vivienne', 'denise', 'remy')")
+

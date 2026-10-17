@@ -92,3 +92,27 @@ async def test_request_callback_scheduling():
         assert data["channel"] == "whatsapp"
         assert "+229 97 12 34 56" in data["phone_number"]
         assert data["estimated_wait_minutes"] <= 10
+
+
+@pytest.mark.asyncio
+async def test_neural_voice_tts_endpoint(monkeypatch):
+    """Verify Neural HD TTS endpoint returns audio/mpeg bytes."""
+    async def _fake_synthesize(text: str, voice_profile: str = "henri") -> bytes:
+        assert "Rockib" in text
+        assert voice_profile in ("henri", "vivienne")
+        return b"ID3-FAKE-NEURAL-MP3-BYTES" * 20
+
+    monkeypatch.setattr(
+        "app.inbound.router.voice_service.synthesize_neural_speech",
+        _fake_synthesize,
+    )
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/inbound/portfolio/voice/tts",
+            json={"text": "Bonjour, je suis le concierge vocal de Rockib.", "voice": "vivienne"},
+        )
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "audio/mpeg"
+        assert len(resp.content) > 100

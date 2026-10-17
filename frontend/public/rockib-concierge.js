@@ -499,7 +499,16 @@ Que souhaitez-vous savoir ?</div>
         </div>
         <div>
           <div class="rq-voice-status" id="rq-voice-status">Appel vocal en direct</div>
-          <div class="rq-voice-sub" id="rq-voice-sub">Parlez directement avec le Concierge IA dans votre navigateur.</div>
+          <div class="rq-voice-sub" id="rq-voice-sub">Parlez directement avec le Concierge IA (Voix Neuronale HD).</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px; width:100%; justify-content:center;">
+          <label for="rq-voice-profile" style="font-size:10px; color:#7E90A6;">Voix HD :</label>
+          <select id="rq-voice-profile" class="rq-input" style="padding:5px 8px; font-size:11px; max-width:220px;">
+            <option value="henri">Henri Neural HD (Homme · Architecte)</option>
+            <option value="vivienne">Vivienne Neural HD (Femme · Multilingue)</option>
+            <option value="denise">Denise Neural HD (Femme · Dynamique)</option>
+            <option value="remy">Rémy Neural HD (Homme · Multilingue)</option>
+          </select>
         </div>
         <div class="rq-voice-transcript" id="rq-voice-transcript" style="width: 100%;">
           <em>Appuyez sur "Démarrer l'appel" pour discuter à voix haute...</em>
@@ -663,6 +672,54 @@ Que souhaitez-vous savoir ?</div>
   const voiceStatus = chatWindow.querySelector('#rq-voice-status');
   const voiceTranscript = chatWindow.querySelector('#rq-voice-transcript');
   const btnToggleCall = chatWindow.querySelector('#rq-btn-toggle-call');
+  const voiceProfileSelect = chatWindow.querySelector('#rq-voice-profile');
+  let currentAudio = null;
+
+  if (voiceProfileSelect) {
+    const savedVoice = localStorage.getItem('rq_voice_profile');
+    if (savedVoice) voiceProfileSelect.value = savedVoice;
+    voiceProfileSelect.addEventListener('change', () => {
+      localStorage.setItem('rq_voice_profile', voiceProfileSelect.value);
+    });
+  }
+
+  // Preload browser voices for instant Option 2 fallback
+  if (window.speechSynthesis && typeof window.speechSynthesis.onvoiceschanged !== 'undefined') {
+    window.speechSynthesis.onvoiceschanged = function () {
+      window.speechSynthesis.getVoices();
+    };
+  }
+
+  function pickBestBrowserFrenchVoice(preferredGender) {
+    if (!window.speechSynthesis) return null;
+    var voices = window.speechSynthesis.getVoices() || [];
+    var frVoices = voices.filter(function (v) {
+      return v.lang && (v.lang.toLowerCase().startsWith('fr') || v.lang.toLowerCase().includes('fr'));
+    });
+    if (!frVoices.length) return null;
+
+    function scoreVoice(v) {
+      var name = (v.name || '').toLowerCase();
+      var score = 0;
+      if (name.includes('natural') || name.includes('neural') || name.includes('online')) score += 100;
+      if (name.includes('multilingual')) score += 40;
+      if (name.includes('google')) score += 85;
+      if (name.includes('enhanced') || name.includes('premium')) score += 70;
+      if (v.lang === 'fr-FR') score += 20;
+      if (preferredGender === 'female') {
+        if (name.includes('vivienne') || name.includes('denise') || name.includes('eloise') || name.includes('amelie') || name.includes('amélie') || name.includes('audrey')) score += 50;
+      } else {
+        if (name.includes('henri') || name.includes('remy') || name.includes('rémy') || name.includes('thomas') || name.includes('paul')) score += 50;
+      }
+      if (name.includes('hortense') || name.includes('desktop')) score -= 45;
+      return score;
+    }
+
+    frVoices.sort(function (a, b) {
+      return scoreVoice(b) - scoreVoice(a);
+    });
+    return frVoices[0];
+  }
 
   function setVoiceTranscript(speaker, text) {
     voiceTranscript.textContent = '';
@@ -672,24 +729,47 @@ Que souhaitez-vous savoir ?</div>
     voiceTranscript.appendChild(document.createTextNode(text || ''));
   }
 
-  function speakReply(text, onComplete) {
+  function speakWithBrowserFallback(text, finishCallback, preferredGender) {
     if (!window.speechSynthesis) {
-      if (onComplete) onComplete();
+      finishCallback();
       return;
     }
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'fr-FR';
-    utterance.rate = 1.05;
-    utterance.pitch = 1.0;
+    utterance.rate = 1.0;
+    utterance.pitch = preferredGender === 'female' ? 1.02 : 0.98;
 
-    var voices = window.speechSynthesis.getVoices();
-    var frVoice = voices.find(function(v) { return v.lang && (v.lang.startsWith('fr') || v.lang.includes('FR')); });
-    if (frVoice) utterance.voice = frVoice;
+    const bestVoice = pickBestBrowserFrenchVoice(preferredGender);
+    if (bestVoice) utterance.voice = bestVoice;
+
+    utterance.onend = finishCallback;
+    utterance.onerror = finishCallback;
+
+    var wordCount = (text || '').split(/\s+/).length;
+    var maxWaitMs = Math.max(3500, (wordCount / 2.1) * 1000 + 2500);
+    setTimeout(function () {
+      if (isSpeaking) finishCallback();
+    }, maxWaitMs);
+
+    setTimeout(function () {
+      window.speechSynthesis.speak(utterance);
+    }, 50);
+  }
+
+  async function speakReply(text, onComplete) {
+    if (currentAudio) {
+      try {
+        currentAudio.pause();
+        currentAudio.src = '';
+      } catch (e) {}
+      currentAudio = null;
+    }
+    if (window.speechSynthesis) window.speechSynthesis.cancel();
 
     isSpeaking = true;
     wave.classList.add('rq-wave-active');
-    voiceStatus.textContent = 'Le Concierge vous parle...';
+    voiceStatus.textContent = 'Le Concierge vous parle (Voix HD)...';
 
     var hasEnded = false;
     function finish() {
@@ -697,23 +777,47 @@ Que souhaitez-vous savoir ?</div>
       hasEnded = true;
       isSpeaking = false;
       wave.classList.remove('rq-wave-active');
-      voiceStatus.textContent = 'À votre écoute...';
+      if (isCalling) voiceStatus.textContent = 'À votre écoute...';
       if (onComplete) onComplete();
     }
 
-    utterance.onend = finish;
-    utterance.onerror = finish;
+    const selectedProfile = (voiceProfileSelect && voiceProfileSelect.value) || 'henri';
+    const preferredGender = (selectedProfile === 'vivienne' || selectedProfile === 'denise') ? 'female' : 'male';
 
-    // Safety timeout in case browser TTS drops onend
-    var wordCount = (text || '').split(/\s+/).length;
-    var maxWaitMs = Math.max(3000, (wordCount / 2.2) * 1000 + 2000);
-    setTimeout(function() {
-      if (isSpeaking && !hasEnded) finish();
-    }, maxWaitMs);
+    // Option 1: Try Neural HD Server TTS first
+    try {
+      const ttsResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/tts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify({ text: text, voice: selectedProfile }),
+      });
 
-    setTimeout(function() {
-      window.speechSynthesis.speak(utterance);
-    }, 60);
+      if (ttsResp.ok) {
+        const audioBlob = await ttsResp.blob();
+        if (audioBlob && audioBlob.size > 200 && isCalling) {
+          const audioUrl = URL.createObjectURL(audioBlob);
+          const audio = new Audio(audioUrl);
+          currentAudio = audio;
+          audio.onended = () => {
+            URL.revokeObjectURL(audioUrl);
+            currentAudio = null;
+            finish();
+          };
+          audio.onerror = () => {
+            URL.revokeObjectURL(audioUrl);
+            currentAudio = null;
+            speakWithBrowserFallback(text, finish, preferredGender);
+          };
+          await audio.play();
+          return;
+        }
+      }
+    } catch (e) {
+      // Fallback to Option 2 (Ranked Browser Neural Voice)
+    }
+
+    // Option 2: Smart Ranked Browser Neural Voice Fallback
+    speakWithBrowserFallback(text, finish, preferredGender);
   }
 
   async function startVoiceCall() {
@@ -849,8 +953,16 @@ Que souhaitez-vous savoir ?</div>
 
   function stopVoiceCall() {
     isCalling = false;
+    isSpeaking = false;
     if (recognition) {
       try { recognition.stop(); } catch (e) {}
+    }
+    if (currentAudio) {
+      try {
+        currentAudio.pause();
+        currentAudio.src = '';
+      } catch (e) {}
+      currentAudio = null;
     }
     if (window.speechSynthesis) window.speechSynthesis.cancel();
 

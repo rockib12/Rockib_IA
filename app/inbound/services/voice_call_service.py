@@ -58,6 +58,13 @@ class VoiceCallSession:
 _SESSION_TTL_SECONDS = 900
 _MAX_ACTIVE_SESSIONS = 1000
 
+NEURAL_VOICE_PROFILES: Dict[str, str] = {
+    "henri": "fr-FR-HenriNeural",
+    "vivienne": "fr-FR-VivienneMultilingualNeural",
+    "denise": "fr-FR-DeniseNeural",
+    "remy": "fr-FR-RemyMultilingualNeural",
+}
+
 
 class VoiceCallService:
     """Orchestrates interactive voice call dialogues and phone callbacks."""
@@ -65,6 +72,27 @@ class VoiceCallService:
     def __init__(self, ai_provider: Optional[GroqProvider] = None):
         self.provider = ai_provider or GroqProvider()
         self._sessions: Dict[str, VoiceCallSession] = {}
+
+    async def synthesize_neural_speech(self, text: str, voice_profile: str = "henri") -> bytes:
+        """Synthesizes natural HD MP3 speech using Microsoft Edge Neural TTS (100% free)."""
+        import edge_tts
+
+        clean_text = re.sub(r"[*#_`>\[\]]", "", (text or "")).strip()
+        if not clean_text:
+            raise ValueError("Empty text for TTS synthesis")
+
+        voice_id = NEURAL_VOICE_PROFILES.get((voice_profile or "henri").lower().strip(), "fr-FR-HenriNeural")
+        communicate = edge_tts.Communicate(text=clean_text, voice=voice_id, rate="+4%")
+        audio_chunks: list[bytes] = []
+        async for chunk in communicate.stream():
+            if chunk.get("type") == "audio" and chunk.get("data"):
+                audio_chunks.append(chunk["data"])
+
+        audio_bytes = b"".join(audio_chunks)
+        if not audio_bytes:
+            raise RuntimeError("No audio bytes returned from Neural TTS engine")
+        return audio_bytes
+
 
     def _prune_expired_sessions(self) -> None:
         now = time.time()

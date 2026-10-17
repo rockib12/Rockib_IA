@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import secrets
 from typing import Optional
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -19,6 +19,7 @@ from app.inbound.schemas import (
     VoiceCallSessionResponse,
     VoiceCallTurnRequest,
     VoiceCallTurnResponse,
+    VoiceTTSRequest,
 )
 from app.inbound.services.portfolio_handler import PortfolioConciergeService
 from app.inbound.services.voice_call_service import VoiceCallService
@@ -82,6 +83,43 @@ async def handle_voice_turn(
     return await voice_service.handle_voice_turn(body, client_ip=client_ip)
 
 
+@router.post("/portfolio/voice/tts")
+async def synthesize_voice_tts(
+    body: VoiceTTSRequest,
+    request: Request,
+) -> Response:
+    """Synthesizes Neural HD MP3 audio (fr-FR-HenriNeural / fr-FR-VivienneMultilingualNeural)."""
+    from app.inbound.services.portfolio_handler import is_rate_limited
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    if is_rate_limited(client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Trop de requêtes de synthèse vocale. Veuillez patienter une minute.",
+            headers={"Retry-After": "60"},
+        )
+
+    try:
+        audio_bytes = await voice_service.synthesize_neural_speech(
+            text=body.text,
+            voice_profile=body.voice,
+        )
+        return Response(
+            content=audio_bytes,
+            media_type="audio/mpeg",
+            headers={"Cache-Control": "no-store"},
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"Neural TTS unavailable: {type(exc).__name__}",
+        )
+
+
 @router.post("/portfolio/voice/request-callback", response_model=CallMeBackResponse)
 async def request_callback(
     body: CallMeBackRequest,
@@ -111,7 +149,7 @@ async def get_portfolio_inbound_health():
         "status": "healthy",
         "service": "Portfolio Concierge Inbound Gateway & Voice Engine",
         "portfolio_target": "https://rockib-quenum.netlify.app/",
-        "features": ["text_chat", "voice_calling", "callback_scheduling"],
+        "features": ["text_chat", "voice_calling", "neural_tts", "callback_scheduling"],
     }
 
 
