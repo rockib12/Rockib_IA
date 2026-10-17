@@ -610,19 +610,29 @@ async def get_goal_details(
     for d in deps:
         deps_by_task.setdefault(d.task_id, []).append(d.depends_on_task_id)
 
-    task_summaries = []
-    for t in tasks:
-        action_res = (
+    task_ids = [t.id for t in tasks]
+    latest_action_by_task: dict[uuid.UUID, tuple[Optional[str], Optional[str]]] = {}
+    if task_ids:
+        action_rows = (
             await db.execute(
-                select(ActionRecord.tool, ExecutionResultRecord.output_summary)
+                select(
+                    ActionRecord.task_id,
+                    ActionRecord.tool,
+                    ExecutionResultRecord.output_summary,
+                )
                 .outerjoin(ExecutionAttempt, ExecutionAttempt.action_id == ActionRecord.id)
                 .outerjoin(ExecutionResultRecord, ExecutionResultRecord.attempt_id == ExecutionAttempt.id)
-                .where(ActionRecord.task_id == t.id)
+                .where(ActionRecord.task_id.in_(task_ids))
                 .order_by(desc(ExecutionResultRecord.created_at))
-                .limit(1)
             )
-        ).first()
+        ).all()
+        for row_task_id, row_tool, row_summary in action_rows:
+            if row_task_id not in latest_action_by_task:
+                latest_action_by_task[row_task_id] = (row_tool, row_summary)
 
+    task_summaries = []
+    for t in tasks:
+        action_res = latest_action_by_task.get(t.id)
         result_text = None
         tool_name = None
         if action_res:

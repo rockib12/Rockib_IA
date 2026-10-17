@@ -437,3 +437,143 @@ async def test_post_decisions_authorized_member_success(db_session: AsyncSession
     finally:
         app.dependency_overrides.clear()
 
+
+# =========================================================================== #
+# P4 : GET /api/v1/decisions/ & GET /api/v1/decisions/{id} & CSP Sandbox
+# =========================================================================== #
+
+@pytest.mark.asyncio
+async def test_get_decisions_requires_auth():
+    """GET /api/v1/decisions/ et GET /api/v1/decisions/{id} sans token -> 401."""
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        r_list = await client.get("/api/v1/decisions/")
+        assert r_list.status_code == 401
+        r_get = await client.get(f"/api/v1/decisions/{uuid.uuid4()}")
+        assert r_get.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_get_decisions_multi_tenant_isolation_and_anti_enumeration(db_session: AsyncSession):
+    """Vérifie que GET /api/v1/decisions/ filtre par workspace et que GET /{id} retourne 404 sur un tenant étranger."""
+    from sqlalchemy import insert
+    from app.core.database import get_async_db
+    from app.core.security import create_access_token
+    from app.decision_engine.models import (
+        ControlOutcome,
+        Decision,
+        DecisionStatus,
+        ImpactType,
+        ReversibilityLevel,
+        RiskLevel,
+    )
+
+    ws_a = Workspace(name="WS Dec A", slug=f"wsda-{uuid.uuid4().hex[:8]}")
+    ws_b = Workspace(name="WS Dec B", slug=f"wsdb-{uuid.uuid4().hex[:8]}")
+    user_a = User(email=f"uda-{uuid.uuid4().hex[:8]}@test.io", password_hash="x", is_active=True)
+    db_session.add_all([ws_a, ws_b, user_a])
+    await db_session.flush()
+
+    await db_session.execute(
+        insert(workspace_memberships).values(
+            workspace_id=ws_a.id, user_id=user_a.id, role=UserRole.admin
+        )
+    )
+    agent_a = Agent(workspace_id=ws_a.id, name="Agent A", default_autonomy_level=2)
+    agent_b = Agent(workspace_id=ws_b.id, name="Agent B", default_autonomy_level=2)
+    db_session.add_all([agent_a, agent_b])
+    await db_session.flush()
+
+    dec_a = Decision(
+        workspace_id=ws_a.id,
+        agent_id=agent_a.id,
+        objective="Obj A",
+        situation="Sit A",
+        proposed_action="Read A",
+        risk_level=RiskLevel.low,
+        risk_reversibility=ReversibilityLevel.reversible,
+        risk_impact=ImpactType.internal,
+        requested_autonomy_level=2,
+        applied_autonomy_level=2,
+        control_outcome=ControlOutcome.ALLOW,
+        control_reason="POLICY_ALLOWED",
+        permission_granted=True,
+        status=DecisionStatus.executed,
+    )
+    dec_b = Decision(
+        workspace_id=ws_b.id,
+        agent_id=agent_b.id,
+        objective="Obj B Secret",
+        situation="Sit B",
+        proposed_action="Read B",
+        risk_level=RiskLevel.high,
+        risk_reversibility=ReversibilityLevel.irreversible,
+        risk_impact=ImpactType.financial,
+        requested_autonomy_level=2,
+        applied_autonomy_level=2,
+        control_outcome=ControlOutcome.ESCALATE,
+        control_reason="RISK_HIGH",
+        permission_granted=False,
+        status=DecisionStatus.escalated,
+    )
+    db_session.add_all([dec_a, dec_b])
+    await db_session.flush()
+
+    token_a = create_access_token({"sub": str(user_a.id)})
+
+    async def _override_db():
+        yield db_session
+
+    app.dependency_overrides[get_async_db] = _override_db
+    try:
+        async with AsyncClient(
+            transport=ASGITransport(app=app),
+            base_url="http://test",
+            headers={"Authorization": f"Bearer {token_a}"},
+        ) as client:
+            # 1. Liste globale ne retourne que les décisions de ws_a
+            res_list = await client.get("/api/v1/decisions/")
+            assert res_list.status_code == 200
+            ids = [d["decision_id"] for d in res_list.json()]
+            assert str(dec_a.id) in ids
+            assert str(dec_b.id) not in ids
+
+            # 2. Filtre explicite sur ws_b -> 403 Forbidden
+            res_forbid = await client.get(f"/api/v1/decisions/?workspace_id={ws_b.id}")
+            assert res_forbid.status_code == 403
+
+            # 3. Accès direct à dec_a -> 200 OK
+            res_own = await client.get(f"/api/v1/decisions/{dec_a.id}")
+            assert res_own.status_code == 200
+            assert res_own.json()["decision_id"] == str(dec_a.id)
+
+            # 4. Accès direct à dec_b (autre tenant) -> 404 Not Found (anti-énumération)
+            res_foreign = await client.get(f"/api/v1/decisions/{dec_b.id}")
+            assert res_foreign.status_code == 404
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_preview_workspace_file_includes_csp_sandbox_header(tmp_path, monkeypatch):
+    """Vérifie que l'endpoint de prévisualisation renvoie Content-Security-Policy: sandbox."""
+    from app.core.signed_urls import sign_preview
+
+    monkeypatch.setattr(settings, "WORKSPACES_ROOT", str(tmp_path))
+    ws_id = uuid.uuid4()
+    ws_dir = tmp_path / str(ws_id)
+    ws_dir.mkdir(parents=True, exist_ok=True)
+    html_file = ws_dir / "index.html"
+    html_file.write_text("<html><body><h1>Rockib Sandbox</h1></body></html>", encoding="utf-8")
+
+    exp, sig = sign_preview(ws_id, "index.html")
+    signed_url = f"/api/v1/workspaces/{ws_id}/preview/index.html?exp={exp}&sig={sig}"
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        res = await client.get(signed_url)
+        assert res.status_code == 200
+        csp = res.headers.get("content-security-policy", "")
+        assert "sandbox" in csp
+        assert res.headers.get("x-content-type-options") == "nosniff"
+
+
+

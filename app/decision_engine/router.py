@@ -72,15 +72,76 @@ async def submit_decision(
             detail="Erreur interne lors du traitement de la décision.",
         )
 
+import uuid
+from typing import Optional
+from fastapi import Query
+from sqlalchemy import desc
+from app.decision_engine.models import Decision
+from app.core.dependencies import get_user_workspace_ids
+
+
+def _map_decision_to_response(d: Decision) -> DecisionResponse:
+    dom_src = d.dominant_source.value if hasattr(d.dominant_source, "value") else (str(d.dominant_source) if d.dominant_source else "none")
+    risk_val = d.risk_level.value if hasattr(d.risk_level, "value") else str(d.risk_level)
+    return DecisionResponse(
+        decision_id=str(d.id),
+        dominant_source=dom_src,
+        final_action=d.final_action or d.proposed_action,
+        risk_level=risk_val,
+        approval_required=bool(d.approval_required),
+        control_outcome=d.control_outcome,
+        control_reason=d.control_reason,
+        permission_granted=bool(d.permission_granted),
+    )
+
+
 @router.get("/{decision_id}", response_model=DecisionResponse)
 async def get_decision(
-    decision_id: str, 
-    orchestrator: DecisionOrchestrator = Depends(get_orchestrator)
+    decision_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
 ):
-    raise HTTPException(status_code=501, detail="Not implemented")
+    """Récupère une décision par son identifiant avec isolation multi-tenant anti-énumération (404)."""
+    decision = (
+        await db.execute(select(Decision).where(Decision.id == decision_id))
+    ).scalar_one_or_none()
+    if not decision:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Décision introuvable.")
+
+    user_ws_ids = await get_user_workspace_ids(db, current_user)
+    if decision.workspace_id not in user_ws_ids:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Décision introuvable.")
+
+    return _map_decision_to_response(decision)
+
 
 @router.get("/", response_model=List[DecisionResponse])
 async def list_decisions(
-    orchestrator: DecisionOrchestrator = Depends(get_orchestrator)
+    workspace_id: Optional[uuid.UUID] = None,
+    limit: int = Query(default=50, le=200),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
 ):
-    raise HTTPException(status_code=501, detail="Not implemented")
+    """Liste les décisions des workspaces de l'utilisateur courant."""
+    user_ws_ids = await get_user_workspace_ids(db, current_user)
+    if workspace_id:
+        if workspace_id not in user_ws_ids:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Accès refusé : vous n'êtes pas membre de cet espace de travail.",
+            )
+        target_ws_ids = {workspace_id}
+    else:
+        target_ws_ids = user_ws_ids
+
+    if not target_ws_ids:
+        return []
+
+    stmt = (
+        select(Decision)
+        .where(Decision.workspace_id.in_(target_ws_ids))
+        .order_by(desc(Decision.created_at))
+        .limit(limit)
+    )
+    decisions = (await db.execute(stmt)).scalars().all()
+    return [_map_decision_to_response(d) for d in decisions]
