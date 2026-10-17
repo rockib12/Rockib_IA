@@ -120,6 +120,38 @@ async def synthesize_voice_tts(
         )
 
 
+@router.post("/portfolio/voice/stt")
+async def transcribe_voice_stt(
+    request: Request,
+):
+    """Transcribes raw audio bytes from the visitor's microphone via Groq Whisper."""
+    from app.inbound.services.portfolio_handler import is_rate_limited
+
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        client_ip = forwarded.split(",")[0].strip()
+
+    if is_rate_limited(client_ip):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Trop de requêtes vocales. Veuillez patienter une minute.",
+            headers={"Retry-After": "60"},
+        )
+
+    audio_bytes = await request.body()
+    if not audio_bytes or len(audio_bytes) > 2 * 1024 * 1024:
+        return {"transcript": "", "status": "empty"}
+
+    ext = request.headers.get("x-audio-ext", "webm").strip().lower()
+    if ext not in ("webm", "ogg", "mp4", "m4a", "wav"):
+        ext = "webm"
+
+    transcript = await voice_service.transcribe_audio_bytes(audio_bytes, filename=f"speech.{ext}")
+    return {"transcript": transcript, "status": "ok" if transcript else "empty"}
+
+
+
 @router.post("/portfolio/voice/request-callback", response_model=CallMeBackResponse)
 async def request_callback(
     body: CallMeBackRequest,

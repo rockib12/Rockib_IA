@@ -514,9 +514,18 @@ Que souhaitez-vous savoir ?</div>
         <div class="rq-voice-transcript" id="rq-voice-transcript" style="width: 100%;">
           <em>Appuyez sur "Démarrer l'appel" pour discuter à voix haute...</em>
         </div>
-        <button class="rq-btn-call" id="rq-btn-toggle-call">
-          <span>📞 Démarrer l'appel vocal</span>
-        </button>
+        <form id="rq-voice-quick-form" style="display:flex; gap:6px; width:100%;">
+          <input type="text" id="rq-voice-quick-input" class="rq-input" placeholder="Parlez au micro ou écrivez ici..." style="font-size:11px; padding:6px 10px;" autocomplete="off" />
+          <button type="submit" class="rq-send" title="Envoyer au Concierge Vocal" style="padding:0 10px; font-size:11px;">➤</button>
+        </form>
+        <div style="display:flex; gap:8px; align-items:center; justify-content:center; flex-wrap:wrap;">
+          <button type="button" class="rq-btn-call" id="rq-btn-toggle-call">
+            <span>📞 Démarrer l'appel vocal</span>
+          </button>
+          <button type="button" id="rq-btn-send-speech" style="display:none; background:#0A101E; border:1px solid #00FF9D; color:#00FF9D; border-radius:8px; padding:9px 14px; font-size:11px; font-weight:700; font-family:inherit; cursor:pointer;">
+            ✅ J'ai fini de parler
+          </button>
+        </div>
       </div>
     </div>
 
@@ -821,11 +830,49 @@ Que souhaitez-vous savoir ?</div>
     speakWithBrowserFallback(text, finish, preferredGender);
   }
 
+  const btnSendSpeech = chatWindow.querySelector('#rq-btn-send-speech');
+  const voiceQuickForm = chatWindow.querySelector('#rq-voice-quick-form');
+  const voiceQuickInput = chatWindow.querySelector('#rq-voice-quick-input');
+  let micStream = null;
+  let mediaRecorder = null;
+  let audioChunks = [];
+  let audioCtx = null;
+  let vadInterval = null;
+  let isProcessingTurn = false;
+
+  function stopActiveListening() {
+    if (vadInterval) {
+      clearInterval(vadInterval);
+      vadInterval = null;
+    }
+    if (recognition) {
+      recognition.onend = null;
+      recognition.onerror = null;
+      recognition.onresult = null;
+      try { recognition.abort(); } catch (e) {}
+      recognition = null;
+    }
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.onstop = null;
+      try { mediaRecorder.stop(); } catch (e) {}
+    }
+    mediaRecorder = null;
+    if (btnSendSpeech) btnSendSpeech.style.display = 'none';
+  }
+
   async function startVoiceCall() {
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) {
-      alert("Votre navigateur ne supporte pas la reconnaissance vocale. Utilisez Chrome, Edge ou Safari.");
-      return;
+    // 1. Immediately request microphone access on the user click gesture!
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        if (!micStream || !micStream.active) {
+          micStream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          });
+        }
+      }
+    } catch (micErr) {
+      voiceStatus.textContent = 'Microphone bloqué';
+      voiceTranscript.textContent = "Veuillez autoriser l'accès au microphone dans la barre d'adresse du navigateur (ou écrivez dans le champ ci-dessous).";
     }
 
     try {
@@ -838,15 +885,16 @@ Que souhaitez-vous savoir ?</div>
       voiceSessionId = data.session_id;
 
       isCalling = true;
+      isProcessingTurn = false;
       orb.classList.add('rq-calling');
       btnToggleCall.classList.add('rq-btn-hangup');
       btnToggleCall.innerHTML = '<span>🔴 Raccrocher</span>';
       voiceStatus.textContent = 'Appel en cours';
       setVoiceTranscript('Concierge', data.greeting_text);
 
-      // Speak greeting
+      // Speak greeting then listen
       speakReply(data.greeting_text, () => {
-        listenToUser();
+        if (isCalling) listenToUser();
       });
     } catch (err) {
       voiceStatus.textContent = 'Erreur de connexion';
@@ -855,108 +903,264 @@ Que souhaitez-vous savoir ?</div>
   }
 
   function listenToUser() {
-    if (!isCalling) return;
-    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRec) return;
+    if (!isCalling || isSpeaking || isProcessingTurn) return;
+    stopActiveListening();
 
-    try {
-      if (recognition) {
-        recognition.onend = null;
-        recognition.onerror = null;
-        try { recognition.abort(); } catch(e) {}
-      }
-    } catch(e) {}
+    voiceStatus.textContent = '🟢 À votre écoute... Parlez maintenant !';
+    if (btnSendSpeech) btnSendSpeech.style.display = 'inline-flex';
 
-    recognition = new SpeechRec();
-    recognition.lang = 'fr-FR';
-    recognition.continuous = false;
-    recognition.interimResults = true;
-
+    var capturedSpeech = '';
     var finishTimeout = null;
+    var turnSubmitted = false;
 
-    recognition.onstart = function() {
-      voiceStatus.textContent = 'À votre écoute... Parlez.';
-    };
+    function submitRecognizedText(textToSubmit) {
+      if (turnSubmitted || !isCalling || isSpeaking || isProcessingTurn) return;
+      var cleaned = (textToSubmit || '').trim();
+      if (!cleaned) return;
+      turnSubmitted = true;
+      clearTimeout(finishTimeout);
+      stopActiveListening();
+      processVoiceTurn(cleaned);
+    }
 
-    recognition.onresult = function(event) {
-      var interim = '';
-      var final = '';
-      for (var i = 0; i < event.results.length; ++i) {
-        if (event.results[i].isFinal) {
-          final += event.results[i][0].transcript;
-        } else {
-          interim += event.results[i][0].transcript;
+    // Engine A: Browser Web Speech API (if supported)
+    const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (SpeechRec) {
+      try {
+        recognition = new SpeechRec();
+        recognition.lang = 'fr-FR';
+        recognition.continuous = true;
+        recognition.interimResults = true;
+
+        recognition.onresult = function (event) {
+          var interim = '';
+          var finalTxt = '';
+          for (var i = 0; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTxt += event.results[i][0].transcript + ' ';
+            } else {
+              interim += event.results[i][0].transcript;
+            }
+          }
+          var spoken = (finalTxt + interim).trim();
+          if (spoken) {
+            capturedSpeech = spoken;
+            setVoiceTranscript('Vous (en direct)', spoken);
+            clearTimeout(finishTimeout);
+            finishTimeout = setTimeout(function () {
+              submitRecognizedText(capturedSpeech);
+            }, 1500);
+          }
+        };
+
+        recognition.onend = function () {
+          if (!turnSubmitted && capturedSpeech.trim().length > 1) {
+            submitRecognizedText(capturedSpeech);
+          }
+        };
+
+        recognition.onerror = function () {
+          // Handled seamlessly by Engine B (MediaRecorder + Groq Whisper)
+        };
+
+        recognition.start();
+      } catch (e) {}
+    }
+
+    // Engine B: MediaRecorder + Web Audio Silence Detection -> Groq Whisper STT
+    if (micStream && micStream.active && typeof window.MediaRecorder !== 'undefined') {
+      try {
+        audioChunks = [];
+        var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus'
+          : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+        mediaRecorder = mimeType ? new MediaRecorder(micStream, { mimeType: mimeType }) : new MediaRecorder(micStream);
+
+        mediaRecorder.ondataavailable = function (e) {
+          if (e.data && e.data.size > 0) audioChunks.push(e.data);
+        };
+
+        mediaRecorder.onstop = async function () {
+          if (turnSubmitted || !isCalling || isSpeaking || isProcessingTurn) return;
+          if (capturedSpeech.trim().length > 1) {
+            submitRecognizedText(capturedSpeech);
+            return;
+          }
+          var blob = new Blob(audioChunks, { type: mimeType || 'audio/webm' });
+          if (blob.size < 1000) {
+            if (isCalling && !isSpeaking && !isProcessingTurn) {
+              setTimeout(listenToUser, 300);
+            }
+            return;
+          }
+          voiceStatus.textContent = 'Transcription vocale HD (Whisper)...';
+          try {
+            var sttResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/stt`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/octet-stream',
+                'X-Audio-Ext': 'webm',
+                'ngrok-skip-browser-warning': 'true',
+              },
+              body: blob,
+            });
+            if (sttResp.ok) {
+              var sttData = await sttResp.json();
+              var whisperText = (sttData.transcript || '').trim();
+              if (whisperText.length > 1) {
+                setVoiceTranscript('Vous', whisperText);
+                submitRecognizedText(whisperText);
+                return;
+              }
+            }
+          } catch (err) {}
+          if (isCalling && !isSpeaking && !isProcessingTurn) {
+            setTimeout(listenToUser, 400);
+          }
+        };
+
+        mediaRecorder.start(250);
+
+        // Web Audio API Voice Activity Detection (VAD)
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (AudioContextClass) {
+          if (!audioCtx) audioCtx = new AudioContextClass();
+          if (audioCtx.state === 'suspended') audioCtx.resume();
+          const source = audioCtx.createMediaStreamSource(micStream);
+          const analyser = audioCtx.createAnalyser();
+          analyser.fftSize = 512;
+          source.connect(analyser);
+          const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+          var hasSpokenAudio = false;
+          var silenceStart = 0;
+          var listenStart = Date.now();
+
+          vadInterval = setInterval(function () {
+            if (!isCalling || isSpeaking || turnSubmitted) {
+              clearInterval(vadInterval);
+              vadInterval = null;
+              return;
+            }
+            analyser.getByteFrequencyData(dataArray);
+            var sum = 0;
+            for (var i = 0; i < dataArray.length; i++) sum += dataArray[i];
+            var avgVolume = sum / dataArray.length;
+
+            if (avgVolume > 14) {
+              hasSpokenAudio = true;
+              silenceStart = 0;
+              wave.classList.add('rq-wave-active');
+            } else {
+              wave.classList.remove('rq-wave-active');
+              if (hasSpokenAudio) {
+                if (!silenceStart) silenceStart = Date.now();
+                else if (Date.now() - silenceStart > 1400) {
+                  clearInterval(vadInterval);
+                  vadInterval = null;
+                  if (capturedSpeech.trim().length > 1) {
+                    submitRecognizedText(capturedSpeech);
+                  } else if (mediaRecorder && mediaRecorder.state === 'recording') {
+                    try { mediaRecorder.stop(); } catch (e) {}
+                  }
+                }
+              } else if (Date.now() - listenStart > 12000 && mediaRecorder && mediaRecorder.state === 'recording') {
+                listenStart = Date.now();
+              }
+            }
+          }, 120);
         }
-      }
-      var spoken = (final || interim).trim();
-      if (spoken) {
-        setVoiceTranscript('Vous', spoken);
-        clearTimeout(finishTimeout);
-        finishTimeout = setTimeout(function() {
-          try { recognition.stop(); } catch(e) {}
-        }, 1200);
-      }
-    };
+      } catch (recErr) {}
+    }
 
-    recognition.onend = async function() {
-      clearTimeout(finishTimeout);
-      var transcript = voiceTranscript.innerText.replace(/^Vous\s*:\s*/i, '').trim();
-      if (isCalling && transcript && !isSpeaking) {
-        await processVoiceTurn(transcript);
-      } else if (isCalling && !isSpeaking) {
-        setTimeout(listenToUser, 500);
-      }
-    };
-
-    recognition.onerror = function() {
-      clearTimeout(finishTimeout);
-      if (isCalling && !isSpeaking) {
-        setTimeout(listenToUser, 800);
-      }
-    };
-
-    try {
-      recognition.start();
-    } catch(err) {
-      setTimeout(listenToUser, 800);
+    if (btnSendSpeech) {
+      btnSendSpeech.onclick = function () {
+        if (capturedSpeech.trim().length > 1) {
+          submitRecognizedText(capturedSpeech);
+        } else if (mediaRecorder && mediaRecorder.state === 'recording') {
+          if (vadInterval) {
+            clearInterval(vadInterval);
+            vadInterval = null;
+          }
+          try { mediaRecorder.stop(); } catch (e) {}
+        }
+      };
     }
   }
 
   async function processVoiceTurn(userText) {
+    if (!userText || !userText.trim() || isProcessingTurn) return;
+    isProcessingTurn = true;
+    stopActiveListening();
+    setVoiceTranscript('Vous', userText.trim());
     voiceStatus.textContent = 'Traitement de votre parole...';
+
     try {
+      if (!voiceSessionId) {
+        const sResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/session`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+          body: JSON.stringify({ page_url: window.location.href }),
+        });
+        const sData = await sResp.json();
+        voiceSessionId = sData.session_id;
+      }
+
       const resp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/turn`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({
           session_id: voiceSessionId,
-          user_speech_transcript: userText,
+          user_speech_transcript: userText.trim(),
         }),
       });
 
       const data = await resp.json();
+      isProcessingTurn = false;
       setVoiceTranscript('Concierge', data.agent_reply_text);
 
       speakReply(data.agent_reply_text, () => {
         if (data.should_end_call) {
           stopVoiceCall();
-        } else {
+        } else if (isCalling) {
           listenToUser();
         }
       });
     } catch (err) {
+      isProcessingTurn = false;
       voiceStatus.textContent = 'Erreur réseau';
       speakReply("Désolé, une coupure est survenue. Pouvez-vous répéter ?", () => {
-        listenToUser();
+        if (isCalling) listenToUser();
       });
     }
+  }
+
+  if (voiceQuickForm) {
+    voiceQuickForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const val = (voiceQuickInput && voiceQuickInput.value || '').trim();
+      if (!val) return;
+      voiceQuickInput.value = '';
+      if (!isCalling) {
+        isCalling = true;
+        orb.classList.add('rq-calling');
+        btnToggleCall.classList.add('rq-btn-hangup');
+        btnToggleCall.innerHTML = '<span>🔴 Raccrocher</span>';
+      }
+      await processVoiceTurn(val);
+    });
   }
 
   function stopVoiceCall() {
     isCalling = false;
     isSpeaking = false;
-    if (recognition) {
-      try { recognition.stop(); } catch (e) {}
+    isProcessingTurn = false;
+    stopActiveListening();
+    if (micStream) {
+      try {
+        micStream.getTracks().forEach((t) => t.stop());
+      } catch (e) {}
+      micStream = null;
     }
     if (currentAudio) {
       try {

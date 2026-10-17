@@ -93,6 +93,38 @@ class VoiceCallService:
             raise RuntimeError("No audio bytes returned from Neural TTS engine")
         return audio_bytes
 
+    async def transcribe_audio_bytes(self, audio_bytes: bytes, filename: str = "speech.webm") -> str:
+        """Transcribes user microphone audio using Groq Whisper (whisper-large-v3-turbo)."""
+        from app.core.config import settings
+
+        if not audio_bytes or len(audio_bytes) < 200:
+            return ""
+        api_key = settings.GROQ_API_KEY
+        if not api_key:
+            return ""
+
+        mime = "audio/webm"
+        if filename.endswith(".ogg"):
+            mime = "audio/ogg"
+        elif filename.endswith(".mp4") or filename.endswith(".m4a"):
+            mime = "audio/mp4"
+        elif filename.endswith(".wav"):
+            mime = "audio/wav"
+
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            resp = await client.post(
+                "https://api.groq.com/openai/v1/audio/transcriptions",
+                headers={"Authorization": f"Bearer {api_key}"},
+                data={"model": "whisper-large-v3-turbo", "language": "fr", "response_format": "json"},
+                files={"file": (filename, audio_bytes, mime)},
+            )
+            if resp.status_code != 200:
+                logger.warning("Groq Whisper STT HTTP %s: %s", resp.status_code, resp.text[:200])
+                return ""
+            payload = resp.json()
+            return (payload.get("text") or "").strip()
+
+
 
     def _prune_expired_sessions(self) -> None:
         now = time.time()
