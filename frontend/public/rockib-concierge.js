@@ -15,7 +15,7 @@
 
   const API_BASE = window.ROCKIB_API_URL || (
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? 'http://127.0.0.1:8080'
+      ? window.location.origin
       : 'https://dion-beaverlike-preceptively.ngrok-free.dev'
   );
 
@@ -501,14 +501,15 @@ Que souhaitez-vous savoir ?</div>
           <div class="rq-voice-status" id="rq-voice-status">Appel vocal en direct</div>
           <div class="rq-voice-sub" id="rq-voice-sub">Parlez directement avec le Concierge IA (Voix Neuronale HD).</div>
         </div>
-        <div style="display:flex; align-items:center; gap:8px; width:100%; justify-content:center;">
+        <div style="display:flex; align-items:center; gap:6px; width:100%; justify-content:center; flex-wrap:wrap;">
           <label for="rq-voice-profile" style="font-size:10px; color:#7E90A6;">Voix HD :</label>
-          <select id="rq-voice-profile" class="rq-input" style="padding:5px 8px; font-size:11px; max-width:220px;">
-            <option value="henri">Henri Neural HD (Homme · Architecte)</option>
-            <option value="vivienne">Vivienne Neural HD (Femme · Multilingue)</option>
-            <option value="denise">Denise Neural HD (Femme · Dynamique)</option>
-            <option value="remy">Rémy Neural HD (Homme · Multilingue)</option>
+          <select id="rq-voice-profile" class="rq-input" style="padding:5px 8px; font-size:11px; max-width:195px;">
+            <option value="henri">Henri Neural HD (Homme)</option>
+            <option value="vivienne">Vivienne Neural HD (Femme)</option>
+            <option value="denise">Denise Neural HD (Femme)</option>
+            <option value="remy">Rémy Neural HD (Homme)</option>
           </select>
+          <button type="button" id="rq-btn-test-voice" title="Écouter un extrait de cette voix" style="background:#0A101E; border:1px solid #00F0FF; color:#00F0FF; border-radius:6px; padding:5px 9px; font-size:11px; font-family:inherit; cursor:pointer;">🔊 Tester</button>
         </div>
         <div class="rq-voice-transcript" id="rq-voice-transcript" style="width: 100%;">
           <em>Appuyez sur "Démarrer l'appel" pour discuter à voix haute...</em>
@@ -794,7 +795,7 @@ Que souhaitez-vous savoir ?</div>
 
       if (ttsResp.ok) {
         const audioBlob = await ttsResp.blob();
-        if (audioBlob && audioBlob.size > 200 && isCalling) {
+        if (audioBlob && audioBlob.size > 200) {
           const audioUrl = URL.createObjectURL(audioBlob);
           const audio = new Audio(audioUrl);
           currentAudio = audio;
@@ -984,6 +985,21 @@ Que souhaitez-vous savoir ?</div>
   orb.addEventListener('click', () => {
     if (!isCalling) startVoiceCall();
   });
+
+  const btnTestVoice = chatWindow.querySelector('#rq-btn-test-voice');
+  if (btnTestVoice) {
+    btnTestVoice.addEventListener('click', () => {
+      const profile = (voiceProfileSelect && voiceProfileSelect.value) || 'henri';
+      const sampleText =
+        profile === 'vivienne' || profile === 'denise'
+          ? "Bonjour ! Je suis le concierge vocal haute définition de Rockib Quenum. Je peux vous présenter MARTISTORE, WaAuto et l'Agence IIA."
+          : "Bonjour ! Je suis le concierge vocal haute définition de Rockib Quenum. Parlez-moi de votre projet d'architecture ou d'automatisation IA.";
+      setVoiceTranscript('Concierge (Test HD)', sampleText);
+      speakReply(sampleText, () => {
+        if (!isCalling) voiceStatus.textContent = 'Prêt pour votre appel vocal';
+      });
+    });
+  }
 
   // --- Callback Request Section ---
   const callbackForm = chatWindow.querySelector('#rq-callback-form');
