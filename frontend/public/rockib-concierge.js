@@ -467,20 +467,20 @@
     <!-- Panel 1: Chat -->
     <div class="rq-panel rq-active" id="rq-panel-chat">
       <div class="rq-messages" id="rq-messages-container">
-        <div class="rq-msg rq-msg-assistant">Bonjour ! Je suis l'Assistant IA et Co-Architecte Logiciel de Rockib Quenum.
+        <div class="rq-msg rq-msg-assistant">Bonjour ! Je suis l'Assistant IA et Co-Architecte de Rockib Quenum.
 
-Je peux vous détailler ses systèmes en production (Rockib AI Engine, MARTISTORE avec vision CLIP, WaAuto, Agence IIA), concevoir l'architecture technique complète de votre projet, rédiger du code ou vous assister sur n'importe quel sujet.
+Je peux vous proposer des idées concrètes d'applications ou d'automatisations IA pour votre activité, concevoir votre architecture technique, ou vous présenter ses systèmes en production (Rockib AI Engine, MARTISTORE, WaAuto, Agence IIA).
 
-De quoi souhaitez-vous discuter ?</div>
+Quelle est votre activité ou votre idée de projet ?</div>
         <div class="rq-suggestions" id="rq-suggestions-container">
-          <button class="rq-chip" data-query="Présente-moi en détail tous les projets en production de Rockib (Rockib AI, MARTISTORE, WaAuto, Agence IIA).">🚀 Découvrir les projets en production de Rockib</button>
-          <button class="rq-chip" data-query="Propose-moi une architecture technique complète et moderne pour lancer une plateforme SaaS ou E-commerce avec IA.">🏗️ Proposer une architecture pour mon projet</button>
-          <button class="rq-chip" data-query="Comment fonctionne l'architecture d'arbitrage déterministe de Rockib AI Engine ?">🤖 Architecture interne de Rockib AI Engine</button>
-          <button class="rq-chip" data-query="Je voudrais estimer le budget, les délais et la stack technique pour mon projet.">⚡ Estimer la stack et le budget de mon projet</button>
+          <button class="rq-chip" data-query="Propose-moi des idées concrètes d'automatisation IA et d'applications rentables pour développer mon activité.">💡 Propose-moi des idées d'IA pour mon activité</button>
+          <button class="rq-chip" data-query="Présente-moi en détail les projets en production de Rockib (Rockib AI, MARTISTORE, WaAuto, Agence IIA).">🚀 Découvrir les projets en production de Rockib</button>
+          <button class="rq-chip" data-query="Propose-moi une architecture technique complète et moderne pour mon futur projet.">🏗️ Concevoir l'architecture de mon projet</button>
+          <button class="rq-chip" data-query="Comment fonctionne la tarification et comment discuter du prix directement avec Rockib ?">🤝 Discuter du tarif avec Rockib</button>
         </div>
       </div>
       <form class="rq-input-area" id="rq-chat-form">
-        <input type="text" class="rq-input" id="rq-input-field" placeholder="Décrivez votre idée d'architecture, posez une question..." autocomplete="off" />
+        <input type="text" class="rq-input" id="rq-input-field" placeholder="Parlez-moi de votre activité, demandez des idées..." autocomplete="off" />
         <button type="submit" class="rq-send">➤</button>
       </form>
     </div>
@@ -511,20 +511,20 @@ De quoi souhaitez-vous discuter ?</div>
           <div id="rq-voice-orb" style="display:none;"></div>
           <div id="rq-voice-wave" style="display:none;"></div>
           <div class="rq-voice-status" id="rq-voice-status" style="margin-top:4px; font-size:13.5px; font-weight:700; color:#EDF5FF; letter-spacing:0.01em;">Touchez pour démarrer</div>
-          <div class="rq-voice-sub" id="rq-voice-sub" style="margin-top:2px; font-size:10.5px; color:#7E90A6;">Projets · Architectures sur mesure · Assistant IA complet</div>
+          <div class="rq-voice-sub" id="rq-voice-sub" style="margin-top:2px; font-size:10.5px; color:#7E90A6;">Idées de projets · Architectures · Projets en production</div>
         </div>
 
         <!-- Live Subtitle / Caption Box -->
         <div class="rq-voice-transcript" id="rq-voice-transcript" style="width:100%; min-height:48px; max-height:94px; overflow-y:auto; text-align:center; font-size:11.5px; border-radius:12px; background:rgba(10,16,28,0.85);">
-          <em>Demandez-lui de présenter les projets de Rockib, de concevoir l'architecture de votre application ou posez n'importe quelle question !</em>
+          <em>Parlez de votre activité : je vous propose des idées d'IA, une architecture sur mesure et je vous mets en relation directe avec Rockib !</em>
         </div>
 
         <!-- Quick Voice Topics + Bottom Control Dock -->
         <div style="display:flex; flex-direction:column; gap:8px; width:100%; align-items:center;">
           <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center; width:100%;">
-            <button type="button" class="rq-voice-topic-chip" data-prompt="Présente-moi en détail tous les projets en production de Rockib Quenum et leur architecture." style="background:rgba(0,240,255,0.08); border:1px solid rgba(0,240,255,0.3); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🚀 Ses Projets</button>
-            <button type="button" class="rq-voice-topic-chip" data-prompt="Propose-moi une architecture logicielle et IA complète pour lancer une plateforme e-commerce et WhatsApp moderne." style="background:rgba(0,255,157,0.08); border:1px solid rgba(0,255,157,0.3); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🏗️ Proposer une Architecture</button>
-            <button type="button" class="rq-voice-topic-chip" data-prompt="Explique-moi comment fonctionne le moteur d'arbitrage déterministe Rockib AI Engine." style="background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.35); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🤖 Rockib AI</button>
+            <button type="button" class="rq-voice-topic-chip" data-prompt="Propose-moi des idées innovantes de projets IA et d'automatisations rentables que Rockib peut créer pour une entreprise." style="background:rgba(0,255,157,0.08); border:1px solid rgba(0,255,157,0.3); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">💡 Proposer des Idées</button>
+            <button type="button" class="rq-voice-topic-chip" data-prompt="Présente-moi les projets en production de Rockib Quenum." style="background:rgba(0,240,255,0.08); border:1px solid rgba(0,240,255,0.3); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🚀 Ses Projets</button>
+            <button type="button" class="rq-voice-topic-chip" data-prompt="Propose-moi une architecture technique moderne et explique comment voir le prix avec Rockib." style="background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.35); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🏗️ Architecture & Devis</button>
           </div>
           <div style="display:flex; align-items:center; justify-content:center; gap:14px; width:100%;">
             <button type="button" id="rq-btn-mute" title="Couper / Activer le micro" style="display:none; width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,0.18); background:#111827; color:#EDF5FF; font-size:16px; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
