@@ -13,11 +13,12 @@
   if (window.__ROCKIB_CONCIERGE_LOADED__) return;
   window.__ROCKIB_CONCIERGE_LOADED__ = true;
 
-  const API_BASE = window.ROCKIB_API_URL || (
+  const widgetScript = document.currentScript || document.querySelector('script[data-site-key]') || document.querySelector('script[src*="rockib-concierge"]');
+  const API_BASE = String(window.ROCKIB_API_URL || widgetScript?.getAttribute('data-api-base') || (
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? window.location.origin
+      ? 'http://127.0.0.1:8080'
       : 'https://dion-beaverlike-preceptively.ngrok-free.dev'
-  );
+  )).replace(/\/+$/, '');
 
   function detectInitialSiteKey() {
     try {
@@ -25,7 +26,7 @@
       if (urlParams.get('concierge_site')) return urlParams.get('concierge_site').trim();
     } catch (e) {}
     if (window.ROCKIB_SITE_KEY) return String(window.ROCKIB_SITE_KEY).trim();
-    const scriptTag = document.currentScript || document.querySelector('script[data-site-key]') || document.querySelector('script[src*="rockib-concierge"]');
+    const scriptTag = widgetScript;
     if (scriptTag && scriptTag.getAttribute('data-site-key')) {
       return scriptTag.getAttribute('data-site-key').trim();
     }
@@ -36,8 +37,8 @@
   let sitePrimaryRgb = '0, 240, 255';
   let currentSiteConfig = null;
 
-  const STORAGE_KEY = 'rq_concierge_conv_id_' + currentSiteKey;
-  let conversationId = sessionStorage.getItem(STORAGE_KEY) || null;
+  const conversationStorageKey = (siteKey) => 'rq_concierge_conv_id_' + siteKey;
+  let conversationId = sessionStorage.getItem(conversationStorageKey(currentSiteKey)) || null;
   let isOpen = false;
   let activeTab = 'chat'; // 'chat' | 'voice' | 'callback'
 
@@ -1087,7 +1088,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
     try {
       const response = await fetch(`${API_BASE}/api/v1/inbound/portfolio/message`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
         body: JSON.stringify({
           message: userMsg,
           conversation_id: conversationId,
@@ -1101,7 +1102,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
 
       if (data.conversation_id) {
         conversationId = data.conversation_id;
-        sessionStorage.setItem(STORAGE_KEY, conversationId);
+        sessionStorage.setItem(conversationStorageKey(currentSiteKey), conversationId);
       }
 
       const rawReply = data.reply || "Je n'ai pas pu obtenir de réponse.";
@@ -1545,7 +1546,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
     try {
       const ttsResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/tts`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
         body: JSON.stringify({ text: text, voice: selectedProfile }),
       });
 
@@ -1606,7 +1607,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
       setOrbUiState('thinking', 'Connexion vocale...', 'Initialisation de la session temps réel');
       const resp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/session`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
         body: JSON.stringify({ page_url: window.location.href, site_key: currentSiteKey }),
       });
       const data = await resp.json();
@@ -1757,8 +1758,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
               method: 'POST',
               headers: {
                 'Content-Type': 'application/octet-stream',
-                'X-Audio-Ext': 'webm',
-                'ngrok-skip-browser-warning': 'true',
+                'X-Audio-Ext': 'webm', 'ngrok-skip-browser-warning': 'true'
               },
               body: blob,
             });
@@ -1881,7 +1881,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
       if (!voiceSessionId) {
         const sResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/session`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
           body: JSON.stringify({ page_url: window.location.href, site_key: currentSiteKey }),
         });
         const sData = await sResp.json();
@@ -1890,7 +1890,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
 
       const resp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/turn`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
         body: JSON.stringify({
           session_id: voiceSessionId,
           user_speech_transcript: userText.trim(),
@@ -2060,7 +2060,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
     try {
       const resp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/request-callback`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
         body: JSON.stringify({
           phone_number: cbPhone.value.trim(),
           contact_name: cbName.value.trim() || undefined,
@@ -2136,6 +2136,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
     // 5. Welcome Message & Quick Chips
     if (resetConversation) {
       conversationId = null;
+      sessionStorage.removeItem(conversationStorageKey(currentSiteKey));
       voiceSessionId = null;
       messagesContainer.innerHTML = '';
       const welcomeEl = document.createElement('div');

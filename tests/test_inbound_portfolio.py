@@ -107,12 +107,22 @@ async def test_multi_site_concierge_customization_and_knowledge_base():
         bad_resp = await client.put("/api/v1/inbound/sites/clinique-espoir/config", json=bad_payload)
         assert bad_resp.status_code == 403
 
-        # 3. Verify GET returns the customized config & knowledge base
+        # 3. Public config must not expose prompts or customer contact details.
         get_resp = await client.get("/api/v1/inbound/sites/clinique-espoir/config")
         assert get_resp.status_code == 200
         fetched = get_resp.json()
         assert fetched["position"] == "left"
-        assert "Imagerie IRM" in fetched["knowledge_base"]
+        assert "knowledge_base" not in fetched
+        assert "contact_email" not in fetched
+
+        denied = await client.get("/api/v1/inbound/sites/clinique-espoir/manage-config")
+        assert denied.status_code == 403
+        managed = await client.get(
+            "/api/v1/inbound/sites/clinique-espoir/manage-config",
+            headers={"X-Concierge-Token": saved["client_token"]},
+        )
+        assert managed.status_code == 200
+        assert "Imagerie IRM" in managed.json()["knowledge_base"]
 
         # 4. Verify chat handler injects the client's specific knowledge base into the LLM system prompt
         mock_provider = AsyncMock()

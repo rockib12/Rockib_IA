@@ -185,14 +185,21 @@ class VoiceCallService:
         client_ip: str = "127.0.0.1",
     ) -> VoiceCallTurnResponse:
         """Processes a speech utterance transcribed from the caller's mic."""
-        req_site_key = turn.site_key or "rockib-portfolio"
+        self._prune_expired_sessions()
         session = self._sessions.get(turn.session_id)
         if not session:
-            # Recreate session if expired
-            session = VoiceCallSession(session_id=turn.session_id, page_url="", site_key=req_site_key)
-            self._sessions[turn.session_id] = session
-        elif turn.site_key and turn.site_key != "rockib-portfolio":
-            session.site_key = turn.site_key
+            return VoiceCallTurnResponse(
+                session_id=turn.session_id,
+                agent_reply_text="Cette session a expir??. Veuillez relancer l'appel vocal.",
+                status="session_expired",
+            )
+        req_site_key = turn.site_key or "rockib-portfolio"
+        if req_site_key != session.site_key:
+            return VoiceCallTurnResponse(
+                session_id=turn.session_id,
+                agent_reply_text="Cette session ne correspond pas ?? ce site. Veuillez relancer l'appel vocal.",
+                status="site_mismatch",
+            )
 
         if is_rate_limited(client_ip):
             return VoiceCallTurnResponse(
@@ -230,6 +237,7 @@ class VoiceCallService:
 
         # Assemble LLM history with site-specific knowledge base
         session.history.append({"role": "user", "content": user_text})
+        del session.history[:-24]
         messages = [{"role": "system", "content": self._build_voice_system_prompt(session.site_key)}]
         # Keep last 14 dialogue turns for deep architectural & multi-turn discussions
         messages.extend(session.history[-14:])
@@ -246,16 +254,17 @@ class VoiceCallService:
             clean_reply = re.sub(r"\s+", " ", clean_reply).strip()
         except Exception as e:
             logger.warning("GroqProvider voice error: %s. Using resilient speech fallback.", e)
+            business_name = site_config_service.get_site_dict(session.site_key)["business_name"]
             clean_reply = (
-                "Je vous entends parfaitement. Rockib conçoit des architectures complètes en production comme le moteur multi-agents Rockib AI, "
-                "le vendeur IA WhatsApp MARTISTORE avec reconnaissance visuelle CLIP, WaAuto Commercial et le portail de l'Agence IIA. "
-                "Décrivez-moi votre besoin technique et je vous propose immédiatement une architecture adaptée."
+                f"Je rencontre un souci temporaire pour repondre correctement au sujet de {business_name}. "
+                "Je prefere ne pas vous donner une information incertaine. Pouvez-vous reessayer dans un instant ?"
             )
 
         if should_end and "au revoir" not in clean_reply.lower() and "bonne" not in clean_reply.lower():
             clean_reply += " Merci pour cet échange et à très bientôt !"
 
         session.history.append({"role": "assistant", "content": clean_reply})
+        del session.history[:-24]
 
         return VoiceCallTurnResponse(
             session_id=turn.session_id,
@@ -311,7 +320,7 @@ class VoiceCallService:
             "email": email,
             "automation_need": f"{need} (Phone: {phone})" if phone else need,
         }
-        logger.info("Captured voice call lead: %s", payload)
+        logger.info("Captured voice lead for concierge site %s (email=%s, phone=%s)", site_key, bool(email), bool(phone))
 
         # 1. Alerte prioritaire immédiate sur Telegram pour Rockib
         from app.telegram.services.telegram_service import telegram_service

@@ -16,11 +16,13 @@ from app.execution.services.system_handlers import install_production_handlers
 async def lifespan(app: FastAPI):
     # 0. Contrôle de sécurité Zero-Trust au démarrage (Fail-Fast)
     DEFAULT_INSECURE_JWT_SECRET = "supersecretkeythatisatleast32characterslongforsecurity"
-    if not settings.CREDENTIAL_VAULT_KEY and settings.JWT_SECRET_KEY == DEFAULT_INSECURE_JWT_SECRET:
+    if settings.JWT_SECRET_KEY == DEFAULT_INSECURE_JWT_SECRET:
         raise RuntimeError(
-            "FATAL SECURITY CONFIGURATION ERROR: Refusing to start Rockib AI. "
-            "CREDENTIAL_VAULT_KEY is not defined and JWT_SECRET_KEY is using the insecure hardcoded default. "
-            "Please configure an explicit CREDENTIAL_VAULT_KEY or a secure non-default JWT_SECRET_KEY in your environment."
+            "FATAL SECURITY CONFIGURATION ERROR: Refusing to start Rockib AI with the insecure default JWT_SECRET_KEY."
+        )
+    if not settings.CREDENTIAL_VAULT_KEY:
+        raise RuntimeError(
+            "FATAL SECURITY CONFIGURATION ERROR: CREDENTIAL_VAULT_KEY must be configured before startup."
         )
 
     # Enregistrement des handlers d'exécution système (fs, web, api, social)
@@ -81,10 +83,13 @@ app = FastAPI(
 # Configuration CORS sécurisée (liste blanche d'origines)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_credentials=True,
+    # The public concierge widget is embedded on customer domains. Authentication
+    # uses explicit Bearer headers, never ambient cookies, so wildcard origins are
+    # safe here and do not require credentialed cross-origin requests.
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["*"],
+    allow_headers=["Authorization", "Content-Type", "X-Audio-Ext", "X-Request-ID", "X-Concierge-Token", "ngrok-skip-browser-warning"],
 )
 
 import re

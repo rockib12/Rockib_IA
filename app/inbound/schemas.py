@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 class PortfolioInboundMessageRequest(BaseModel):
     """Payload received from the portfolio embeddable concierge widget."""
     message: str = Field(..., min_length=1, max_length=2000, description="Visitor's message or inquiry")
-    site_key: Optional[str] = Field(default="rockib-portfolio", max_length=64, description="Target client site identifier")
+    site_key: Optional[str] = Field(default="rockib-portfolio", max_length=63, pattern=r"^[a-z0-9][a-z0-9_-]{1,62}$", description="Target client site identifier")
     contact_email: Optional[str] = Field(default=None, max_length=254, description="Optional email for quote/callback")
     contact_phone: Optional[str] = Field(default=None, max_length=40, description="Optional WhatsApp or phone number")
     sender_name: Optional[str] = Field(default=None, max_length=120, description="Optional visitor name")
@@ -26,7 +26,7 @@ class PortfolioInboundResponse(BaseModel):
 
 class VoiceCallSessionRequest(BaseModel):
     """Initiates an interactive voice call session with the Concierge."""
-    site_key: Optional[str] = Field(default="rockib-portfolio", max_length=64, description="Target client site identifier")
+    site_key: Optional[str] = Field(default="rockib-portfolio", max_length=63, pattern=r"^[a-z0-9][a-z0-9_-]{1,62}$", description="Target client site identifier")
     page_url: Optional[str] = Field(default="https://rockib-quenum.netlify.app/", max_length=500, description="Referrer page context")
     visitor_id: Optional[str] = Field(default=None, max_length=64, description="Optional visitor device tracking ID")
 
@@ -44,7 +44,7 @@ class VoiceCallTurnRequest(BaseModel):
     """A vocal utterance transcribed from the visitor's microphone."""
     session_id: str = Field(..., min_length=1, max_length=64)
     user_speech_transcript: str = Field(..., min_length=1, max_length=2000)
-    site_key: Optional[str] = Field(default="rockib-portfolio", max_length=64)
+    site_key: Optional[str] = Field(default="rockib-portfolio", max_length=63, pattern=r"^[a-z0-9][a-z0-9_-]{1,62}$")
     duration_seconds: Optional[float] = Field(default=None)
 
 
@@ -60,7 +60,7 @@ class VoiceCallTurnResponse(BaseModel):
 class CallMeBackRequest(BaseModel):
     """Request by visitor to receive a phone or WhatsApp voice call."""
     phone_number: str = Field(..., min_length=6, max_length=30, description="International phone number")
-    site_key: Optional[str] = Field(default="rockib-portfolio", max_length=64)
+    site_key: Optional[str] = Field(default="rockib-portfolio", max_length=63, pattern=r"^[a-z0-9][a-z0-9_-]{1,62}$")
     contact_name: Optional[str] = Field(default=None, max_length=120, description="Visitor's name")
     topic: Optional[str] = Field(default="Discussion projet", max_length=500, description="Reason for call")
     channel: str = Field(default="whatsapp", pattern=r"(?i)^(whatsapp|phone)$", description="'whatsapp' or 'phone'")
@@ -90,7 +90,7 @@ class VoiceTopicChip(BaseModel):
 
 
 class ConciergeSiteConfigPublic(BaseModel):
-    """Public configuration and knowledge base metadata for a client's Concierge."""
+    """Public, browser-safe configuration for a client's Concierge widget."""
     site_key: str
     business_name: str
     subtitle: str = ""
@@ -102,6 +102,10 @@ class ConciergeSiteConfigPublic(BaseModel):
     voice_greeting: str
     quick_chips: List[str] = Field(default_factory=list)
     voice_topic_chips: List[VoiceTopicChip] = Field(default_factory=list)
+
+
+class ConciergeSiteConfigPrivate(ConciergeSiteConfigPublic):
+    """Private prompt and contact settings returned only to a token holder."""
     assistant_role: str = ""
     knowledge_base: str = ""
     pricing_rule: str = ""
@@ -109,14 +113,19 @@ class ConciergeSiteConfigPublic(BaseModel):
     contact_email: str = ""
 
 
+class ConciergeSiteSummary(BaseModel):
+    site_key: str
+    business_name: str
+
+
 class ConciergeSiteConfigUpsertRequest(BaseModel):
     """Payload to create or customize a client's Concierge."""
     business_name: str = Field(..., min_length=2, max_length=120)
     subtitle: Optional[str] = Field(default="", max_length=160)
     launcher_label: Optional[str] = Field(default="📞 Concierge & Appel IA", max_length=60)
-    primary_color: Optional[str] = Field(default="#00F0FF", max_length=20)
-    position: Optional[str] = Field(default="right", max_length=10)
-    default_voice: Optional[str] = Field(default="henri", max_length=30)
+    primary_color: Optional[str] = Field(default="#00F0FF", pattern=r"^#[0-9A-Fa-f]{6}$")
+    position: Optional[str] = Field(default="right", pattern=r"^(left|right)$")
+    default_voice: Optional[str] = Field(default="henri", pattern=r"^(henri|vivienne|denise|remy)$")
     welcome_message: str = Field(..., min_length=5, max_length=1500)
     voice_greeting: str = Field(..., min_length=5, max_length=600)
     quick_chips: List[str] = Field(default_factory=list)
@@ -136,7 +145,7 @@ class ConciergeSiteConfigUpsertResponse(BaseModel):
     """Response after saving a client's Concierge configuration."""
     status: str = "saved"
     message: str = "Configuration et base de connaissances enregistrées avec succès."
-    config: ConciergeSiteConfigPublic
+    config: ConciergeSiteConfigPrivate
     client_token: str
     embed_script: str
     embed_snippet: str

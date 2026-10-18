@@ -503,7 +503,7 @@
     (function () {
       const API_BASE = window.ROCKIB_API_URL || (
         window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-          ? window.location.origin
+          ? 'http://127.0.0.1:8080'
           : 'https://dion-beaverlike-preceptively.ngrok-free.dev'
       );
 
@@ -618,7 +618,7 @@
 
       function updateEmbedSnippet() {
         const key = (inputSiteKey.value || 'rockib-portfolio').trim();
-        embedCodeBox.textContent = `<script src="https://rockib-quenum.netlify.app/rockib-concierge.js" data-site-key="${key}" defer><\/script>`;
+        embedCodeBox.textContent = `<script src="https://rockib-quenum.netlify.app/rockib-concierge.js" data-api-base="https://dion-beaverlike-preceptively.ngrok-free.dev" data-site-key="${key}" defer><\/script>`;
       }
 
       function buildCurrentFormConfig() {
@@ -677,15 +677,11 @@
 
       async function refreshSitesDropdown(selectedKey) {
         try {
-          const resp = await fetch(`${API_BASE}/api/v1/inbound/sites`, {
-            headers: { 'ngrok-skip-browser-warning': 'true' }
-          });
+          const resp = await fetch(`${API_BASE}/api/v1/inbound/sites`, { headers: { 'ngrok-skip-browser-warning': 'true' } });
           if (resp.ok) {
             const data = await resp.json();
             if (Array.isArray(data.sites) && data.sites.length > 0) {
-              selectExisting.innerHTML = data.sites
-                .map(s => `<option value="${s.site_key}">${s.site_key} (${s.business_name})</option>`)
-                .join('');
+              selectExisting.replaceChildren(...data.sites.map(s => new Option(`${s.site_key} (${s.business_name})`, s.site_key)));
               if (selectedKey) selectExisting.value = selectedKey;
             }
           }
@@ -696,13 +692,15 @@
         const key = (siteKey || inputSiteKey.value || 'rockib-portfolio').trim();
         inputSiteKey.value = key;
         try {
-          const resp = await fetch(`${API_BASE}/api/v1/inbound/sites/${encodeURIComponent(key)}/config`, {
-            headers: { 'ngrok-skip-browser-warning': 'true' }
+          const resp = await fetch(`${API_BASE}/api/v1/inbound/sites/${encodeURIComponent(key)}/manage-config`, {
+            headers: { 'X-Concierge-Token': fToken.value.trim(), 'ngrok-skip-browser-warning': 'true' }
           });
           if (resp.ok) {
             const cfg = await resp.json();
             populateForm(cfg);
             showToast(`✅ Configuration et base de connaissances du site "${key}" chargées avec succès.`, false);
+          } else {
+            showToast(resp.status === 403 ? 'Cle client invalide.' : `Erreur serveur (${resp.status}).`, true);
           }
         } catch (err) {
           showToast(`⚠️ Impossible de joindre le serveur IA pour charger "${key}".`, true);
@@ -788,8 +786,7 @@
           const resp = await fetch(`${API_BASE}/api/v1/inbound/sites/${encodeURIComponent(cfg.site_key)}/config`, {
             method: 'PUT',
             headers: {
-              'Content-Type': 'application/json',
-              'ngrok-skip-browser-warning': 'true'
+              'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true'
             },
             body: JSON.stringify(cfg)
           });
@@ -798,6 +795,7 @@
             showToast(`❌ Erreur (${resp.status}) : ${data.detail || 'Impossible de sauvegarder'}`, true);
             return;
           }
+          fToken.value = data.client_token || cfg.client_token || '';
           await refreshSitesDropdown(cfg.site_key);
           if (window.RockibConcierge) {
             await window.RockibConcierge.reloadSite(cfg.site_key);

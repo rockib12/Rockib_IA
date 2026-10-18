@@ -55,6 +55,30 @@ async def test_voice_turn_flow_and_clean_speech():
 
 
 @pytest.mark.asyncio
+async def test_voice_session_cannot_be_recreated_or_switched_between_sites():
+    mock_provider = AsyncMock()
+    mock_provider.generate.return_value = "Bonjour."
+    service = VoiceCallService(ai_provider=mock_provider)
+    session_resp = service.start_call_session(VoiceCallSessionRequest(site_key="rockib-portfolio"))
+
+    switched = await service.handle_voice_turn(VoiceCallTurnRequest(
+        session_id=session_resp.session_id,
+        site_key="martistore",
+        user_speech_transcript="Question privée",
+    ))
+    assert switched.status == "site_mismatch"
+    assert mock_provider.generate.await_count == 0
+
+    expired = await service.handle_voice_turn(VoiceCallTurnRequest(
+        session_id="invented-session-id",
+        site_key="rockib-portfolio",
+        user_speech_transcript="Bonjour",
+    ))
+    assert expired.status == "session_expired"
+    assert "invented-session-id" not in service._sessions
+
+
+@pytest.mark.asyncio
 async def test_voice_turn_lead_capture_and_end_call():
     """Verify spoken lead extraction and hang-up detection."""
     mock_provider = AsyncMock()

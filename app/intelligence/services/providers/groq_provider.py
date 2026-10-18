@@ -30,7 +30,7 @@ class GroqProvider:
     ``async def generate(self, messages) -> str``.
 
     La clé API est lue depuis ``settings.GROQ_API_KEY`` et le modèle par
-    défaut depuis ``settings.DEFAULT_MODEL_NAME``. Aucune valeur n'est
+    default from ``settings.GROQ_MODEL``. No model ID is hardcoded.
     hardcodée : tout est configurable via les settings / .env.
     """
 
@@ -43,7 +43,7 @@ class GroqProvider:
         client: httpx.AsyncClient | None = None,
     ) -> None:
         self._api_key = api_key if api_key is not None else settings.GROQ_API_KEY
-        self._model = model if model is not None else settings.DEFAULT_MODEL_NAME
+        self._model = model if model is not None else settings.GROQ_MODEL
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._client = client  # None => création à l'appel (permets d'injecter un mock)
@@ -80,7 +80,7 @@ class GroqProvider:
         payload = {
             "model": model,
             "messages": messages,
-            "temperature": 0.0,
+            "temperature": 0.0 if json_mode else 0.25,
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}

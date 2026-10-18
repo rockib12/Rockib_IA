@@ -14,6 +14,7 @@ from app.inbound.schemas import (
     CallMeBackRequest,
     CallMeBackResponse,
     ConciergeSiteConfigPublic,
+    ConciergeSiteConfigPrivate,
     ConciergeSiteConfigUpsertRequest,
     ConciergeSiteConfigUpsertResponse,
     PortfolioInboundMessageRequest,
@@ -41,8 +42,25 @@ async def list_concierge_sites():
 
 @router.get("/sites/{site_key}/config", response_model=ConciergeSiteConfigPublic)
 async def get_concierge_site_config(site_key: str) -> ConciergeSiteConfigPublic:
-    """Returns the public customization & knowledge base config for a specific client site_key."""
-    return site_config_service.get_public_config(site_key)
+    """Returns only browser-safe branding; business prompts and contacts stay private."""
+    try:
+        return site_config_service.get_public_config(site_key)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Concierge site not found.")
+
+
+@router.get("/sites/{site_key}/manage-config", response_model=ConciergeSiteConfigPrivate)
+async def get_manage_concierge_site_config(
+    site_key: str,
+    x_concierge_token: Optional[str] = Header(default=None),
+) -> ConciergeSiteConfigPrivate:
+    """Returns private setup data only to the site's owner or configured master key."""
+    if not site_config_service.can_manage_site(site_key, x_concierge_token):
+        raise HTTPException(status_code=403, detail="Invalid concierge management token.")
+    try:
+        return site_config_service.get_private_config(site_key)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Concierge site not found.")
 
 
 @router.put("/sites/{site_key}/config", response_model=ConciergeSiteConfigUpsertResponse)
@@ -57,7 +75,7 @@ async def upsert_concierge_site_config(
     client_ip = request.client.host if request.client else "127.0.0.1"
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
+        client_ip = forwarded.split(",")[-1].strip()
 
     if is_rate_limited(client_ip):
         raise HTTPException(
@@ -68,7 +86,11 @@ async def upsert_concierge_site_config(
 
     try:
         public_cfg, saved_token = site_config_service.upsert_site_config(site_key, body)
-        snippet = f'<script src="https://rockib-quenum.netlify.app/rockib-concierge.js" data-site-key="{public_cfg.site_key}" defer></script>'
+        snippet = (
+            f'<script src="{settings.CONCIERGE_WIDGET_URL}" '
+            f'data-api-base="{settings.PUBLIC_API_URL}" '
+            f'data-site-key="{public_cfg.site_key}" defer></script>'
+        )
         return ConciergeSiteConfigUpsertResponse(
             status="saved",
             message=f"Concierge et base de connaissances du site '{public_cfg.site_key}' enregistrés avec succès !",
@@ -87,6 +109,8 @@ async def upsert_concierge_site_config(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
         )
+    except RuntimeError as exc:
+        raise HTTPException(status_code=503, detail=str(exc))
 
 
 @router.post("/portfolio/message", response_model=PortfolioInboundResponse)
@@ -102,8 +126,12 @@ async def post_portfolio_message(
     client_ip = request.client.host if request.client else "127.0.0.1"
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
+        client_ip = forwarded.split(",")[-1].strip()
 
+    try:
+        site_config_service.get_site_dict(body.site_key)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Concierge site not found.")
     return await concierge_service.handle_message(body, client_ip=client_ip)
 
 
@@ -118,7 +146,7 @@ async def start_voice_call_session(
     client_ip = request.client.host if request.client else "127.0.0.1"
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
+        client_ip = forwarded.split(",")[-1].strip()
 
     if is_rate_limited(client_ip):
         raise HTTPException(
@@ -126,6 +154,10 @@ async def start_voice_call_session(
             detail="Trop de sessions vocales ouvertes. Veuillez patienter une minute.",
             headers={"Retry-After": "60"},
         )
+    try:
+        site_config_service.get_site_dict(body.site_key)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Concierge site not found.")
     return voice_service.start_call_session(body)
 
 
@@ -138,7 +170,7 @@ async def handle_voice_turn(
     client_ip = request.client.host if request.client else "127.0.0.1"
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
+        client_ip = forwarded.split(",")[-1].strip()
 
     return await voice_service.handle_voice_turn(body, client_ip=client_ip)
 
@@ -154,7 +186,7 @@ async def synthesize_voice_tts(
     client_ip = request.client.host if request.client else "127.0.0.1"
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
+        client_ip = forwarded.split(",")[-1].strip()
 
     if is_rate_limited(client_ip):
         raise HTTPException(
@@ -190,7 +222,7 @@ async def transcribe_voice_stt(
     client_ip = request.client.host if request.client else "127.0.0.1"
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
+        client_ip = forwarded.split(",")[-1].strip()
 
     if is_rate_limited(client_ip):
         raise HTTPException(
@@ -223,7 +255,7 @@ async def request_callback(
     client_ip = request.client.host if request.client else "127.0.0.1"
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
+        client_ip = forwarded.split(",")[-1].strip()
 
     if is_rate_limited(client_ip):
         raise HTTPException(
@@ -231,6 +263,10 @@ async def request_callback(
             detail="Trop de demandes de rappel. Veuillez patienter une minute.",
             headers={"Retry-After": "60"},
         )
+    try:
+        site_config_service.get_site_dict(body.site_key)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Concierge site not found.")
     return await voice_service.schedule_callback(body)
 
 

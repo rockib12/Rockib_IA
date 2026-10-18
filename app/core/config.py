@@ -26,6 +26,8 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
     CREDENTIAL_VAULT_KEY: Optional[str] = None
+    PUBLIC_API_URL: str = "https://dion-beaverlike-preceptively.ngrok-free.dev"
+    CONCIERGE_WIDGET_URL: str = "https://rockib-quenum.netlify.app/rockib-concierge.js"
     CORS_ORIGINS: list[str] = [
         "http://localhost",
         "http://localhost:80",
@@ -56,7 +58,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     DEEPSEEK_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
-    DEFAULT_MODEL_NAME: str = "gpt-4o"
+    DEFAULT_MODEL_NAME: str = "llama-3.3-70b-versatile"
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
     ANALYTICAL_MODEL_NAME: str = "deepseek-coder"
 
     # Execution / Sandboxing

@@ -64,7 +64,7 @@ def is_rate_limited(client_ip: str) -> bool:
 
 
 _CONVERSATION_History_MAX_SESSIONS = 1000
-_conversation_store: dict[str, list[dict[str, str]]] = {}
+_conversation_store: dict[tuple[str, str], list[dict[str, str]]] = {}
 
 
 class PortfolioConciergeService:
@@ -124,11 +124,12 @@ class PortfolioConciergeService:
             )
 
         # Maintain multi-turn conversation history
-        if conversation_id not in _conversation_store and len(_conversation_store) >= _CONVERSATION_History_MAX_SESSIONS:
-            oldest_cid = next(iter(_conversation_store))
-            _conversation_store.pop(oldest_cid, None)
-        history = _conversation_store.setdefault(conversation_id, [])
+        conversation_key = (site_key, conversation_id)
+        if conversation_key not in _conversation_store and len(_conversation_store) >= _CONVERSATION_History_MAX_SESSIONS:
+            _conversation_store.pop(next(iter(_conversation_store)), None)
+        history = _conversation_store.setdefault(conversation_key, [])
         history.append({"role": "user", "content": request.message})
+        del history[:-24]
 
         # Call LLM with conversation history and site-specific knowledge base
         messages = [{"role": "system", "content": self._build_system_prompt(site_key)}]
@@ -139,16 +140,14 @@ class PortfolioConciergeService:
             reply_text = re.sub(r"<think>[\s\S]*?</think>", "", raw_reply).strip()
         except Exception as e:
             logger.warning("GroqProvider unavailable for inbound portfolio: %s. Using resilient fallback.", e)
+            business_name = site_config_service.get_site_dict(site_key)["business_name"]
             reply_text = (
-                "Bonjour ! Je suis l'assistant IA et co-architecte de Rockib Quenum.\n\n"
-                "Rockib conçoit et déploie des architectures distribuées, des automatisations avancées et des agents IA "
-                "en production réelle — comme le moteur d'arbitrage multi-agents Rockib AI, le vendeur IA WhatsApp de MARTISTORE "
-                "(avec vision CLIP), WaAuto Commercial ou le portail client de l'Agence IIA.\n\n"
-                "Décrivez-moi votre projet pour que je vous propose une architecture technique complète, ou laissez-moi "
-                "votre adresse email (ou contactez rockibdev@gmail.com) !"
+                f"Bonjour, je suis l'assistant de {business_name}. Je rencontre un souci temporaire et je ne veux pas "
+                "vous donner une information incertaine. Pouvez-vous reformuler votre demande dans un instant, ou contacter directement l'entreprise ?"
             )
 
         history.append({"role": "assistant", "content": reply_text})
+        del history[:-24]
 
         # If lead was captured, append reassurance
         if lead_captured and detected_email and detected_email not in reply_text:
@@ -176,7 +175,7 @@ class PortfolioConciergeService:
             "email": email,
             "automation_need": f"{need} (Phone: {phone})" if phone else need,
         }
-        logger.info("Captured qualified lead for Agence IIA & Rockib: %s", payload)
+        logger.info("Captured qualified lead for concierge site %s (email=%s, phone=%s)", site_key, bool(email), bool(phone))
 
         # 1. Envoi prioritaire de l'alerte sur Telegram directement à Rockib
         from app.telegram.services.telegram_service import telegram_service

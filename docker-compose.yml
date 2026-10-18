@@ -44,10 +44,14 @@ services:
 
     env_file:
       - .env
+    volumes:
+      - ./data:/app/data
     environment:
       ASYNC_DATABASE_URL: postgresql+asyncpg://rockib:rockib_dev_password@postgres:5432/rockib_ia
       DATABASE_URL: postgresql://rockib:rockib_dev_password@postgres:5432/rockib_ia
       REDIS_URL: redis://redis:6379/0
+      PUBLIC_API_URL: https://dion-beaverlike-preceptively.ngrok-free.dev
+      CONCIERGE_WIDGET_URL: https://rockib-quenum.netlify.app/rockib-concierge.js
       APP_ENV: production
       DEBUG: "false"
     depends_on:
