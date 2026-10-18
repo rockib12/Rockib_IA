@@ -205,6 +205,23 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
    - **Lot P6 (Protection Inbound Complète, Plafonnement IP, Healthcheck DB/Redis & Nginx Assets)** : Extension du rate-limiting IP aux endpoints vocaux publics `/portfolio/voice/session` et `/request-callback` ; plafonnement mémoire des IP suivies (`_MAX_TRACKED_IPS = 2000`) dans `portfolio_handler.py` ; sonde `/api/v1/health` vérifiant conjointement PostgreSQL et Redis + fermeture propre du pool (`async_engine.dispose()`) au shutdown ; limite `client_max_body_size 2m;` et préservation des en-têtes de sécurité sur `location /assets/` dans `nginx.conf`.
    - **Lot P7 (Validation Stricte des Schémas Pydantic & Normalisation Email)** : Bornes de longueur sur `UserCreate.password` (`8..128` caractères, anti-DoS Argon2/bcrypt), normalisation systématique des emails en minuscules sur `/register` et `/login`, bornes strictes sur `DecisionRequest`, `CreateGoalRequest`, `CreateAgentRequest` et validation par pattern de `CallMeBackRequest.channel` (`whatsapp|phone`).
    - **Validation de Non-Régression Globale** : Suite de tests portée à **686 tests unitaires et d'intégration réussis (100% verts, 0 warning)**.
+21. **Connecteurs Réseaux Sociaux & Sécurité HMAC Anti-Tampering (16 Tests Dédiés)** :
+   - **Signature Officielle Meta `appsecret_proof`** : Calcul cryptographique HMAC-SHA256 (`hashlib.sha256`) sur l'access token avec l'app secret de l'application Meta, garantissant l'authenticité inviolable des requêtes vers Graph API.
+   - **Validation des Webhooks Entrants `X-Hub-Signature-256`** : Vérification timing-safe (`hmac.compare_digest`) du payload brut entrant, avec rejet strict en cas de mismatch ou de payload altéré (`Anti-Tampering`).
+   - **Connecteurs Réseaux Sociaux Industriels** : Connecteurs Facebook Pages, Instagram Graph, WhatsApp Cloud API, Twitter (X) API v2 (OAuth 1.0a HMAC-SHA1), LinkedIn UGC Posts, et Discord Webhooks.
+   - **Garde-Fou Budgétaire Meta Ads Formel** : Le connecteur publicitaire vérifie rigoureusement le plafond budgétaire autorisé avant d'émettre tout appel API, levant une violation bloquante `FINANCIAL_POLICY_VIOLATION` si le montant dépasse le budget alloué.
+   - **Suite Dédiée** : 16 tests unitaires et de sécurité validés (`tests/test_social_connectors_hmac.py`), portant la suite globale à **702 tests unitaires et d'intégration réussis (100% verts)**.
+22. **Verrouillage Zero-Trust de l'UI & Hardening Navbar du Cockpit Frontend** :
+   - **Contrôle d'Accès Visuel & Fonctionnel** : Verrouillage conditionnel de tous les boutons et actions sensibles (`+ Mission`, `Déployer`, `Wake`, `Réseaux`, `Arbitrage`, `Terminal`) dans `CockpitHeader.jsx` et `App.jsx` lorsque l'utilisateur n'est pas authentifié.
+   - **Indicateurs de Sécurité Visuels** : Remplacement des icônes d'action par un cadenas ambré (`🔒`) et interception automatique des clics invitant à la connexion sans crash ni fuite d'état.
+   - **Sécurisation des Endpoints Backend** : Décoration systématique des routes dans `app/connectors/router.py` par `assert_workspace_member`.
+23. **Refonte Concierge : Rondelle Flottante Circulaire ChatGPT 60 FPS & Capture de Leads Multi-Tenant** :
+   - **Rondelle Flottante Circulaire ("ChatGPT Floating Disc")** : Remplacement de la barre rectangulaire de minimisation par un disque parfait de 72px (`rq-floating-orb`) avec Canvas morphing fluide à 3 couches réagissant en direct à l'énergie vocale et au micro sans interruption de la conversation audio.
+   - **Dock de Contrôle au Survol** : Bouton coupure micro (`🎙️ / 🔇`), bouton raccrocher (`✕`), et restauration instantanée de la fenêtre au clic.
+   - **Détection & Capture Robuste des Coordonnées Client** : Normalisation de `PHONE_REGEX` prenant en charge les numéros locaux et internationaux de 8 à 15 chiffres avec ou sans indicatif (`+229...`, `01...`).
+   - **Directives de Capture Proactive (Chat & Vocal)** : L'IA demande proactivement son numéro de téléphone ou WhatsApp et son nom au visiteur dès qu'il s'intéresse à un projet, devis ou demande de rappel, avec confirmation chaleureuse d'enregistrement.
+   - **Routage et Alertes Multi-Tenant sur Telegram** : Transmission instantanée des leads à Rockib sur Telegram (`@masterrockibot`) incluant le nom de l'entreprise cliente, le site source (`site_key`), le nom du prospect, son numéro, le besoin exprimé et les contacts de rappel du client.
+   - **Synchronisation & Déploiement en Production Confirmés** : Dépôts `rockib12/Rockib_IA` (commit `b7aa31d`) et `rockib12/rockib-portfolio` (commit `2b0c1fd`) synchronisés à 100% sur GitHub `master` et déployés en direct sur Netlify (**HTTP 200 OK**).
 
 
 
