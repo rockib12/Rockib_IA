@@ -50,6 +50,8 @@ export default function SocialConnectorsPanel({
   isOpen = false,
   onClose,
   workspaceId,
+  currentUser = null,
+  onOpenAuth,
   addToast,
 }) {
   const [networks, setNetworks] = useState([]);
@@ -69,7 +71,10 @@ export default function SocialConnectorsPanel({
   const [testingAction, setTestingAction] = useState(false);
 
   const fetchStatus = useCallback(async () => {
-    if (!isOpen) return;
+    if (!isOpen || !currentUser) {
+      setNetworks([]);
+      return;
+    }
     setLoading(true);
     try {
       const url = workspaceId ? `/api/v1/connectors/status?workspace_id=${workspaceId}` : '/api/v1/connectors/status';
@@ -78,15 +83,14 @@ export default function SocialConnectorsPanel({
         const data = await res.json();
         setNetworks(data);
       } else {
-        // Fallback demo list if not logged in
-        setNetworks(getFallbackNetworks());
+        setNetworks([]);
       }
     } catch {
-      setNetworks(getFallbackNetworks());
+      setNetworks([]);
     } finally {
       setLoading(false);
     }
-  }, [isOpen, workspaceId]);
+  }, [isOpen, workspaceId, currentUser]);
 
   useEffect(() => {
     fetchStatus();
@@ -381,14 +385,104 @@ export default function SocialConnectorsPanel({
           </div>
         </div>
 
-        {/* Networks Grid */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+        {/* État Verrouillé si non authentifié */}
+        {!currentUser ? (
           <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-            gap: '16px',
+            flex: 1,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '48px 24px',
+            textAlign: 'center',
           }}>
-            {networks.map((net) => {
+            <div style={{
+              width: '72px',
+              height: '72px',
+              borderRadius: '20px',
+              background: 'rgba(255, 51, 102, 0.1)',
+              border: '2px solid #FF3366',
+              display: 'grid',
+              placeItems: 'center',
+              boxShadow: '0 0 35px rgba(255, 51, 102, 0.3)',
+              marginBottom: '20px',
+            }}>
+              <Lock size={36} color="#FF3366" />
+            </div>
+
+            <div style={{
+              fontSize: '20px',
+              fontWeight: 700,
+              color: '#FFFFFF',
+              letterSpacing: '-0.02em',
+              marginBottom: '8px',
+            }}>
+              ACCÈS STRICTEMENT VERROUILLÉ
+            </div>
+
+            <div style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(255, 51, 102, 0.15)',
+              border: '1px solid rgba(255, 51, 102, 0.35)',
+              color: '#FF3366',
+              padding: '4px 12px',
+              borderRadius: '999px',
+              fontSize: '11px',
+              fontWeight: 700,
+              fontFamily: 'var(--font-mono, monospace)',
+              marginBottom: '16px',
+            }}>
+              ● AUTHENTIFICATION OPÉRATEUR REQUISE (JWT)
+            </div>
+
+            <p style={{
+              maxWidth: '460px',
+              fontSize: '13px',
+              color: '#94A3B8',
+              lineHeight: 1.6,
+              marginBottom: '24px',
+            }}>
+              Le Hub Réseaux Sociaux &amp; Meta Ads contient des points de terminaison sensibles (diffusion de campagnes sponsorisées, déduction budgétaire, injection de secrets HMAC-SHA256). Vous devez être connecté avec un compte opérateur pour déverrouiller ce cockpit.
+            </p>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button
+                onClick={() => {
+                  if (onOpenAuth) onOpenAuth();
+                  if (onClose) onClose();
+                }}
+                className="btn-cyber primary"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(0, 240, 255, 0.25), rgba(99, 102, 241, 0.35))',
+                  border: '1px solid var(--neon-cyan)',
+                  padding: '11px 22px',
+                  fontSize: '13px',
+                  fontWeight: 600,
+                  boxShadow: '0 0 20px rgba(0, 240, 255, 0.25)',
+                }}
+              >
+                ⚡ Se Connecter / Déverrouiller la Console
+              </button>
+              <button
+                onClick={onClose}
+                className="btn-cyber secondary"
+                style={{ padding: '11px 18px', fontSize: '13px' }}
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* Networks Grid */
+          <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
+              gap: '16px',
+            }}>
+              {networks.map((net) => {
               const isLive = net.mode === 'live';
               return (
                 <div
@@ -545,6 +639,7 @@ export default function SocialConnectorsPanel({
             })}
           </div>
         </div>
+        )}
 
         {/* Footer info bar */}
         <div style={{

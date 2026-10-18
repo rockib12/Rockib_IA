@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import get_current_user
+from app.core.dependencies import assert_workspace_member, get_current_user
 from app.connectors.social_connectors import (
     compute_meta_appsecret_proof,
     get_credential_safe,
@@ -65,6 +65,8 @@ async def get_connectors_status(
 ):
     """Retourne l'état de configuration et de sécurité HMAC des 7 réseaux sociaux."""
     ws_id = workspace_id or (current_user.workspaces[0].id if getattr(current_user, "workspaces", None) else None)
+    if ws_id:
+        await assert_workspace_member(db, current_user, ws_id)
 
     # Vérification des clés dans le Vault ou dans l'environnement
     meta_token = await get_credential_safe(ws_id, "meta", "access_token") or await get_credential_safe(ws_id, "meta", "page_access_token")
@@ -169,6 +171,7 @@ async def save_connector_credentials(
     db: AsyncSession = Depends(get_async_db),
 ):
     """Enregistre de manière chiffrée (AEAD AES-256-GCM) les clés du réseau dans le Vault."""
+    await assert_workspace_member(db, current_user, payload.workspace_id)
     saved_keys = []
     for key_alias, secret_value in payload.credentials.items():
         if secret_value and secret_value.strip():
@@ -204,6 +207,7 @@ async def test_connector_action(
     db: AsyncSession = Depends(get_async_db),
 ):
     """Déclenche l'action du connecteur pour tester la publication en direct ou en sandbox."""
+    await assert_workspace_member(db, current_user, payload.workspace_id)
     action = ActionRecord(
         id=uuid.uuid4(),
         workspace_id=payload.workspace_id,

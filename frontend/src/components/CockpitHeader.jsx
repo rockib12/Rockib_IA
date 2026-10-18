@@ -17,6 +17,7 @@ import {
   Menu,
   X,
   Share2,
+  Lock,
 } from 'lucide-react';
 
 export default function CockpitHeader({
@@ -166,10 +167,11 @@ export default function CockpitHeader({
           <button
             onClick={onToggleConnectors}
             className={`btn-cyber ${isConnectorsOpen ? 'active-panel' : 'secondary'}`}
-            title="Hub Réseaux Sociaux & Meta Ads (HMAC-SHA256)"
+            title={currentUser ? "Hub Réseaux Sociaux & Meta Ads (HMAC-SHA256)" : "Verrouillé — Connexion requise"}
+            style={!currentUser ? { opacity: 0.8, borderColor: 'rgba(245, 158, 11, 0.45)' } : {}}
           >
-            <Share2 size={15} />
-            <span>Réseaux</span>
+            {currentUser ? <Share2 size={15} /> : <Lock size={14} color="#F59E0B" />}
+            <span style={!currentUser ? { color: '#F59E0B' } : {}}>Réseaux</span>
           </button>
         </div>
 

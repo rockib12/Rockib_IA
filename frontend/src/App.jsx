@@ -416,7 +416,14 @@ export default function App() {
         isGovernanceOpen={isGovernanceOpen}
         onToggleGovernance={() => setIsGovernanceOpen(!isGovernanceOpen)}
         isConnectorsOpen={isConnectorsOpen}
-        onToggleConnectors={() => setIsConnectorsOpen(!isConnectorsOpen)}
+        onToggleConnectors={() => {
+          if (!currentUser) {
+            addToast("Accès Verrouillé : Connectez-vous pour accéder au Hub Réseaux & Meta Ads.", "warning");
+            setIsAuthModalOpen(true);
+            return;
+          }
+          setIsConnectorsOpen(!isConnectorsOpen);
+        }}
       />
 
       {/* Zone de rendu 3D & HUD */}
@@ -617,6 +624,8 @@ export default function App() {
         isOpen={isConnectorsOpen}
         onClose={() => setIsConnectorsOpen(false)}
         workspaceId={agents[0]?.workspace_id || workspaceId}
+        currentUser={currentUser}
+        onOpenAuth={() => setIsAuthModalOpen(true)}
         addToast={addToast}
       />
 
