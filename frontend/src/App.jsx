@@ -397,11 +397,30 @@ export default function App() {
         isSplitView={isSplitView}
         onToggleSplitView={() => setIsSplitView(!isSplitView)}
         onOpenSpawnModal={() => {
+          if (!currentUser) {
+            addToast("Accès Verrouillé : Connectez-vous pour déployer un agent.", "warning");
+            setIsAuthModalOpen(true);
+            return;
+          }
           setSpawnParentId(null);
           setIsSpawnModalOpen(true);
         }}
-        onOpenCreateGoalModal={() => handleOpenCreateGoalForAgent(selectedAgentId)}
-        onWakeGlobal={() => handleWakeGoal(selectedGoalId || goals[0]?.id)}
+        onOpenCreateGoalModal={() => {
+          if (!currentUser) {
+            addToast("Accès Verrouillé : Connectez-vous pour créer une mission DAG.", "warning");
+            setIsAuthModalOpen(true);
+            return;
+          }
+          handleOpenCreateGoalForAgent(selectedAgentId);
+        }}
+        onWakeGlobal={() => {
+          if (!currentUser) {
+            addToast("Accès Verrouillé : Connectez-vous pour exécuter le réveil autonome.", "warning");
+            setIsAuthModalOpen(true);
+            return;
+          }
+          handleWakeGoal(selectedGoalId || goals[0]?.id);
+        }}
         onResetCamera={() => setSelectedAgentId(null)}
         isWaking={isWaking}
         currentUser={currentUser}
@@ -410,11 +429,25 @@ export default function App() {
         isDashboardOpen={isDashboardOpen}
         onToggleDashboard={() => setIsDashboardOpen(!isDashboardOpen)}
         isTerminalOpen={isTerminalOpen}
-        onToggleTerminal={() => setIsTerminalOpen(!isTerminalOpen)}
+        onToggleTerminal={() => {
+          if (!currentUser) {
+            addToast("Accès Verrouillé : Connectez-vous pour ouvrir le Terminal de commandes.", "warning");
+            setIsAuthModalOpen(true);
+            return;
+          }
+          setIsTerminalOpen(!isTerminalOpen);
+        }}
         isTimelineOpen={isTimelineOpen}
         onToggleTimeline={() => setIsTimelineOpen(!isTimelineOpen)}
         isGovernanceOpen={isGovernanceOpen}
-        onToggleGovernance={() => setIsGovernanceOpen(!isGovernanceOpen)}
+        onToggleGovernance={() => {
+          if (!currentUser) {
+            addToast("Accès Verrouillé : Connectez-vous pour accéder au centre d'Arbitrage.", "warning");
+            setIsAuthModalOpen(true);
+            return;
+          }
+          setIsGovernanceOpen(!isGovernanceOpen);
+        }}
         isConnectorsOpen={isConnectorsOpen}
         onToggleConnectors={() => {
           if (!currentUser) {

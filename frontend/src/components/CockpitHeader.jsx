@@ -131,10 +131,11 @@ export default function CockpitHeader({
           <button
             onClick={onToggleGovernance}
             className={`btn-cyber ${isGovernanceOpen ? 'active-panel' : 'secondary'}`}
-            title="Centre d'Arbitrage Déterministe & Décisions"
+            title={currentUser ? "Centre d'Arbitrage Déterministe & Décisions" : "Arbitrage (Verrouillé — Connexion requise)"}
+            style={!currentUser ? { opacity: 0.8, borderColor: 'rgba(245, 158, 11, 0.45)' } : {}}
           >
-            <Scale size={15} />
-            <span>Arbitrage</span>
+            {currentUser ? <Scale size={15} /> : <Lock size={14} color="#F59E0B" />}
+            <span style={!currentUser ? { color: '#F59E0B' } : {}}>Arbitrage</span>
           </button>
 
           <button
@@ -149,10 +150,11 @@ export default function CockpitHeader({
           <button
             onClick={onToggleTerminal}
             className={`btn-cyber ${isTerminalOpen ? 'active-panel' : 'secondary'}`}
-            title="Terminal de commandes (Ctrl+`)"
+            title={currentUser ? "Terminal de commandes (Ctrl+`)" : "Terminal (Verrouillé — Connexion requise)"}
+            style={!currentUser ? { opacity: 0.8, borderColor: 'rgba(245, 158, 11, 0.45)' } : {}}
           >
-            <Terminal size={15} />
-            <span>Terminal</span>
+            {currentUser ? <Terminal size={15} /> : <Lock size={14} color="#F59E0B" />}
+            <span style={!currentUser ? { color: '#F59E0B' } : {}}>Terminal</span>
           </button>
 
           <button
@@ -167,7 +169,7 @@ export default function CockpitHeader({
           <button
             onClick={onToggleConnectors}
             className={`btn-cyber ${isConnectorsOpen ? 'active-panel' : 'secondary'}`}
-            title={currentUser ? "Hub Réseaux Sociaux & Meta Ads (HMAC-SHA256)" : "Verrouillé — Connexion requise"}
+            title={currentUser ? "Hub Réseaux Sociaux & Meta Ads (HMAC-SHA256)" : "Réseaux (Verrouillé — Connexion requise)"}
             style={!currentUser ? { opacity: 0.8, borderColor: 'rgba(245, 158, 11, 0.45)' } : {}}
           >
             {currentUser ? <Share2 size={15} /> : <Lock size={14} color="#F59E0B" />}
@@ -180,29 +182,34 @@ export default function CockpitHeader({
           <button 
             onClick={onOpenCreateGoalModal} 
             className="btn-cyber secondary"
-            style={{ borderColor: 'rgba(0, 240, 255, 0.35)' }}
-            title="Assigner une nouvelle mission DAG à un agent"
+            style={{ 
+              borderColor: currentUser ? 'rgba(0, 240, 255, 0.35)' : 'rgba(245, 158, 11, 0.45)',
+              opacity: currentUser ? 1 : 0.85
+            }}
+            title={currentUser ? "Assigner une nouvelle mission DAG à un agent" : "+ Mission (Verrouillé — Connexion requise)"}
           >
-            <Target size={15} />
-            <span>+ Mission</span>
+            {currentUser ? <Target size={15} /> : <Lock size={14} color="#F59E0B" />}
+            <span style={!currentUser ? { color: '#F59E0B' } : {}}>+ Mission</span>
           </button>
 
           <button 
             onClick={onOpenSpawnModal} 
             className="btn-cyber accent-purple"
-            title="Matérialiser un nouvel agent dans la matrice 3D"
+            style={!currentUser ? { opacity: 0.85, borderColor: 'rgba(245, 158, 11, 0.45)', background: 'rgba(245, 158, 11, 0.08)' } : {}}
+            title={currentUser ? "Matérialiser un nouvel agent dans la matrice 3D" : "Déployer (Verrouillé — Connexion requise)"}
           >
-            <Plus size={16} />
-            <span>Déployer</span>
+            {currentUser ? <Plus size={16} /> : <Lock size={14} color="#F59E0B" />}
+            <span style={!currentUser ? { color: '#F59E0B' } : {}}>Déployer</span>
           </button>
 
           <button 
             onClick={onWakeGlobal} 
             disabled={isWaking}
             className="btn-cyber primary"
-            title="Déclencher 1 cycle d'exécution autonome (wake_goal)"
+            style={!currentUser ? { opacity: 0.85, borderColor: 'rgba(245, 158, 11, 0.45)', background: 'rgba(245, 158, 11, 0.12)', color: '#F59E0B' } : {}}
+            title={currentUser ? "Déclencher 1 cycle d'exécution autonome (wake_goal)" : "Wake (Verrouillé — Connexion requise)"}
           >
-            <Play size={16} />
+            {currentUser ? <Play size={16} /> : <Lock size={14} color="#F59E0B" />}
             <span>{isWaking ? "Exec..." : "Wake"}</span>
           </button>
         </div>
