@@ -31,7 +31,7 @@ _MAX_TRACKED_IPS = 2000
 _ip_request_history: dict[str, deque[float]] = defaultdict(deque)
 
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
-PHONE_REGEX = re.compile(r"(\+?[0-9]{1,4}[\s-]?)?(\(?[0-9]{2,4}\)?[\s-]?)?[0-9]{3,4}[\s-]?[0-9]{3,4}")
+PHONE_REGEX = re.compile(r"(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?)?\d{2,4}[\s.-]?\d{2,4}[\s.-]?\d{2,4}(?:[\s.-]?\d{2,4})?")
 
 
 def is_rate_limited(client_ip: str) -> bool:
@@ -104,15 +104,23 @@ class PortfolioConciergeService:
             if email_match:
                 detected_email = email_match.group(0)
 
+        if not detected_phone:
+            phone_match = PHONE_REGEX.search(request.message)
+            if phone_match:
+                cleaned_digits = re.sub(r"[^\d]", "", phone_match.group(0))
+                if len(cleaned_digits) >= 8:
+                    detected_phone = phone_match.group(0).strip()
+
         lead_captured = bool(detected_email or detected_phone)
 
-        # Dispatch lead to Agence IIA if captured
+        # Dispatch lead to Agence IIA and notify Rockib on Telegram
         if lead_captured:
             await self._dispatch_lead_to_agency(
                 contact_name=request.sender_name or f"Visiteur ({site_key})",
                 email=detected_email or "non-fourni@portfolio.lead",
                 need=request.message,
                 phone=detected_phone,
+                site_key=site_key,
             )
 
         # Maintain multi-turn conversation history
@@ -159,17 +167,48 @@ class PortfolioConciergeService:
         email: str,
         need: str,
         phone: Optional[str] = None,
+        site_key: str = "rockib-portfolio",
     ) -> None:
-        """Asynchronously dispatches lead to IIA Agency API (POST /api/leads/)."""
+        """Asynchronously dispatches lead to IIA Agency API and sends a high-priority alert to Rockib via Telegram."""
         payload = {
-            "company_name": "Lead Inbound Portfolio",
+            "company_name": f"Lead Inbound ({site_key})",
             "contact_name": contact_name,
             "email": email,
             "automation_need": f"{need} (Phone: {phone})" if phone else need,
         }
-        logger.info("Captured qualified lead for Agence IIA: %s", payload)
+        logger.info("Captured qualified lead for Agence IIA & Rockib: %s", payload)
 
-        # Attempt forwarding to IIA backend if reachable
+        # 1. Envoi prioritaire de l'alerte sur Telegram directement à Rockib
+        from app.telegram.services.telegram_service import telegram_service
+        from app.inbound.services.site_config_service import site_config_service
+        site_cfg = site_config_service.get_site_dict(site_key)
+        client_biz = site_cfg.get("business_name", site_key)
+        client_wa = site_cfg.get("contact_whatsapp", "")
+        client_mail = site_cfg.get("contact_email", "")
+
+        if telegram_service.is_configured():
+            try:
+                tg_msg = (
+                    "🔔 *NOUVEAU CONTACT CLIENT DÉTECTÉ SUR LE CONCIERGE IA* 🚀\n\n"
+                    f"🏢 *Entreprise / Site* : `{client_biz}` (`{site_key}`)\n"
+                    f"👤 *Nom du Prospect* : `{contact_name}`\n"
+                    f"📞 *Téléphone / WhatsApp* : `{phone or 'Non spécifié'}`\n"
+                    f"📧 *Email* : `{email}`\n"
+                    + (f"📲 *Contact Client WhatsApp* : `{client_wa}`\n" if client_wa else "")
+                    + (f"📩 *Contact Client Email* : `{client_mail}`\n" if client_mail else "")
+                    + f"\n📝 *Besoin / Message exprimé* :\n_{need}_\n\n"
+                    "👉 *Action recommandée* : Effectuer le rappel ou transférer au client !"
+                )
+                await telegram_service.send_message(
+                    chat_id=telegram_service.admin_chat_id,
+                    text=tg_msg,
+                    parse_mode="Markdown",
+                )
+                logger.info("Telegram notification sent to Rockib for new lead from %s on %s", contact_name, site_key)
+            except Exception as tg_err:
+                logger.warning("Failed to dispatch lead alert to Telegram: %s", tg_err)
+
+        # 2. Attempt forwarding to IIA backend if reachable
         agency_leads_url = "http://127.0.0.1:8000/api/leads/"
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:

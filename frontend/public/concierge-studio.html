@@ -2,6 +2,7 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8" />
+  <meta name="robots" content="noindex, nofollow" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rockib Concierge Studio — Personnalisation & Base de Connaissances Multi-Sites</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -465,7 +466,7 @@
           </p>
           <div class="form-group">
             <label for="field-client-token">Clé d'édition du site (ou clé maître Rockib)</label>
-            <input type="password" id="field-client-token" value="rockib-master-key" placeholder="Clé secrète du client" />
+            <input type="password" id="field-client-token" value="" placeholder="Clé secrète du client (obligatoire pour enregistrer)" autocomplete="off" />
           </div>
           <div style="display:flex; gap:10px; flex-wrap:wrap;">
             <button type="submit" class="btn btn-primary" style="flex:1; justify-content:center;">
@@ -643,7 +644,7 @@
           pricing_rule: fPricing.value.trim(),
           contact_whatsapp: fWhatsapp.value.trim(),
           contact_email: fEmail.value.trim(),
-          client_token: fToken.value.trim() || 'rockib-master-key'
+          client_token: fToken.value.trim() || null
         };
       }
 

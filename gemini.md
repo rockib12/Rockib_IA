@@ -65,7 +65,8 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
 ---
 
 ## 🧪 Statut des Tests
-- **686 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
+- **702 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
+  - `tests/test_social_connectors_hmac.py` ✅ *(16 tests : Signature officielle Meta `appsecret_proof` HMAC-SHA256, validation webhooks `X-Hub-Signature-256` timing-safe, rejet d'altération Anti-Tampering, connecteur Meta Ads avec garde-fou budgétaire formel `FINANCIAL_POLICY_VIOLATION`, connecteurs Facebook, Instagram Business, WhatsApp Cloud API, Twitter v2, LinkedIn UGC et Discord)*
   - `tests/test_system_handlers.py` & `tests/test_connectors.py` ✅ *(Connecteurs production, dont `content.create` sandboxed, zero-spend)*
   - `tests/test_celery_tasks.py` & `tests/test_wake_runner.py` ✅ *(Boucle de réveil Celery Beat et workers)*
   - `tests/test_security_hardening.py` ✅ *(37 tests : Hardening P0/P1/P4/P5/P6/P7 — Telegram Webhook Secret, SSRF & DNS resolution + immunité DNS Rebinding par épinglage IP socket, Credential Vault fail-fast, Auth & Multi-tenant isolation sur `/api/v1/decisions/`, CSP Sandbox `/preview/`, Anti-Bruteforce Auth, `X-Request-ID`, TTL Sessions, Rate-Limiting Vocal, Healthcheck DB/Redis & Validation stricte Pydantic)*

@@ -171,16 +171,117 @@
       color: var(--rq-accent);
       background: rgba(255, 255, 255, 0.08);
     }
-    .rq-window.rq-minimized {
-      height: 52px !important;
-      max-height: 52px !important;
-      overflow: hidden !important;
-      border-color: rgba(var(--rq-accent-rgb), 0.5) !important;
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 20px rgba(var(--rq-accent-rgb), 0.25) !important;
+    /* ChatGPT Floating Round Call Orb (Rondelle Flottante) */
+    .rq-floating-orb {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #0F172A, #030712 90%);
+      border: 2px solid var(--rq-accent);
+      box-shadow: 0 10px 32px rgba(0, 0, 0, 0.9), 0 0 25px rgba(var(--rq-accent-rgb), 0.45);
+      z-index: 1000000;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s ease;
+      user-select: none;
     }
-    .rq-window.rq-minimized .rq-tabs,
-    .rq-window.rq-minimized .rq-panel {
-      display: none !important;
+    .rq-floating-orb.rq-pos-left {
+      right: auto;
+      left: 24px;
+    }
+    .rq-floating-orb.rq-visible {
+      display: flex;
+      animation: rq-orb-pop 0.32s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    .rq-floating-orb:hover {
+      transform: scale(1.08) translateY(-2px);
+      box-shadow: 0 14px 40px rgba(0, 0, 0, 0.95), 0 0 35px rgba(0, 240, 255, 0.65);
+      border-color: #00F0FF;
+    }
+    @keyframes rq-orb-pop {
+      0% { opacity: 0; transform: scale(0.4) translateY(20px); }
+      100% { opacity: 1; transform: scale(1) translateY(0); }
+    }
+    .rq-floating-canvas {
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .rq-floating-badge {
+      position: absolute;
+      top: -2px;
+      right: -2px;
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: #00FF9D;
+      border: 2px solid #030712;
+      box-shadow: 0 0 8px #00FF9D;
+      animation: rq-glow 1.8s infinite;
+    }
+    .rq-floating-tooltip {
+      position: absolute;
+      bottom: 78px;
+      right: 0;
+      background: rgba(6, 10, 20, 0.94);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      border-radius: 8px;
+      padding: 5px 10px;
+      font-size: 11px;
+      color: #EDF5FF;
+      white-space: nowrap;
+      pointer-events: none;
+      box-shadow: 0 6px 20px rgba(0, 0, 0, 0.7);
+      opacity: 0;
+      transform: translateY(6px);
+      transition: all 0.2s ease;
+    }
+    .rq-floating-orb:hover .rq-floating-tooltip {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .rq-floating-controls {
+      position: absolute;
+      top: -28px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: none;
+      gap: 6px;
+      background: rgba(3, 7, 18, 0.94);
+      border: 1px solid rgba(0, 240, 255, 0.35);
+      border-radius: 999px;
+      padding: 3px 8px;
+      backdrop-filter: blur(8px);
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.6);
+      white-space: nowrap;
+    }
+    .rq-floating-orb:hover .rq-floating-controls {
+      display: flex;
+    }
+    .rq-floating-btn {
+      background: none;
+      border: none;
+      color: #EDF5FF;
+      cursor: pointer;
+      font-size: 12px;
+      padding: 2px 4px;
+      display: grid;
+      place-items: center;
+      border-radius: 4px;
+      transition: all 0.15s;
+    }
+    .rq-floating-btn:hover {
+      color: #00F0FF;
+      transform: scale(1.2);
+    }
+    .rq-floating-btn.hangup:hover {
+      color: #FF3366;
     }
     .rq-tabs {
       display: flex;
@@ -559,9 +660,9 @@ Je peux vous proposer des idées concrètes d'applications ou d'automatisations 
 Quelle est votre activité ou votre idée de projet ?</div>
         <div class="rq-suggestions" id="rq-suggestions-container">
           <button class="rq-chip" data-query="Propose-moi des idées concrètes d'automatisation IA et d'applications rentables pour développer mon activité.">💡 Propose-moi des idées d'IA pour mon activité</button>
+          <button class="rq-chip" data-query="Je souhaite être rappelé directement par Rockib pour discuter de mon projet et du devis.">📞 Demander à être rappelé par Rockib</button>
           <button class="rq-chip" data-query="Présente-moi en détail les projets en production de Rockib (Rockib AI, MARTISTORE, WaAuto, Agence IIA).">🚀 Découvrir les projets en production de Rockib</button>
           <button class="rq-chip" data-query="Propose-moi une architecture technique complète et moderne pour mon futur projet.">🏗️ Concevoir l'architecture de mon projet</button>
-          <button class="rq-chip" data-query="Comment fonctionne la tarification et comment discuter du prix directement avec Rockib ?">🤝 Discuter du tarif avec Rockib</button>
         </div>
       </div>
       <form class="rq-input-area" id="rq-chat-form">
@@ -614,9 +715,10 @@ Quelle est votre activité ou votre idée de projet ?</div>
         <!-- Quick Voice Topics + Bottom Control Dock -->
         <div style="display:flex; flex-direction:column; gap:8px; width:100%; align-items:center;">
           <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center; width:100%;">
+            <button type="button" class="rq-voice-topic-chip" data-prompt="Je souhaite laisser mes coordonnées téléphoniques pour que Rockib me rappelle pour mon projet." style="background:rgba(232,163,61,0.12); border:1px solid rgba(232,163,61,0.4); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">📞 Demander un Rappel</button>
             <button type="button" class="rq-voice-topic-chip" data-prompt="Propose-moi des idées innovantes de projets IA et d'automatisations rentables que Rockib peut créer pour une entreprise." style="background:rgba(0,255,157,0.08); border:1px solid rgba(0,255,157,0.3); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">💡 Proposer des Idées</button>
             <button type="button" class="rq-voice-topic-chip" data-prompt="Présente-moi les projets en production de Rockib Quenum." style="background:rgba(0,240,255,0.08); border:1px solid rgba(0,240,255,0.3); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🚀 Ses Projets</button>
-            <button type="button" class="rq-voice-topic-chip" data-prompt="Propose-moi une architecture technique moderne et explique comment voir le prix avec Rockib." style="background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.35); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🏗️ Architecture & Devis</button>
+            <button type="button" class="rq-voice-topic-chip" data-prompt="Propose-moi une architecture technique moderne et explique comment voir le prix avec Rockib." style="background:rgba(168,85,247,0.1); border:1px solid rgba(168,85,247,0.35); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">🏗️ Devis & Archi</button>
           </div>
           <div style="display:flex; align-items:center; justify-content:center; gap:14px; width:100%;">
             <button type="button" id="rq-btn-mute" title="Couper / Activer le micro" style="display:none; width:40px; height:40px; border-radius:50%; border:1px solid rgba(255,255,255,0.18); background:#111827; color:#EDF5FF; font-size:16px; align-items:center; justify-content:center; cursor:pointer; transition:all 0.2s;">
@@ -683,8 +785,23 @@ Quelle est votre activité ou votre idée de projet ?</div>
     </div>
   `;
 
+  const floatingOrb = document.createElement('div');
+  const orbPosClass = (typeof posClass !== 'undefined' && posClass) ? ' ' + posClass : '';
+  floatingOrb.className = 'rq-floating-orb' + orbPosClass;
+  floatingOrb.id = 'rq-floating-orb';
+  floatingOrb.innerHTML = `
+    <div class="rq-floating-badge" id="rq-floating-badge"></div>
+    <canvas class="rq-floating-canvas" id="rq-floating-canvas" width="62" height="62"></canvas>
+    <div class="rq-floating-tooltip" id="rq-floating-tooltip">Appel vocal IA actif · Touchez pour rouvrir</div>
+    <div class="rq-floating-controls">
+      <button type="button" class="rq-floating-btn" id="rq-float-mute" title="Couper / Activer le micro">🎙️</button>
+      <button type="button" class="rq-floating-btn hangup" id="rq-float-hangup" title="Raccrocher">✕</button>
+    </div>
+  `;
+
   document.body.appendChild(launcher);
   document.body.appendChild(chatWindow);
+  document.body.appendChild(floatingOrb);
 
   // Tabs switching
   const tabBtns = chatWindow.querySelectorAll('.rq-tab-btn');
@@ -711,41 +828,26 @@ Quelle est votre activité ou votre idée de projet ?</div>
 
   function toggleMinimize(forceState) {
     isMinimized = forceState !== undefined ? forceState : !isMinimized;
-    const minBtn = chatWindow.querySelector('#rq-btn-minimize');
-    const headerSub = chatWindow.querySelector('#rq-header-subtitle');
-    const headerTitleText = chatWindow.querySelector('#rq-header-title-text');
+    const tooltip = floatingOrb.querySelector('#rq-floating-tooltip');
 
     if (isMinimized) {
-      chatWindow.classList.add('rq-minimized');
-      if (minBtn) {
-        minBtn.innerHTML = '🗖';
-        minBtn.title = 'Agrandir la fenêtre';
-      }
-      if (isCalling) {
-        if (headerSub) {
-          headerSub.textContent = '🟢 Appel vocal IA actif · Touchez pour rouvrir';
-          headerSub.style.color = '#00FF9D';
-        }
-        if (headerTitleText) headerTitleText.textContent = 'Appel Vocal IA (En cours)';
-      } else {
-        if (headerSub) {
-          headerSub.textContent = 'Fenêtre réduite · Touchez pour agrandir';
-          headerSub.style.color = '#7E90A6';
-        }
-        if (headerTitleText) headerTitleText.textContent = 'Concierge IA (Réduit)';
+      // Hide full chat window and launcher, reveal the round floating orb
+      chatWindow.classList.remove('rq-open');
+      launcher.style.display = 'none';
+      floatingOrb.classList.add('rq-visible');
+      if (tooltip) {
+        tooltip.textContent = isCalling
+          ? 'Appel vocal IA actif · Touchez pour rouvrir'
+          : 'Concierge IA · Touchez pour rouvrir';
       }
     } else {
-      chatWindow.classList.remove('rq-minimized');
-      if (minBtn) {
-        minBtn.innerHTML = '🗕';
-        minBtn.title = 'Minimiser la fenêtre';
-      }
-      if (headerSub) {
-        headerSub.textContent = "Architecture · Projets · Vocal Temps Réel";
-        headerSub.style.color = '#7E90A6';
-      }
-      if (headerTitleText) {
-        headerTitleText.textContent = 'Rockib Quenum · Co-Architecte & IA';
+      // Restore full chat window, hide round floating orb
+      floatingOrb.classList.remove('rq-visible');
+      if (isOpen) {
+        chatWindow.classList.add('rq-open');
+        launcher.style.display = 'none';
+      } else {
+        launcher.style.display = '';
       }
     }
   }
@@ -754,16 +856,46 @@ Quelle est votre activité ou votre idée de projet ?</div>
     isOpen = forceState !== undefined ? forceState : !isOpen;
     if (isOpen) {
       chatWindow.classList.add('rq-open');
+      launcher.style.display = 'none';
       toggleMinimize(false);
     } else {
       chatWindow.classList.remove('rq-open');
-      toggleMinimize(false);
+      launcher.style.display = '';
+      floatingOrb.classList.remove('rq-visible');
+      isMinimized = false;
       if (isCalling) stopVoiceCall();
     }
   }
 
+  // Clicking the floating orb restores the full window
+  floatingOrb.addEventListener('click', (e) => {
+    // If click was on control buttons, don't trigger parent restore
+    if (e.target.closest('.rq-floating-controls')) return;
+    toggleMinimize(false);
+  });
+
+  // Floating controls: Mute & Hangup
+  const floatMuteBtn = floatingOrb.querySelector('#rq-float-mute');
+  if (floatMuteBtn) {
+    floatMuteBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (btnMute) btnMute.click();
+      floatMuteBtn.textContent = isMuted ? '🔇' : '🎙️';
+    });
+  }
+
+  const floatHangupBtn = floatingOrb.querySelector('#rq-float-hangup');
+  if (floatHangupBtn) {
+    floatHangupBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      stopVoiceCall();
+      toggleMinimize(false);
+      toggleChat(false);
+    });
+  }
+
   launcher.addEventListener('click', () => {
-    if (isOpen && isMinimized) {
+    if (isMinimized) {
       toggleMinimize(false);
     } else {
       toggleChat();
@@ -1040,8 +1172,12 @@ Quelle est votre activité ou votre idée de projet ?</div>
 
   // --- 60 FPS ChatGPT Fluid Sphere Renderer ---
   (function initFluidOrbCanvas() {
-    if (!voiceCanvas) return;
+    if (!voiceCanvas || typeof voiceCanvas.getContext !== 'function') return;
     const ctx = voiceCanvas.getContext('2d');
+    const floatingCanvas = floatingOrb ? floatingOrb.querySelector('#rq-floating-canvas') : null;
+    const floatCtx = (floatingCanvas && typeof floatingCanvas.getContext === 'function')
+      ? floatingCanvas.getContext('2d')
+      : null;
     let phase = 0;
 
     function computeRmsFromTimeData(analyser, buf) {
@@ -1059,15 +1195,89 @@ Quelle est votre activité ou votre idée de projet ?</div>
       }
     }
 
-    function renderOrb() {
-      requestAnimationFrame(renderOrb);
-      if (!isOpen || activeTab !== 'voice') return;
-
-      const w = voiceCanvas.width;
-      const h = voiceCanvas.height;
+    function drawFluidBlob(targetCtx, w, h, radiusScale) {
       const cx = w / 2;
       const cy = h / 2;
-      ctx.clearRect(0, 0, w, h);
+      targetCtx.clearRect(0, 0, w, h);
+
+      // Color palette by state (ChatGPT Voice style, using client's primary color)
+      let c1 = sitePrimaryRgb;  // Client Accent (default Cyan)
+      let c2 = '99, 102, 241';  // Indigo
+      if (orbState === 'user_speaking') {
+        c1 = '0, 255, 157';     // Emerald
+        c2 = sitePrimaryRgb;
+      } else if (orbState === 'thinking') {
+        c1 = '168, 85, 247';    // Violet
+        c2 = sitePrimaryRgb;
+      } else if (orbState === 'ai_speaking') {
+        c1 = sitePrimaryRgb;
+        c2 = '237, 245, 255';   // Luminous White-Cyan
+      }
+
+      const baseR = (46 + orbLevel * 22) * radiusScale;
+
+      // Outer atmospheric glow
+      const outerGrad = targetCtx.createRadialGradient(cx, cy, baseR * 0.3, cx, cy, baseR * 1.75);
+      outerGrad.addColorStop(0, `rgba(${c1}, ${0.32 + orbLevel * 0.35})`);
+      outerGrad.addColorStop(0.55, `rgba(${c2}, ${0.14 + orbLevel * 0.18})`);
+      outerGrad.addColorStop(1, 'rgba(6, 9, 18, 0)');
+      targetCtx.fillStyle = outerGrad;
+      targetCtx.beginPath();
+      targetCtx.arc(cx, cy, baseR * 1.75, 0, Math.PI * 2);
+      targetCtx.fill();
+
+      // 3 Fluid morphing organic lobes
+      for (let layer = 0; layer < 3; layer++) {
+        targetCtx.beginPath();
+        const pts = 48;
+        const layerOffset = layer * 2.1;
+        const layerR = baseR * (1 - layer * 0.08);
+        const amp = (3.5 + orbLevel * 13) * (1 - layer * 0.2) * radiusScale;
+
+        for (let i = 0; i <= pts; i++) {
+          const angle = (i / pts) * Math.PI * 2;
+          const wave1 = Math.sin(angle * 3 + phase + layerOffset) * amp;
+          const wave2 = Math.cos(angle * 4 - phase * 1.3 + layerOffset) * (amp * 0.55);
+          const r = layerR + wave1 + wave2;
+          const x = cx + Math.cos(angle) * r;
+          const y = cy + Math.sin(angle) * r;
+          if (i === 0) targetCtx.moveTo(x, y);
+          else targetCtx.lineTo(x, y);
+        }
+        targetCtx.closePath();
+
+        const grad = targetCtx.createRadialGradient(
+          cx - 10 * Math.cos(phase * 0.7) * radiusScale,
+          cy - 10 * Math.sin(phase * 0.7) * radiusScale,
+          layerR * 0.1,
+          cx,
+          cy,
+          layerR * 1.25
+        );
+        if (layer === 0) {
+          grad.addColorStop(0, `rgba(${c2}, 0.55)`);
+          grad.addColorStop(1, `rgba(${c1}, 0.22)`);
+        } else if (layer === 1) {
+          grad.addColorStop(0, `rgba(255, 255, 255, ${0.45 + orbLevel * 0.35})`);
+          grad.addColorStop(0.6, `rgba(${c1}, 0.75)`);
+          grad.addColorStop(1, `rgba(${c2}, 0.35)`);
+        } else {
+          grad.addColorStop(0, '#FFFFFF');
+          grad.addColorStop(0.45, `rgba(${c1}, 0.92)`);
+          grad.addColorStop(1, `rgba(${c2}, 0.75)`);
+        }
+        targetCtx.fillStyle = grad;
+        targetCtx.fill();
+      }
+    }
+
+    function renderOrb() {
+      requestAnimationFrame(renderOrb);
+
+      const isMainActive = isOpen && activeTab === 'voice';
+      const isFloatActive = isMinimized;
+
+      if (!isMainActive && !isFloatActive) return;
 
       // Measure real-time audio energy from either AI voice or User mic
       let rawEnergy = 0;
@@ -1086,74 +1296,13 @@ Quelle est votre activité ou votre idée de projet ?</div>
       orbLevel = orbLevel * 0.78 + rawEnergy * 0.22;
       phase += 0.045 + orbLevel * 0.09;
 
-      // Color palette by state (ChatGPT Voice style, using client's primary color)
-      let c1 = sitePrimaryRgb;  // Client Accent (default Cyan)
-      let c2 = '99, 102, 241';  // Indigo
-      if (orbState === 'user_speaking') {
-        c1 = '0, 255, 157';     // Emerald
-        c2 = sitePrimaryRgb;
-      } else if (orbState === 'thinking') {
-        c1 = '168, 85, 247';    // Violet
-        c2 = sitePrimaryRgb;
-      } else if (orbState === 'ai_speaking') {
-        c1 = sitePrimaryRgb;
-        c2 = '237, 245, 255';   // Luminous White-Cyan
+      if (isMainActive && ctx) {
+        drawFluidBlob(ctx, voiceCanvas.width, voiceCanvas.height, 1.0);
       }
 
-      const baseR = 46 + orbLevel * 22;
-
-      // Outer atmospheric glow
-      const outerGrad = ctx.createRadialGradient(cx, cy, baseR * 0.3, cx, cy, baseR * 1.75);
-      outerGrad.addColorStop(0, `rgba(${c1}, ${0.32 + orbLevel * 0.35})`);
-      outerGrad.addColorStop(0.55, `rgba(${c2}, ${0.14 + orbLevel * 0.18})`);
-      outerGrad.addColorStop(1, 'rgba(6, 9, 18, 0)');
-      ctx.fillStyle = outerGrad;
-      ctx.beginPath();
-      ctx.arc(cx, cy, baseR * 1.75, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 3 Fluid morphing organic lobes
-      for (let layer = 0; layer < 3; layer++) {
-        ctx.beginPath();
-        const pts = 64;
-        const layerOffset = layer * 2.1;
-        const layerR = baseR * (1 - layer * 0.08);
-        const amp = (3.5 + orbLevel * 13) * (1 - layer * 0.2);
-
-        for (let i = 0; i <= pts; i++) {
-          const angle = (i / pts) * Math.PI * 2;
-          const wave1 = Math.sin(angle * 3 + phase + layerOffset) * amp;
-          const wave2 = Math.cos(angle * 4 - phase * 1.3 + layerOffset) * (amp * 0.55);
-          const r = layerR + wave1 + wave2;
-          const x = cx + Math.cos(angle) * r;
-          const y = cy + Math.sin(angle) * r;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        ctx.closePath();
-
-        const grad = ctx.createRadialGradient(
-          cx - 10 * Math.cos(phase * 0.7),
-          cy - 10 * Math.sin(phase * 0.7),
-          layerR * 0.1,
-          cx,
-          cy,
-          layerR * 1.25
-        );
-        if (layer === 0) {
-          grad.addColorStop(0, `rgba(${c2}, 0.55)`);
-          grad.addColorStop(1, `rgba(${c1}, 0.22)`);
-        } else if (layer === 1) {
-          grad.addColorStop(0, `rgba(255, 255, 255, ${0.45 + orbLevel * 0.35})`);
-          grad.addColorStop(0.6, `rgba(${c1}, 0.75)`);
-          grad.addColorStop(1, `rgba(${c2}, 0.35)`);
-        } else {
-          grad.addColorStop(0, '#FFFFFF');
-          grad.addColorStop(0.45, `rgba(${c1}, 0.92)`);
-          grad.addColorStop(1, `rgba(${c2}, 0.75)`);
-        }
-        ctx.fillStyle = grad;
-        ctx.fill();
+      if (isFloatActive && floatCtx && floatingCanvas) {
+        // Render scaled down to 62x62 in the floating circular disc!
+        drawFluidBlob(floatCtx, floatingCanvas.width, floatingCanvas.height, 0.34);
       }
     }
 
@@ -1181,6 +1330,22 @@ Quelle est votre activité ou votre idée de projet ?</div>
         voiceBadge.style.background = '#64748B';
         voiceBadge.style.boxShadow = 'none';
         voiceModeLabel.textContent = 'Mode Vocal Temps Réel';
+      }
+    }
+    const floatBadge = floatingOrb ? floatingOrb.querySelector('#rq-floating-badge') : null;
+    if (floatBadge) {
+      if (state === 'listening' || state === 'user_speaking') {
+        floatBadge.style.background = '#00FF9D';
+        floatBadge.style.boxShadow = '0 0 10px #00FF9D';
+      } else if (state === 'thinking') {
+        floatBadge.style.background = '#A855F7';
+        floatBadge.style.boxShadow = '0 0 10px #A855F7';
+      } else if (state === 'ai_speaking') {
+        floatBadge.style.background = '#00F0FF';
+        floatBadge.style.boxShadow = '0 0 10px #00F0FF';
+      } else {
+        floatBadge.style.background = '#00FF9D';
+        floatBadge.style.boxShadow = '0 0 6px #00FF9D';
       }
     }
   }
@@ -1830,6 +1995,13 @@ Quelle est votre activité ou votre idée de projet ?</div>
     btnToggleCall.classList.remove('rq-btn-hangup');
     btnToggleCall.innerHTML = '<span>📞 Démarrer la conversation</span>';
     setOrbUiState('idle', 'Conversation terminée', 'Touchez la sphère pour relancer');
+
+    const floatTooltip = floatingOrb ? floatingOrb.querySelector('#rq-floating-tooltip') : null;
+    if (floatTooltip) {
+      floatTooltip.textContent = 'Concierge IA · Touchez pour rouvrir';
+    }
+    const floatMute = floatingOrb ? floatingOrb.querySelector('#rq-float-mute') : null;
+    if (floatMute) floatMute.textContent = '🎙️';
   }
 
   btnToggleCall.addEventListener('click', () => {

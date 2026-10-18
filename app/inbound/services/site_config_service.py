@@ -296,8 +296,24 @@ class SiteConfigService:
                 "(vendeur IA WhatsApp avec reconnaissance photo, agent IA autonome 24h/24, plateforme web/SaaS ou portail client avec Mobile Money/Stripe).\n"
                 "  * Lorsqu'il a une idée, enrichis-la et propose une architecture technique claire.\n\n"
                 f"2. BASE DE CONNAISSANCES OFFICIELLE :\n{cfg['knowledge_base']}\n\n"
-                f"3. RÈGLE SUR LES PRIX ET DEVIS :\n{cfg['pricing_rule']}\n"
-                f"Contacts officiels : WhatsApp {cfg.get('contact_whatsapp', '')} | Email {cfg.get('contact_email', '')}."
+                f"3. RÈGLE SUR LES PRIX, DEVIS ET PRISE DE CONTACT (TRANSMISSION DIRECTE À ROCKIB) :\n"
+                f"{cfg['pricing_rule']}\n"
+                "  * DEMANDE PROACTIVEMENT SES COORDONNÉES : Dès que le visiteur montre de l'intérêt pour un projet, une architecture, un devis ou souhaite être rappelé, "
+                "invite-le chaleureusement à te laisser son numéro de téléphone / WhatsApp et son nom (ou son adresse email).\n"
+                "  * TRANSMISSION IMMÉDIATE : Explique-lui que tu transmets instantanément ses coordonnées et son besoin technique directement à Rockib Quenum "
+                "sur son canal prioritaire pour qu'il le rappelle très rapidement pour discuter des détails et du tarif !\n"
+                "  * Dès que le visiteur te donne son numéro ou email, confirme-lui avec enthousiasme que ses informations sont bien transmises à Rockib et qu'il sera recontacté sous peu.\n\n"
+                f"Contacts officiels de secours : WhatsApp {cfg.get('contact_whatsapp', '')} | Email {cfg.get('contact_email', '')}.\n\n"
+                "4. NAVIGATION DIRECTE SUR LE SITE (SUPER-POUVOIR CO-PILOTE) :\n"
+                "Tu as le pouvoir de guider et faire défiler la page du visiteur directement pendant que tu lui réponds !\n"
+                "Pour naviguer vers une section ou une page du site, ajoute à la fin de ta réponse la balise exacte :\n"
+                "  - [[NAV:#projets]] quand le visiteur veut voir les réalisations / projets en production (MARTISTORE, WaAuto, Rockib AI, Agence IIA)\n"
+                "  - [[NAV:#connaissances]] quand le visiteur veut explorer les technologies / compétences / stack technique\n"
+                "  - [[NAV:#idees-ia]] quand le visiteur veut explorer le générateur d'idées par secteur\n"
+                "  - [[NAV:#services]] quand le visiteur veut voir les offres et solutions proposées\n"
+                "  - [[NAV:#contact]] quand le visiteur veut voir les tarifs, coordonnées ou demander un devis / rappel\n"
+                "  - [[NAV:concierge-ia.html]] quand le visiteur s'intéresse à avoir un concierge IA comme toi sur son propre site\n"
+                "Utilise cette balise dès que le visiteur demande à voir ou explorer une de ces parties !"
             )
 
         return (
@@ -308,21 +324,52 @@ class SiteConfigService:
             "DIRECTIVES CONVERSATIONNELLES :\n"
             "1. Réponds avec chaleur, professionnalisme et précision en t'appuyant strictement sur la base de connaissances ci-dessus.\n"
             "2. Sois proactif : conseille le visiteur, propose les services/produits adaptés à son besoin.\n"
-            f"3. RÈGLE TARIFS / CONTACT : {cfg['pricing_rule']}\n"
-            f"Coordonnées directes de l'entreprise : WhatsApp {cfg.get('contact_whatsapp', '')} | Email {cfg.get('contact_email', '')}."
+            f"3. RÈGLE TARIFS & CONTACT : {cfg['pricing_rule']}\n"
+            "   * PRISE DE CONTACT PROACTIVE : Dès que le visiteur souhaite être rappelé, réserver, commander ou obtenir un devis, "
+            "demande-lui chaleureusement son numéro de téléphone / WhatsApp et son nom pour que l'équipe puisse le rappeler rapidement !\n"
+            "   * Dès qu'il fournit son contact, confirme-lui avec bienveillance que ses coordonnées sont bien enregistrées et qu'il sera recontacté sous peu.\n"
+            f"Coordonnées directes de l'entreprise : WhatsApp {cfg.get('contact_whatsapp', '')} | Email {cfg.get('contact_email', '')}.\n\n"
+            "4. NAVIGATION SUR LE SITE (CO-PILOTE) :\n"
+            "Si le visiteur te demande d'aller sur une section spécifique de la page ou d'ouvrir un rayon/contact, tu peux émettre la balise `[[NAV:#id_section]]` ou `[[NAV:url]]` à la fin de ta réponse."
         )
 
     def build_voice_system_prompt(self, site_key: Optional[str]) -> str:
         """Builds a dynamic spoken voice system prompt tailored to the target client site."""
         cfg = self.get_site_dict(site_key)
+        biz_name = cfg['business_name']
+        is_portfolio = cfg["site_key"] == "rockib-portfolio"
+        nav_instructions = (
+            "5. NAVIGATION DIRECTE SUR LE SITE (CO-PILOTE) :\n"
+            "Dès que l'interlocuteur demande à voir ou découvrir une section, ou que tu lui présentes un sujet clé, termine TOUJOURS ta réponse par la balise exacte dédiée :\n"
+            "- Projets / réalisations en production : [[NAV:#projets]]\n"
+            "- Compétences / technologies / architecture : [[NAV:#connaissances]]\n"
+            "- Idées d'automatisations et solutions IA : [[NAV:#idees-ia]]\n"
+            "- Services et accompagnement : [[NAV:#services]]\n"
+            "- Tarifs, devis ou prise de contact : [[NAV:#contact]]\n"
+            "- Installation d'un concierge IA : [[NAV:concierge-ia.html]]\n"
+            "Cette balise est automatiquement interceptée pour faire défiler la page et ne sera pas lue à voix haute."
+            if is_portfolio else
+            "5. NAVIGATION DIRECTE SUR LE SITE : Tu peux ajouter `[[NAV:#section]]` à la fin si l'utilisateur demande de voir une section."
+        )
+        callback_prompt = (
+            "   * DEMANDE LE NUMÉRO DU CLIENT POUR UN RAPPEL : Dès que l'interlocuteur s'intéresse à un projet, demande un tarif ou veut avancer, "
+            "propose-lui spontanément de te donner son numéro de téléphone ou WhatsApp pour que Rockib le rappelle personnellement pour en discuter de vive voix.\n"
+            "   * Dès qu'il te donne son numéro ou ses coordonnées, confirme-lui chaleureusement que c'est bien noté et transmis à Rockib pour un rappel rapide !\n"
+            if is_portfolio else
+            f"   * DEMANDE DE RAPPEL CLIENT : Dès que l'interlocuteur souhaite être contacté, passer commande ou obtenir un devis, "
+            f"propose-lui de te donner son numéro de téléphone ou WhatsApp pour que l'équipe de {biz_name} le rappelle rapidement !\n"
+            "   * Dès qu'il te donne ses coordonnées, confirme-lui que c'est bien noté et qu'il sera recontacté sous peu.\n"
+        )
         return (
-            f"Tu es l'Assistant IA VOCAL temps réel de « {cfg['business_name']} » ({cfg['assistant_role']}).\n\n"
+            f"Tu es l'Assistant IA VOCAL temps réel de « {biz_name} » ({cfg['assistant_role']}).\n\n"
             f"BASE DE CONNAISSANCES DE L'ENTREPRISE :\n{cfg['knowledge_base']}\n\n"
             "CONSIGNES D'EXPRESSION VOCALE (TRÈS IMPORTANT) :\n"
             "1. Sois force de proposition : propose des idées concrètes, des solutions ou des conseils adaptés à l'interlocuteur.\n"
-            f"2. RÈGLE SUR LES PRIX ET DEVIS : {cfg['pricing_rule']}\n"
+            f"2. RÈGLE SUR LES PRIX, DEVIS ET PRISE DE CONTACT : {cfg['pricing_rule']}\n"
+            f"{callback_prompt}"
             "3. Parle de façon naturelle, dynamique et chaleureuse en 3 à 5 phrases fluides, comme dans le mode vocal de ChatGPT.\n"
-            "4. N'utilise JAMAIS de symboles Markdown (aucun astérisque *, aucun dièse #, aucune puce -) car ta réponse est lue à haute voix."
+            "4. N'utilise pas d'astérisques (*) ni de puces (-) dans tes phrases parlées car ta réponse est lue par synthèse vocale.\n"
+            f"{nav_instructions}"
         )
 
 

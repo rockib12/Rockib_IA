@@ -31,7 +31,7 @@ from app.intelligence.services.providers.groq_provider import GroqProvider
 logger = logging.getLogger(__name__)
 
 EMAIL_REGEX = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
-PHONE_REGEX = re.compile(r"(\+?[0-9]{1,4}[\s-]?)?(\(?[0-9]{2,4}\)?[\s-]?)?[0-9]{3,4}[\s-]?[0-9]{3,4}")
+PHONE_REGEX = re.compile(r"(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?)?\d{2,4}[\s.-]?\d{2,4}[\s.-]?\d{2,4}(?:[\s.-]?\d{2,4})?")
 
 END_CALL_PHRASES = [
     "au revoir",
@@ -225,6 +225,7 @@ class VoiceCallService:
                 email=detected_email or "vocal-lead@portfolio.com",
                 need=user_text,
                 phone=detected_phone,
+                site_key=session.site_key,
             )
 
         # Assemble LLM history with site-specific knowledge base
@@ -279,6 +280,7 @@ class VoiceCallService:
             email=f"{request.phone_number.replace('+', '').replace(' ', '')}@call.lead",
             need=lead_need,
             phone=request.phone_number,
+            site_key=request.site_key or "rockib-portfolio",
         )
 
         message = (
@@ -301,15 +303,47 @@ class VoiceCallService:
         email: str,
         need: str,
         phone: Optional[str] = None,
+        site_key: str = "rockib-portfolio",
     ) -> None:
         payload = {
-            "company_name": "Inbound Portfolio Call / Voice",
+            "company_name": f"Inbound Voice / Call ({site_key})",
             "contact_name": contact_name,
             "email": email,
             "automation_need": f"{need} (Phone: {phone})" if phone else need,
         }
         logger.info("Captured voice call lead: %s", payload)
 
+        # 1. Alerte prioritaire immédiate sur Telegram pour Rockib
+        from app.telegram.services.telegram_service import telegram_service
+        from app.inbound.services.site_config_service import site_config_service
+        site_cfg = site_config_service.get_site_dict(site_key)
+        client_biz = site_cfg.get("business_name", site_key)
+        client_wa = site_cfg.get("contact_whatsapp", "")
+        client_mail = site_cfg.get("contact_email", "")
+
+        if telegram_service.is_configured():
+            try:
+                tg_msg = (
+                    "🎙️ *DEMANDE DE RAPPEL / LEAD VOCAL DU CONCIERGE IA* 📞\n\n"
+                    f"🏢 *Entreprise / Site* : `{client_biz}` (`{site_key}`)\n"
+                    f"👤 *Nom / Contact* : `{contact_name}`\n"
+                    f"📞 *Numéro de rappel* : `{phone or 'Non spécifié'}`\n"
+                    f"📧 *Email* : `{email}`\n"
+                    + (f"📲 *Contact Client WhatsApp* : `{client_wa}`\n" if client_wa else "")
+                    + (f"📩 *Contact Client Email* : `{client_mail}`\n" if client_mail else "")
+                    + f"\n📝 *Détail / Contexte de l'appel* :\n_{need}_\n\n"
+                    "⚡ *Action requise* : Contacter le prospect au plus vite ou transférer au client !"
+                )
+                await telegram_service.send_message(
+                    chat_id=telegram_service.admin_chat_id,
+                    text=tg_msg,
+                    parse_mode="Markdown",
+                )
+                logger.info("Telegram voice lead alert sent to Rockib for %s on %s", phone or contact_name, site_key)
+            except Exception as tg_err:
+                logger.warning("Failed to dispatch voice lead to Telegram: %s", tg_err)
+
+        # 2. Transmission vers Agence IIA
         agency_leads_url = "http://127.0.0.1:8000/api/leads/"
         try:
             async with httpx.AsyncClient(timeout=2.0) as client:
