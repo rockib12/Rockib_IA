@@ -148,18 +148,39 @@
       color: #7E90A6;
       margin-top: 1px;
     }
-    .rq-close {
+    .rq-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .rq-btn-icon {
       background: none;
       border: none;
       color: #7E90A6;
       cursor: pointer;
-      font-size: 16px;
-      padding: 4px;
+      font-size: 15px;
+      padding: 4px 6px;
       line-height: 1;
-      transition: color 0.2s;
+      border-radius: 6px;
+      transition: all 0.2s;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
-    .rq-close:hover {
+    .rq-btn-icon:hover {
       color: var(--rq-accent);
+      background: rgba(255, 255, 255, 0.08);
+    }
+    .rq-window.rq-minimized {
+      height: 52px !important;
+      max-height: 52px !important;
+      overflow: hidden !important;
+      border-color: rgba(var(--rq-accent-rgb), 0.5) !important;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.85), 0 0 20px rgba(var(--rq-accent-rgb), 0.25) !important;
+    }
+    .rq-window.rq-minimized .rq-tabs,
+    .rq-window.rq-minimized .rq-panel {
+      display: none !important;
     }
     .rq-tabs {
       display: flex;
@@ -256,6 +277,35 @@
       border-color: var(--rq-accent);
       color: var(--rq-accent);
       box-shadow: 0 0 10px rgba(var(--rq-accent-rgb), 0.2);
+    }
+    .rq-nav-banner {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 8px;
+      background: rgba(var(--rq-accent-rgb), 0.12);
+      border: 1px solid var(--rq-accent);
+      color: #EDF5FF;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 5px 10px;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .rq-nav-banner:hover {
+      background: rgba(var(--rq-accent-rgb), 0.25);
+      box-shadow: 0 0 12px rgba(var(--rq-accent-rgb), 0.4);
+      transform: translateY(-1px);
+    }
+    @keyframes rq-section-glow {
+      0% { box-shadow: 0 0 0 rgba(0, 240, 255, 0); }
+      50% { box-shadow: 0 0 40px rgba(0, 240, 255, 0.65), 0 0 20px rgba(0, 255, 157, 0.5); }
+      100% { box-shadow: 0 0 0 rgba(0, 240, 255, 0); }
+    }
+    .rq-highlight-target {
+      animation: rq-section-glow 2.2s cubic-bezier(0.16, 1, 0.3, 1) ease-out;
+      border-radius: 14px;
     }
     .rq-input-area {
       padding: 12px;
@@ -481,11 +531,17 @@
   chatWindow.className = 'rq-window';
   chatWindow.innerHTML = `
     <div class="rq-header">
-      <div>
-        <div class="rq-title">Rockib Quenum · Co-Architecte & Assistant IA</div>
-        <div class="rq-subtitle">Projets en production · Conception d'Architecture · Vocal Temps Réel</div>
+      <div style="cursor:pointer; flex:1; overflow:hidden;" id="rq-header-drag" title="Cliquer pour réduire ou agrandir">
+        <div class="rq-title">
+          <span class="rq-pulse" style="width:7px; height:7px;"></span>
+          <span id="rq-header-title-text">Rockib Quenum · Co-Architecte &amp; IA</span>
+        </div>
+        <div class="rq-subtitle" id="rq-header-subtitle">Architecture · Projets · Vocal Temps Réel</div>
       </div>
-      <button class="rq-close" title="Fermer">✕</button>
+      <div class="rq-header-actions">
+        <button class="rq-btn-icon" id="rq-btn-minimize" title="Minimiser la fenêtre">🗕</button>
+        <button class="rq-btn-icon rq-close" id="rq-btn-close" title="Fermer">✕</button>
+      </div>
     </div>
     <div class="rq-tabs">
       <button class="rq-tab-btn rq-active" data-tab="chat">💬 Assistant & Archi</button>
@@ -540,6 +596,13 @@ Quelle est votre activité ou votre idée de projet ?</div>
           <div id="rq-voice-orb" style="display:none;"></div>
           <div id="rq-voice-wave" style="display:none;"></div>
           <div class="rq-voice-status" id="rq-voice-status" style="margin-top:4px; font-size:13.5px; font-weight:700; color:#EDF5FF; letter-spacing:0.01em;">Touchez pour démarrer</div>
+          <div id="rq-voice-meter" style="display:none; align-items:center; justify-content:center; gap:4px; height:18px; margin:4px 0;">
+            <span class="rq-vu-bar" style="display:inline-block; width:3.5px; height:4px; background:#00FF9D; border-radius:2px; transition:height 0.05s ease;"></span>
+            <span class="rq-vu-bar" style="display:inline-block; width:3.5px; height:7px; background:#00FF9D; border-radius:2px; transition:height 0.05s ease;"></span>
+            <span class="rq-vu-bar" style="display:inline-block; width:3.5px; height:11px; background:#00FF9D; border-radius:2px; transition:height 0.05s ease;"></span>
+            <span class="rq-vu-bar" style="display:inline-block; width:3.5px; height:7px; background:#00FF9D; border-radius:2px; transition:height 0.05s ease;"></span>
+            <span class="rq-vu-bar" style="display:inline-block; width:3.5px; height:4px; background:#00FF9D; border-radius:2px; transition:height 0.05s ease;"></span>
+          </div>
           <div class="rq-voice-sub" id="rq-voice-sub" style="margin-top:2px; font-size:10.5px; color:#7E90A6;">Idées de projets · Architectures · Projets en production</div>
         </div>
 
@@ -643,19 +706,94 @@ Quelle est votre activité ou votre idée de projet ?</div>
     });
   });
 
-  // Open/Close
+  // Open/Close & Minimize State
+  let isMinimized = false;
+
+  function toggleMinimize(forceState) {
+    isMinimized = forceState !== undefined ? forceState : !isMinimized;
+    const minBtn = chatWindow.querySelector('#rq-btn-minimize');
+    const headerSub = chatWindow.querySelector('#rq-header-subtitle');
+    const headerTitleText = chatWindow.querySelector('#rq-header-title-text');
+
+    if (isMinimized) {
+      chatWindow.classList.add('rq-minimized');
+      if (minBtn) {
+        minBtn.innerHTML = '🗖';
+        minBtn.title = 'Agrandir la fenêtre';
+      }
+      if (isCalling) {
+        if (headerSub) {
+          headerSub.textContent = '🟢 Appel vocal IA actif · Touchez pour rouvrir';
+          headerSub.style.color = '#00FF9D';
+        }
+        if (headerTitleText) headerTitleText.textContent = 'Appel Vocal IA (En cours)';
+      } else {
+        if (headerSub) {
+          headerSub.textContent = 'Fenêtre réduite · Touchez pour agrandir';
+          headerSub.style.color = '#7E90A6';
+        }
+        if (headerTitleText) headerTitleText.textContent = 'Concierge IA (Réduit)';
+      }
+    } else {
+      chatWindow.classList.remove('rq-minimized');
+      if (minBtn) {
+        minBtn.innerHTML = '🗕';
+        minBtn.title = 'Minimiser la fenêtre';
+      }
+      if (headerSub) {
+        headerSub.textContent = "Architecture · Projets · Vocal Temps Réel";
+        headerSub.style.color = '#7E90A6';
+      }
+      if (headerTitleText) {
+        headerTitleText.textContent = 'Rockib Quenum · Co-Architecte & IA';
+      }
+    }
+  }
+
   function toggleChat(forceState) {
     isOpen = forceState !== undefined ? forceState : !isOpen;
     if (isOpen) {
       chatWindow.classList.add('rq-open');
+      toggleMinimize(false);
     } else {
       chatWindow.classList.remove('rq-open');
+      toggleMinimize(false);
       if (isCalling) stopVoiceCall();
     }
   }
 
-  launcher.addEventListener('click', () => toggleChat());
-  chatWindow.querySelector('.rq-close').addEventListener('click', () => toggleChat(false));
+  launcher.addEventListener('click', () => {
+    if (isOpen && isMinimized) {
+      toggleMinimize(false);
+    } else {
+      toggleChat();
+    }
+  });
+
+  const btnClose = chatWindow.querySelector('#rq-btn-close') || chatWindow.querySelector('.rq-close');
+  if (btnClose) {
+    btnClose.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleChat(false);
+    });
+  }
+
+  const btnMinimize = chatWindow.querySelector('#rq-btn-minimize');
+  if (btnMinimize) {
+    btnMinimize.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMinimize();
+    });
+  }
+
+  const headerDrag = chatWindow.querySelector('#rq-header-drag');
+  if (headerDrag) {
+    headerDrag.addEventListener('click', () => {
+      if (isMinimized) {
+        toggleMinimize(false);
+      }
+    });
+  }
 
   // --- Chat Section ---
   const messagesContainer = chatWindow.querySelector('#rq-messages-container');
@@ -663,10 +801,139 @@ Quelle est votre activité ou votre idée de projet ?</div>
   const chatForm = chatWindow.querySelector('#rq-chat-form');
   const inputField = chatWindow.querySelector('#rq-input-field');
 
-  function appendChatMessage(text, role) {
+  // --- Autonomous Navigation & Co-Pilot Action Engine ---
+  const NAV_TARGET_MAP = {
+    'projets': '#projets',
+    'projet': '#projets',
+    'projects': '#projets',
+    'realisations': '#projets',
+    'martistore': '#card-martistore',
+    'waauto': '#card-waauto-commercial',
+    'rockib-ai': '#card-rockib-ai',
+    'agence-iia': '#card-agence-iia',
+    'connaissances': '#connaissances',
+    'competences': '#connaissances',
+    'skills': '#connaissances',
+    'technologies': '#connaissances',
+    'stack': '#connaissances',
+    'idees': '#idees-ia',
+    'idees-ia': '#idees-ia',
+    'innovations': '#idees-ia',
+    'services': '#services',
+    'offres': '#services',
+    'contact': '#contact',
+    'devis': '#contact',
+    'tarifs': '#contact',
+    'prix': '#contact',
+    'concierge': 'concierge-ia.html',
+    'concierge-ia': 'concierge-ia.html',
+    'concierge-ia.html': 'concierge-ia.html',
+  };
+
+  function resolveNavTarget(rawTarget) {
+    if (!rawTarget) return null;
+    let clean = rawTarget.trim().replace(/^\[+|\]+$/g, '');
+    const lower = clean.toLowerCase().replace(/^#/, '');
+    if (NAV_TARGET_MAP[lower]) return NAV_TARGET_MAP[lower];
+    if (clean.startsWith('#') || clean.endsWith('.html') || clean.includes('/')) return clean;
+    return '#' + clean;
+  }
+
+  function detectUserNavIntent(userQuery) {
+    if (!userQuery) return null;
+    const q = userQuery.toLowerCase();
+    if (q.includes('projet') || q.includes('réalisation') || q.includes('realisation') || q.includes('martistore') || q.includes('waauto')) return '#projets';
+    if (q.includes('compétence') || q.includes('competence') || q.includes('techno') || q.includes('stack') || q.includes('connaissance')) return '#connaissances';
+    if (q.includes('idée') || q.includes('idee') || q.includes('innovation') || q.includes('secteur')) return '#idees-ia';
+    if (q.includes('service') || q.includes('offre') || q.includes('prestation')) return '#services';
+    if (q.includes('contact') || q.includes('prix') || q.includes('tarif') || q.includes('devis') || q.includes('numéro') || q.includes('numero') || q.includes('email') || q.includes('whatsapp') || q.includes('rappel')) return '#contact';
+    if (q.includes('concierge') || q.includes('widget') || q.includes('vocal')) return 'concierge-ia.html';
+    return null;
+  }
+
+  function executeNavigationAction(target, userInitiated) {
+    if (!target) return false;
+    const cleanTarget = resolveNavTarget(target);
+    if (!cleanTarget) return false;
+
+    // Case 1: In-page anchor (e.g. #projets, #connaissances, #idees-ia, #services, #contact)
+    if (cleanTarget.startsWith('#')) {
+      try {
+        const id = cleanTarget.replace('#', '');
+        const elem = document.getElementById(id) || document.querySelector(cleanTarget);
+        if (elem) {
+          elem.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          elem.classList.remove('rq-highlight-target');
+          void elem.offsetWidth;
+          elem.classList.add('rq-highlight-target');
+          setTimeout(() => {
+            elem.classList.remove('rq-highlight-target');
+          }, 3500);
+          return true;
+        }
+      } catch (err) {}
+    }
+
+    // Case 2: Relative or full URL (e.g. concierge-ia.html, /concierge-ia.html, https://...)
+    if (cleanTarget.endsWith('.html') || cleanTarget.includes('/') || cleanTarget.startsWith('http')) {
+      if (userInitiated) {
+        window.location.href = cleanTarget;
+      } else {
+        setTimeout(() => {
+          window.location.href = cleanTarget;
+        }, 1600);
+      }
+      return true;
+    }
+    return false;
+  }
+
+  function parseAndExecuteNav(rawText) {
+    if (!rawText) return { cleanText: '', navTarget: null };
+
+    // Flexible multi-format matching: [[NAV:...]], [NAV:...], or NAV:...
+    let navTarget = null;
+    let cleanText = rawText;
+
+    const navMatch = rawText.match(/\[\[NAV:([^\]]+)\]\]/i) ||
+                     rawText.match(/\[NAV:([^\]]+)\]/i) ||
+                     rawText.match(/\bNAV:\s*([#a-zA-Z0-9_\-\.\/]+)/i);
+
+    if (navMatch) {
+      navTarget = resolveNavTarget(navMatch[1]);
+      cleanText = cleanText
+        .replace(/\[\[NAV:[^\]]+\]\]/gi, '')
+        .replace(/\[NAV:[^\]]+\]/gi, '')
+        .replace(/\bNAV:\s*[#a-zA-Z0-9_\-\.\/]+/gi, '')
+        .trim();
+    }
+
+    if (navTarget) {
+      executeNavigationAction(navTarget, false);
+    }
+    return { cleanText: cleanText, navTarget: navTarget };
+  }
+
+  function appendChatMessage(text, role, navTarget) {
     const el = document.createElement('div');
     el.className = `rq-msg rq-msg-${role}`;
     el.textContent = text;
+
+    if (role === 'assistant' && navTarget) {
+      const banner = document.createElement('div');
+      banner.className = 'rq-nav-banner';
+      const label = navTarget.startsWith('#')
+        ? `📍 Naviguer vers ${navTarget.replace('#', '')}`
+        : `🔗 Ouvrir ${navTarget}`;
+      banner.innerHTML = `<span>🧭</span> <span>${label}</span>`;
+      banner.addEventListener('click', (e) => {
+        e.stopPropagation();
+        executeNavigationAction(navTarget, true);
+      });
+      el.appendChild(document.createElement('br'));
+      el.appendChild(banner);
+    }
+
     messagesContainer.appendChild(el);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
@@ -705,7 +972,9 @@ Quelle est votre activité ou votre idée de projet ?</div>
         sessionStorage.setItem(STORAGE_KEY, conversationId);
       }
 
-      appendChatMessage(data.reply || "Je n'ai pas pu obtenir de réponse.", 'assistant');
+      const rawReply = data.reply || "Je n'ai pas pu obtenir de réponse.";
+      const parsed = parseAndExecuteNav(rawReply);
+      appendChatMessage(parsed.cleanText, 'assistant', parsed.navTarget);
     } catch (err) {
       loadingEl.remove();
       appendChatMessage('Erreur réseau. Vous pouvez contacter Rockib : rockibdev@gmail.com.', 'assistant');
@@ -978,6 +1247,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
       vadInterval = null;
     }
     if (recognition) {
+      recognition.onstart = null;
       recognition.onend = null;
       recognition.onerror = null;
       recognition.onresult = null;
@@ -986,10 +1256,13 @@ Quelle est votre activité ou votre idée de projet ?</div>
     }
     if (mediaRecorder && mediaRecorder.state !== 'inactive') {
       mediaRecorder.onstop = null;
+      mediaRecorder.ondataavailable = null;
       try { mediaRecorder.stop(); } catch (e) {}
     }
     mediaRecorder = null;
     if (btnSendSpeech) btnSendSpeech.style.display = 'none';
+    const meter = chatWindow.querySelector('#rq-voice-meter');
+    if (meter) meter.style.display = 'none';
   }
 
   function interruptAiSpeaking() {
@@ -1056,9 +1329,17 @@ Quelle est votre activité ou votre idée de projet ?</div>
 
     var bargeInCheckInterval = null;
     var hasEnded = false;
+
+    // Watchdog timer: GUARANTEES finish() is called so it NEVER stays stuck in speaking mode!
+    var maxDuration = Math.max(3500, ((text || '').length / 12) * 1000 + 3000);
+    var safetyTimeout = setTimeout(function () {
+      if (isSpeaking) finish();
+    }, maxDuration);
+
     function finish() {
       if (hasEnded) return;
       hasEnded = true;
+      clearTimeout(safetyTimeout);
       isSpeaking = false;
       if (bargeInCheckInterval) {
         clearInterval(bargeInCheckInterval);
@@ -1067,7 +1348,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
       if (onComplete) onComplete();
     }
 
-    // Monitor microphone during AI speech for hands-free Barge-In (interruption)
+    // Monitor microphone during AI speech for hands-free Barge-In (interruption on sustained speech)
     if (isCalling && micAnalyser && micTimeData && !isMuted) {
       let loudFrames = 0;
       bargeInCheckInterval = setInterval(() => {
@@ -1079,9 +1360,9 @@ Quelle est votre activité ou votre idée de projet ?</div>
           sumSq += d * d;
         }
         const rms = Math.sqrt(sumSq / micTimeData.length);
-        if (rms > 18) {
+        if (rms > 28) {
           loudFrames++;
-          if (loudFrames >= 4) {
+          if (loudFrames >= 5) {
             clearInterval(bargeInCheckInterval);
             bargeInCheckInterval = null;
             interruptAiSpeaking();
@@ -1089,7 +1370,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
         } else {
           loudFrames = Math.max(0, loudFrames - 1);
         }
-      }, 90);
+      }, 100);
     }
 
     const selectedProfile = (voiceProfileSelect && voiceProfileSelect.value) || 'henri';
@@ -1109,21 +1390,6 @@ Quelle est votre activité ou votre idée de projet ?</div>
           const audioUrl = URL.createObjectURL(audioBlob);
           const audio = new Audio(audioUrl);
           currentAudio = audio;
-
-          // Connect AI audio to AnalyserNode so the fluid sphere dances to the AI's voice
-          try {
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (AudioContextClass) {
-              if (!audioCtx) audioCtx = new AudioContextClass();
-              if (audioCtx.state === 'suspended') audioCtx.resume();
-              const elemSource = audioCtx.createMediaElementSource(audio);
-              aiAnalyser = audioCtx.createAnalyser();
-              aiAnalyser.fftSize = 512;
-              elemSource.connect(aiAnalyser);
-              aiAnalyser.connect(audioCtx.destination);
-              aiTimeData = new Uint8Array(aiAnalyser.fftSize);
-            }
-          } catch (graphErr) {}
 
           audio.onended = () => {
             URL.revokeObjectURL(audioUrl);
@@ -1147,6 +1413,15 @@ Quelle est votre activité ou votre idée de projet ?</div>
   }
 
   async function startVoiceCall() {
+    // 0. Synchronously unlock Web Audio Context on user gesture
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        if (!audioCtx) audioCtx = new AudioContextClass();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      }
+    } catch (e) {}
+
     // 1. Unlock microphone immediately on user click gesture
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
@@ -1158,7 +1433,8 @@ Quelle est votre activité ou votre idée de projet ?</div>
         ensureMicAudioGraph(micStream);
       }
     } catch (micErr) {
-      setOrbUiState('idle', 'Microphone non autorisé', "Autorisez le micro dans la barre d'adresse ou écrivez ci-dessous.");
+      setOrbUiState('idle', 'Microphone requis', "Cliquez sur l'icône de cadenas pour autoriser le micro, ou écrivez.");
+      return;
     }
 
     try {
@@ -1196,16 +1472,19 @@ Quelle est votre activité ou votre idée de projet ?</div>
     stopActiveListening();
 
     if (isMuted) {
-      setOrbUiState('idle', 'Micro coupé', 'Touchez 🎙️ pour réactiver votre micro');
+      setOrbUiState('idle', 'Micro en sourdine', 'Touchez 🎙️ pour réactiver votre micro');
       return;
     }
 
-    setOrbUiState('listening', 'Je vous écoute...', 'Parlez naturellement, je détecte vos pauses automatiquement');
+    const voiceMeter = chatWindow.querySelector('#rq-voice-meter');
+    if (voiceMeter) voiceMeter.style.display = 'inline-flex';
+    setOrbUiState('listening', 'Micro actif · Je vous écoute...', 'Parlez naturellement ou touchez la sphère pour valider');
     if (btnSendSpeech) btnSendSpeech.style.display = 'inline-flex';
 
     var capturedSpeech = '';
     var finishTimeout = null;
     var turnSubmitted = false;
+    var recognitionActive = false;
 
     function submitRecognizedText(textToSubmit) {
       if (turnSubmitted || !isCalling || isSpeaking || isProcessingTurn) return;
@@ -1217,17 +1496,22 @@ Quelle est votre activité ou votre idée de projet ?</div>
       processVoiceTurn(cleaned);
     }
 
-    // Engine A: Browser Web Speech API (instant live captions + fast trigger)
+    // Engine A: Browser Web Speech API (continuous self-healing session)
     const SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRec) {
       try {
         recognition = new SpeechRec();
         recognition.lang = 'fr-FR';
-        recognition.continuous = true;
+        recognition.continuous = false; // continuous = false with onend auto-restart is 10x more resilient in Chrome
         recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+
+        recognition.onstart = function () {
+          recognitionActive = true;
+        };
 
         recognition.onresult = function (event) {
-          if (isMuted) return;
+          if (isMuted || turnSubmitted) return;
           var interim = '';
           var finalTxt = '';
           for (var i = 0; i < event.results.length; ++i) {
@@ -1240,27 +1524,42 @@ Quelle est votre activité ou votre idée de projet ?</div>
           var spoken = (finalTxt + interim).trim();
           if (spoken) {
             capturedSpeech = spoken;
-            setOrbUiState('user_speaking', 'Je vous écoute...', 'En train de capter votre voix...');
+            setOrbUiState('user_speaking', 'Micro actif · Je vous entends...', 'Parlez librement...');
             setVoiceTranscript('Vous (en direct)', spoken);
             clearTimeout(finishTimeout);
+            // 980ms of silence after speaking auto-submits turn
             finishTimeout = setTimeout(function () {
               submitRecognizedText(capturedSpeech);
-            }, 1050);
+            }, 980);
+          }
+        };
+
+        recognition.onerror = function (err) {
+          if (err && err.error === 'no-speech') {
+            return;
           }
         };
 
         recognition.onend = function () {
-          if (!turnSubmitted && capturedSpeech.trim().length > 1) {
+          recognitionActive = false;
+          if (turnSubmitted) return;
+          if (capturedSpeech.trim().length > 1) {
             submitRecognizedText(capturedSpeech);
+          } else if (isCalling && !isSpeaking && !isProcessingTurn && !isMuted) {
+            // Keep speech recognition continuously running!
+            setTimeout(function () {
+              if (isCalling && !isSpeaking && !isProcessingTurn && !turnSubmitted && !recognitionActive) {
+                try { recognition.start(); } catch (e) {}
+              }
+            }, 120);
           }
         };
 
-        recognition.onerror = function () {};
         recognition.start();
       } catch (e) {}
     }
 
-    // Engine B: Calibrated Time-Domain RMS VAD + Groq Whisper STT (works on 100% of browsers)
+    // Engine B: MediaRecorder + Groq Whisper STT backup + Real-time VU-Meter
     if (micStream && micStream.active && typeof window.MediaRecorder !== 'undefined') {
       ensureMicAudioGraph(micStream);
       try {
@@ -1281,13 +1580,13 @@ Quelle est votre activité ou votre idée de projet ?</div>
             return;
           }
           var blob = new Blob(audioChunks, { type: mimeType || 'audio/webm' });
-          if (blob.size < 800) {
+          if (blob.size < 600) {
             if (isCalling && !isSpeaking && !isProcessingTurn) {
               setTimeout(listenToUser, 200);
             }
             return;
           }
-          setOrbUiState('thinking', 'Transcription...', 'Analyse vocale ultra-rapide');
+          setOrbUiState('thinking', 'Transcription vocale...', 'Analyse Groq Whisper');
           try {
             var sttResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/stt`, {
               method: 'POST',
@@ -1313,64 +1612,75 @@ Quelle est votre activité ou votre idée de projet ?</div>
           }
         };
 
-        mediaRecorder.start(200);
+        mediaRecorder.start(250);
 
-        // Calibrated Time-Domain RMS Voice Activity Detection
-        if (micAnalyser && micTimeData) {
-          var speechFrames = 0;
-          var hasSpokenAudio = false;
-          var silenceStart = 0;
-          var noiseFloor = 1.4;
-          var cycleStart = Date.now();
+        // Real-time audio VU Meter + VAD loop
+        var vuBars = chatWindow.querySelectorAll('.rq-vu-bar');
+        var speechFrames = 0;
+        var hasSpokenAudio = false;
+        var silenceStart = 0;
+        var noiseFloor = 1.2;
 
-          vadInterval = setInterval(function () {
-            if (!isCalling || isSpeaking || turnSubmitted || isMuted) {
-              clearInterval(vadInterval);
-              vadInterval = null;
-              return;
-            }
+        vadInterval = setInterval(function () {
+          if (!isCalling || isSpeaking || turnSubmitted || isMuted) {
+            clearInterval(vadInterval);
+            vadInterval = null;
+            return;
+          }
+
+          var rms = 0;
+          if (micAnalyser && micTimeData) {
             micAnalyser.getByteTimeDomainData(micTimeData);
             var sumSq = 0;
             for (var i = 0; i < micTimeData.length; i++) {
               var d = micTimeData[i] - 128;
               sumSq += d * d;
             }
-            var rms = Math.sqrt(sumSq / micTimeData.length);
-            var threshold = Math.max(3.2, Math.min(9.0, noiseFloor * 2.2));
+            rms = Math.sqrt(sumSq / micTimeData.length);
+          }
 
-            if (rms > threshold) {
-              speechFrames++;
-              silenceStart = 0;
-              if (speechFrames >= 2) {
-                hasSpokenAudio = true;
-                setOrbUiState('user_speaking', 'Je vous écoute...', 'Parlez librement...');
-              }
-            } else {
-              if (!hasSpokenAudio) {
-                noiseFloor = noiseFloor * 0.92 + rms * 0.08;
-              }
-              speechFrames = Math.max(0, speechFrames - 1);
-              if (hasSpokenAudio) {
-                if (!silenceStart) {
-                  silenceStart = Date.now();
-                } else if (Date.now() - silenceStart > 920) {
-                  // 920ms pause after speaking -> auto-send turn like ChatGPT!
-                  clearInterval(vadInterval);
-                  vadInterval = null;
-                  if (capturedSpeech.trim().length > 1) {
-                    submitRecognizedText(capturedSpeech);
-                  } else if (mediaRecorder && mediaRecorder.state === 'recording') {
-                    try { mediaRecorder.stop(); } catch (e) {}
-                  }
-                }
-              } else if (Date.now() - cycleStart > 15000) {
-                // Keep buffer fresh during long silence
-                cycleStart = Date.now();
-                audioChunks = [];
+          // Animate the 5 VU bars based on actual mic energy
+          if (vuBars && vuBars.length) {
+            var baseH = Math.min(18, Math.max(3.5, rms * 1.5));
+            vuBars[0].style.height = Math.max(3, baseH * 0.65) + 'px';
+            vuBars[1].style.height = Math.max(4, baseH * 0.95) + 'px';
+            vuBars[2].style.height = Math.max(5, baseH * 1.2) + 'px';
+            vuBars[3].style.height = Math.max(4, baseH * 0.95) + 'px';
+            vuBars[4].style.height = Math.max(3, baseH * 0.65) + 'px';
+          }
+
+          var threshold = Math.max(2.6, Math.min(7.5, noiseFloor * 1.9));
+
+          if (rms > threshold) {
+            speechFrames++;
+            silenceStart = 0;
+            if (speechFrames >= 2) {
+              hasSpokenAudio = true;
+              if (orbState !== 'user_speaking') {
+                setOrbUiState('user_speaking', 'Micro actif · Je vous entends...', 'Parlez librement...');
               }
             }
-          }, 85);
-        }
+          } else {
+            if (!hasSpokenAudio) {
+              noiseFloor = noiseFloor * 0.94 + rms * 0.06;
+            }
+            speechFrames = Math.max(0, speechFrames - 1);
+            if (hasSpokenAudio) {
+              if (!silenceStart) {
+                silenceStart = Date.now();
+              } else if (Date.now() - silenceStart > 950) {
+                // 950ms pause after speaking -> auto-submit!
+                clearInterval(vadInterval);
+                vadInterval = null;
+                if (capturedSpeech.trim().length > 1) {
+                  submitRecognizedText(capturedSpeech);
+                } else if (mediaRecorder && mediaRecorder.state === 'recording') {
+                  try { mediaRecorder.stop(); } catch (e) {}
+                }
+              }
+            }
+          }
+        }, 70);
       } catch (recErr) {}
     }
 
@@ -1396,6 +1706,12 @@ Quelle est votre activité ou votre idée de projet ?</div>
     setVoiceTranscript('Vous', userText.trim());
     setOrbUiState('thinking', 'Réflexion...', 'Formulation de la réponse vocale');
 
+    // Immediate local navigation if user requested a section
+    const directUserNav = detectUserNavIntent(userText.trim());
+    if (directUserNav) {
+      executeNavigationAction(directUserNav, false);
+    }
+
     try {
       if (!voiceSessionId) {
         const sResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/session`, {
@@ -1419,9 +1735,10 @@ Quelle est votre activité ou votre idée de projet ?</div>
 
       const data = await resp.json();
       isProcessingTurn = false;
-      setVoiceTranscript('Concierge', data.agent_reply_text);
+      const parsedVoice = parseAndExecuteNav(data.agent_reply_text);
+      setVoiceTranscript('Concierge', parsedVoice.cleanText);
 
-      speakReply(data.agent_reply_text, () => {
+      speakReply(parsedVoice.cleanText, () => {
         if (data.should_end_call) {
           stopVoiceCall();
         } else if (isCalling) {
@@ -1530,6 +1847,9 @@ Quelle est votre activité ou votre idée de projet ?</div>
       } else if (isSpeaking) {
         // ChatGPT-style tap-to-interrupt!
         interruptAiSpeaking();
+      } else if (!isSpeaking && !isProcessingTurn) {
+        // Tap while listening -> force immediate submission like walkie-talkie!
+        if (btnSendSpeech) btnSendSpeech.click();
       }
     });
   }
@@ -1713,6 +2033,9 @@ Quelle est votre activité ou votre idée de projet ?</div>
       }
     },
     close: () => toggleChat(false),
+    minimize: () => toggleMinimize(true),
+    maximize: () => toggleMinimize(false),
+    navigate: (target) => executeNavigationAction(target, true),
     getSiteKey: () => currentSiteKey,
     getApiBase: () => API_BASE,
   };
