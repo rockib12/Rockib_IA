@@ -10,6 +10,7 @@ import AuthModal from './components/AuthModal';
 import DashboardPanel from './components/DashboardPanel';
 import CyberTerminal from './components/CyberTerminal';
 import EventTimeline from './components/EventTimeline';
+import SocialConnectorsPanel from './components/SocialConnectorsPanel';
 import { authFetch } from './lib/authFetch';
 
 // Workspace par défaut pour l'environnement local
@@ -40,6 +41,7 @@ export default function App() {
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [isTimelineOpen, setIsTimelineOpen] = useState(false);
   const [isGovernanceOpen, setIsGovernanceOpen] = useState(false);
+  const [isConnectorsOpen, setIsConnectorsOpen] = useState(false);
 
   const addToast = useCallback((message, type = 'info') => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -413,6 +415,8 @@ export default function App() {
         onToggleTimeline={() => setIsTimelineOpen(!isTimelineOpen)}
         isGovernanceOpen={isGovernanceOpen}
         onToggleGovernance={() => setIsGovernanceOpen(!isGovernanceOpen)}
+        isConnectorsOpen={isConnectorsOpen}
+        onToggleConnectors={() => setIsConnectorsOpen(!isConnectorsOpen)}
       />
 
       {/* Zone de rendu 3D & HUD */}
@@ -606,6 +610,14 @@ export default function App() {
         agents={agents}
         workspaceId={agents[0]?.workspace_id || workspaceId}
         onNotify={addToast}
+      />
+
+      {/* Hub Réseaux Sociaux & Meta Ads (HMAC-SHA256) */}
+      <SocialConnectorsPanel
+        isOpen={isConnectorsOpen}
+        onClose={() => setIsConnectorsOpen(false)}
+        workspaceId={agents[0]?.workspace_id || workspaceId}
+        addToast={addToast}
       />
 
       {/* Modal de création d'une nouvelle mission DAG */}

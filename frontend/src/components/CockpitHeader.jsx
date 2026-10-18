@@ -16,6 +16,7 @@ import {
   Target,
   Menu,
   X,
+  Share2,
 } from 'lucide-react';
 
 export default function CockpitHeader({
@@ -40,6 +41,8 @@ export default function CockpitHeader({
   onToggleTimeline,
   isGovernanceOpen = false,
   onToggleGovernance,
+  isConnectorsOpen = false,
+  onToggleConnectors,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isHealthy = healthStatus?.status === 'healthy';
@@ -158,6 +161,15 @@ export default function CockpitHeader({
           >
             <Clock size={15} />
             <span>Timeline</span>
+          </button>
+
+          <button
+            onClick={onToggleConnectors}
+            className={`btn-cyber ${isConnectorsOpen ? 'active-panel' : 'secondary'}`}
+            title="Hub Réseaux Sociaux & Meta Ads (HMAC-SHA256)"
+          >
+            <Share2 size={15} />
+            <span>Réseaux</span>
           </button>
         </div>
 

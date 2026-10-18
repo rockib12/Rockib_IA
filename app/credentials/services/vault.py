@@ -274,3 +274,7 @@ class WorkspaceCredentialVault:
         await db.delete(record)
         await db.flush()
         return True
+
+
+# Instance singleton pour commodité d'accès
+credential_vault = WorkspaceCredentialVault()

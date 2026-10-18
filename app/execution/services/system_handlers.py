@@ -98,7 +98,9 @@ def install_production_handlers() -> None:
         instagram_post_handler,
         whatsapp_send_handler,
         twitter_post_handler,
-        discord_send_handler
+        discord_send_handler,
+        meta_ads_create_handler,
+        linkedin_post_handler,
     )
     
     from app.connectors.web_connectors import (
@@ -134,11 +136,13 @@ def install_production_handlers() -> None:
     register_action_handler("agent", "spawn", agent_spawn_handler)
     register_action_handler("agent", "create", agent_spawn_handler)
     
-    # Social Network Mock Handlers
+    # Social Network & Meta Handlers
     register_action_handler("facebook", "post", facebook_post_handler)
     register_action_handler("instagram", "post", instagram_post_handler)
     register_action_handler("whatsapp", "send", whatsapp_send_handler)
+    register_action_handler("meta_ads", "create", meta_ads_create_handler)
     register_action_handler("twitter", "post", twitter_post_handler)
+    register_action_handler("linkedin", "post", linkedin_post_handler)
     register_action_handler("discord", "send", discord_send_handler)
 
     # Content Handler (rédaction sandboxée, aucun effet externe)
