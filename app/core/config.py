@@ -58,8 +58,8 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: Optional[str] = None
     DEEPSEEK_API_KEY: Optional[str] = None
     GROQ_API_KEY: Optional[str] = None
-    DEFAULT_MODEL_NAME: str = "llama-3.3-70b-versatile"
-    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    DEFAULT_MODEL_NAME: str = "openai/gpt-oss-120b"
+    GROQ_MODEL: str = "openai/gpt-oss-120b"
     ANALYTICAL_MODEL_NAME: str = "deepseek-coder"
 
     # Execution / Sandboxing

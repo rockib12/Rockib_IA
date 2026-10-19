@@ -52,6 +52,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       PUBLIC_API_URL: https://dion-beaverlike-preceptively.ngrok-free.dev
       CONCIERGE_WIDGET_URL: https://rockib-quenum.netlify.app/rockib-concierge.js
+      GROQ_MODEL: openai/gpt-oss-120b
       APP_ENV: production
       DEBUG: "false"
     depends_on:
