@@ -1,5 +1,5 @@
 import time
-from collections import defaultdict, deque
+from collections import OrderedDict, deque
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,26 +9,29 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.identity.models import User, UserRole, Workspace, workspace_memberships
 from app.identity.schemas import Token, UserCreate, UserLogin, UserRead
 from app.core.dependencies import get_current_user, get_user_workspace_ids
+from app.core.proxy import get_client_ip
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 # Protection anti-bruteforce par IP (fenêtre glissante de 60s)
 _AUTH_WINDOW_SECONDS = 60
 _AUTH_MAX_ATTEMPTS = 15
-_auth_ip_attempts: dict[str, deque[float]] = defaultdict(deque)
+_MAX_TRACKED_AUTH_IPS = 4096
+_auth_ip_attempts: OrderedDict[str, deque[float]] = OrderedDict()
 _DUMMY_PASSWORD_HASH = hash_password("rockib-dummy-timing-guard-secret")
 
 
 def _check_auth_rate_limit(request: Request) -> None:
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
+    client_ip = get_client_ip(request)
 
     now = time.time()
-    history = _auth_ip_attempts[client_ip]
+    history = _auth_ip_attempts.setdefault(client_ip, deque())
+    _auth_ip_attempts.move_to_end(client_ip)
     while history and now - history[0] > _AUTH_WINDOW_SECONDS:
         history.popleft()
+
+    while len(_auth_ip_attempts) > _MAX_TRACKED_AUTH_IPS:
+        _auth_ip_attempts.popitem(last=False)
 
     if len(history) >= _AUTH_MAX_ATTEMPTS:
         raise HTTPException(

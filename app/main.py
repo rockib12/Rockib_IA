@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -153,7 +154,7 @@ async def api_health_check(db=Depends(get_async_db)):
     except Exception:
         redis_ok = False
 
-    return {
+    health = {
         "status": "healthy" if (db_ok and redis_ok) else "degraded",
         "app_name": settings.APP_NAME,
         "environment": settings.APP_ENV,
@@ -162,3 +163,6 @@ async def api_health_check(db=Depends(get_async_db)):
             "redis": "up" if redis_ok else "down",
         },
     }
+    if not db_ok or not redis_ok:
+        return JSONResponse(status_code=503, content=health)
+    return health
