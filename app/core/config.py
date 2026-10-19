@@ -6,7 +6,7 @@ class Settings(BaseSettings):
     # Core app configs
     APP_NAME: str = "Rockib AI"
     APP_ENV: str = "development"
-    DEBUG: bool = True
+    DEBUG: bool = False
     PORT: int = 8000
     HOST: str = "0.0.0.0"
 

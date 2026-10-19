@@ -5,10 +5,10 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: rockib
-      POSTGRES_PASSWORD: rockib_dev_password
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a unique URL-safe POSTGRES_PASSWORD in .env}
       POSTGRES_DB: rockib_ia
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - rockib_pg_data:/var/lib/postgresql/data
     healthcheck:
@@ -22,7 +22,7 @@ services:
     container_name: rockib_ia_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
     volumes:
       - rockib_redis_data:/data
     healthcheck:
@@ -47,8 +47,8 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      ASYNC_DATABASE_URL: postgresql+asyncpg://rockib:rockib_dev_password@postgres:5432/rockib_ia
-      DATABASE_URL: postgresql://rockib:rockib_dev_password@postgres:5432/rockib_ia
+      ASYNC_DATABASE_URL: postgresql+asyncpg://rockib:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/rockib_ia
+      DATABASE_URL: postgresql://rockib:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@postgres:5432/rockib_ia
       REDIS_URL: redis://redis:6379/0
       PUBLIC_API_URL: https://dion-beaverlike-preceptively.ngrok-free.dev
       CONCIERGE_WIDGET_URL: https://rockib-quenum.netlify.app/rockib-concierge.js
