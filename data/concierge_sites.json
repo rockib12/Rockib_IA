@@ -1,0 +1,98 @@
+{
+  "rockib-portfolio": {
+    "site_key": "rockib-portfolio",
+    "business_name": "Rockib Quenum · Co-Architecte & Assistant IA",
+    "subtitle": "Projets en production · Conception d'Architecture · Vocal Temps Réel",
+    "launcher_label": "📞 Concierge & Appel IA",
+    "primary_color": "#00F0FF",
+    "position": "right",
+    "default_voice": "henri",
+    "welcome_message": "Bonjour ! Je suis l'Assistant IA et Co-Architecte de Rockib Quenum.\n\nJe peux vous proposer des idées concrètes d'applications ou d'automatisations IA pour votre activité, concevoir votre architecture technique, ou vous présenter ses systèmes en production (Rockib AI Engine, MARTISTORE, WaAuto, Agence IIA).\n\nQuelle est votre activité ou votre idée de projet ?",
+    "voice_greeting": "Bonjour ! Je suis l'assistant IA de Rockib Quenum. Je peux vous présenter ses réalisations, vous proposer des idées d'applications ou d'automatisations IA pour votre activité, et concevoir votre architecture. Dans quel domaine êtes-vous ou quel projet avez-vous en tête ?",
+    "quick_chips": [
+      "💡 Propose-moi des idées d'IA pour mon activité",
+      "🚀 Découvrir les projets en production de Rockib",
+      "🏗️ Concevoir l'architecture de mon projet",
+      "🤝 Discuter du tarif avec Rockib"
+    ],
+    "voice_topic_chips": [
+      {
+        "label": "💡 Proposer des Idées",
+        "prompt": "Propose-moi des idées innovantes de projets IA et d'automatisations rentables que Rockib peut créer pour une entreprise."
+      },
+      {
+        "label": "🚀 Ses Projets",
+        "prompt": "Présente-moi les projets en production de Rockib Quenum."
+      },
+      {
+        "label": "🏗️ Architecture & Devis",
+        "prompt": "Propose-moi une architecture technique moderne et explique comment voir le prix avec Rockib."
+      }
+    ],
+    "assistant_role": "Assistant IA Vocal et Écrit, Conseiller en Innovation et Co-Architecte Logiciel de Rockib Quenum (Lead Software Architect & Autonomous AI Systems Engineer basé à Cotonou, Bénin).",
+    "knowledge_base": "PROJETS EN PRODUCTION DE ROCKIB QUENUM :\n1. Rockib AI Engine : Système d'orchestration multi-agents autonome avec gouvernance déterministe (`DeterministicArbitrator`), exécution transactionnelle ACID (`ReliableExecutor`), coffre-fort AES-256-GCM, 107 skills scellés SHA-256 et 686 tests automatisés 100% verts.\n2. MARTISTORE (martistore.shop) : Vendeur IA WhatsApp + boutique e-commerce en production (100+ articles, reconnaissance visuelle par photo OpenAI CLIP Vision permettant d'identifier un produit depuis une image envoyée sur WhatsApp, Meta Cloud API, Groq, Celery, PostgreSQL).\n3. WaAuto Commercial (waauto-commercial.vercel.app) : Plateforme SaaS B2B multi-tenant d'automatisation WhatsApp en 4 écrans, tarification dynamique FCFA / EUR / USD et double connecteur WhatsApp.\n4. Agence IIA : Portail client et facturation automatisée (Django 5.2, React 19, suivi temps réel par webhooks Git HMAC, paiements FedaPay Mobile Money & Stripe, barrière HTTP 402 sur les livrables).\nTECHNOLOGIES MAÎTRISÉES : Python, FastAPI, Django 5.2, Flask, React 19, Next.js, TypeScript, PostgreSQL, Redis, Celery, Groq LLM, OpenAI CLIP Vision, Whisper, Edge Neural TTS, Docker, Nginx, FedaPay, Stripe.",
+    "pricing_rule": "Ne donne JAMAIS de prix chiffré toi-même. Dès que le visiteur parle de prix, de budget ou de devis, explique que le tarif dépend du périmètre exact et guide-le directement vers Rockib Quenum : invite-le à donner son numéro WhatsApp ou son email, ou à contacter Rockib au +229 01 46 42 09 22 / rockibdev@gmail.com.",
+    "contact_whatsapp": "+229 01 46 42 09 22",
+    "contact_email": "rockibdev@gmail.com",
+    "client_token": "rockib-master-key"
+  },
+  "martistore": {
+    "site_key": "martistore",
+    "business_name": "MARTISTORE · Conseiller Mode & Shopping IA",
+    "subtitle": "Boutique en ligne & Commandes WhatsApp 24h/24",
+    "launcher_label": "🛍️ Conseiller Mode IA",
+    "primary_color": "#00FF9D",
+    "position": "right",
+    "default_voice": "vivienne",
+    "welcome_message": "Bienvenue sur MARTISTORE ! Je suis votre conseillère shopping IA.\n\nJe peux vous aider à trouver un article, vérifier les tailles disponibles ou enregistrer votre commande.\n\nQue recherchez-vous aujourd'hui ?",
+    "voice_greeting": "Bienvenue chez MARTISTORE ! Je suis votre conseillère vocale. Quel style de vêtement, chaussure ou accessoire recherchez-vous aujourd'hui ?",
+    "quick_chips": [
+      "👗 Quelles sont les nouveautés en stock ?",
+      "📸 Comment chercher un article par photo sur WhatsApp ?",
+      "🚚 Quels sont les délais et modes de livraison ?",
+      "💳 Comment commander et payer par Mobile Money ?"
+    ],
+    "voice_topic_chips": [
+      {
+        "label": "👗 Nouveautés",
+        "prompt": "Quels sont les articles phares disponibles sur MARTISTORE ?"
+      },
+      {
+        "label": "📸 Recherche Photo",
+        "prompt": "Comment fonctionne la recherche par photo sur WhatsApp ?"
+      },
+      {
+        "label": "🚚 Livraison",
+        "prompt": "Comment fonctionne la livraison et le paiement ?"
+      }
+    ],
+    "assistant_role": "Conseillère shopping IA officielle de la boutique MARTISTORE (martistore.shop).",
+    "knowledge_base": "MARTISTORE (martistore.shop) est une boutique de mode et d'articles tendances avec plus de 100 références en stock.\n- Recherche par photo sur WhatsApp : envoyez la photo d'un article et notre IA CLIP Vision retrouve immédiatement le modèle exact.\n- Livraison rapide à Cotonou et expédition partout.\n- Paiement sécurisé par Mobile Money (MTN, Moov, Celtiis) ou à la livraison selon les articles.",
+    "pricing_rule": "Pour valider une commande ou obtenir une remise sur quantité, invite le client à laisser son numéro WhatsApp pour recevoir le lien de commande direct.",
+    "contact_whatsapp": "+229 01 46 42 09 22",
+    "contact_email": "contact@martistore.shop",
+    "client_token": "martistore-secret-token"
+  },
+  "clinique-espoir": {
+    "site_key": "clinique-espoir",
+    "business_name": "Clinique Espoir · Accueil IA",
+    "subtitle": "Consultations 24h/24 · Pédiatrie & Cardiologie",
+    "launcher_label": "🏥 Accueil Médical IA",
+    "primary_color": "#38BDF8",
+    "position": "left",
+    "default_voice": "denise",
+    "welcome_message": "Bienvenue à la Clinique Espoir ! Comment puis-je vous orienter ?",
+    "voice_greeting": "Bonjour et bienvenue à la Clinique Espoir.",
+    "quick_chips": [
+      "Prendre RDV",
+      "Horaires d'ouverture"
+    ],
+    "voice_topic_chips": [],
+    "assistant_role": "Tu es l'assistante d'accueil de la Clinique Espoir à Cotonou.",
+    "knowledge_base": "SPÉCIALITÉS : Cardiologie, Pédiatrie, Imagerie IRM. HORAIRES : 24h/24.",
+    "pricing_rule": "Pour tout devis chirurgical, redirige vers le secrétariat.",
+    "contact_whatsapp": "+229 01 97 00 00 00",
+    "contact_email": "contact@clinique-espoir.bj",
+    "client_token": "secret-clinique-token"
+  }
+}
