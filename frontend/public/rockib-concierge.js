@@ -614,6 +614,47 @@
       color: #00FF9D;
       border: 1px solid rgba(0, 255, 157, 0.4);
     }
+    @media (max-width: 480px) {
+      .rq-launcher {
+        right: 16px;
+        bottom: max(16px, env(safe-area-inset-bottom));
+        width: 50px;
+        height: 50px;
+        min-width: 50px;
+        padding: 0;
+        justify-content: center;
+        gap: 0;
+        border-radius: 50%;
+        font-size: 0;
+      }
+      .rq-launcher::after { content: '📞'; font-size: 19px; line-height: 1; }
+      .rq-floating-orb {
+        right: 16px;
+        bottom: max(16px, env(safe-area-inset-bottom));
+        width: 66px;
+        height: 66px;
+      }
+      .rq-floating-canvas {
+        width: 56px;
+        height: 56px;
+      }
+      .rq-window, .rq-window.rq-pos-left {
+        left: 8px;
+        right: 8px;
+        bottom: max(10px, env(safe-area-inset-bottom));
+        width: auto;
+        max-width: none;
+        height: min(600px, calc(100dvh - 20px));
+        max-height: calc(100dvh - 20px);
+        box-sizing: border-box;
+        border-radius: 16px;
+      }
+      .rq-voice-container { padding: 10px 12px; gap: 8px; }
+      #rq-voice-canvas { width: 140px !important; height: 140px !important; }
+      .rq-messages { padding: 12px 10px; gap: 8px; }
+      .rq-msg { font-size: 11.5px; padding: 8px 11px; }
+      .rq-callback-container { padding: 16px 12px; overflow-y: auto; }
+    }
   `;
 
   // 2. Inject CSS
@@ -692,6 +733,10 @@ Quelle est votre activité ou votre idée de projet ?</div>
           </div>
         </div>
 
+        <p role="note" style="font-size:10px;line-height:1.45;color:#94A3B8;margin:8px 0;">
+          En mode vocal, votre audio ou sa transcription est traite par le navigateur ou Groq; la reponse vocale peut etre synthetisee par Microsoft Edge. Ne dictez pas vos coordonnees : utilisez l'onglet Rappel.
+        </p>
+
         <!-- Center ChatGPT Fluid Morphing Orb -->
         <div style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; margin:2px 0;">
           <canvas id="rq-voice-canvas" width="176" height="176" style="width:176px; height:176px; cursor:pointer;" title="Touchez la sphère pour parler ou interrompre"></canvas>
@@ -746,7 +791,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
         <div>
           <div style="font-size: 13px; font-weight: 700; color: #E8A33D;">Demande de Rappel Direct</div>
           <div style="font-size: 11px; color: #8C847A; margin-top: 4px;">
-            Laissez votre numéro : Rockib ou un agent de l'équipe vous appelle sous 5 minutes.
+            Votre demande sera enregistree dans l'espace de l'equipe de ce site.
           </div>
         </div>
 
@@ -777,6 +822,13 @@ Quelle est votre activité ou votre idée de projet ?</div>
         <div class="rq-form-group">
           <label class="rq-label">Sujet principal</label>
           <input type="text" class="rq-input" id="rq-cb-topic" placeholder="ex: Automatisation WhatsApp / Site E-commerce" />
+        </div>
+
+        <div class="rq-form-group" style="font-size:11px; line-height:1.5;">
+          <label style="display:flex; gap:8px; align-items:flex-start; cursor:pointer;">
+            <input type="checkbox" id="rq-cb-consent" required style="margin-top:2px;" />
+            <span>J'accepte que mon numero, mon nom et ma demande soient transmis a l'equipe de ce site pour me recontacter. Les demandes sont conservees au maximum 90 jours.</span>
+          </label>
         </div>
 
         <button type="submit" class="rq-btn-call" style="justify-content: center; width: 100%; margin-top: 8px;">
@@ -968,8 +1020,9 @@ Quelle est votre activité ou votre idée de projet ?</div>
     let clean = rawTarget.trim().replace(/^\[+|\]+$/g, '');
     const lower = clean.toLowerCase().replace(/^#/, '');
     if (NAV_TARGET_MAP[lower]) return NAV_TARGET_MAP[lower];
-    if (clean.startsWith('#') || clean.endsWith('.html') || clean.includes('/')) return clean;
-    return '#' + clean;
+    const allowed = new Set(Object.values(NAV_TARGET_MAP));
+    if (allowed.has(clean) || clean === 'concierge-ia.html') return clean;
+    return null;
   }
 
   function detectUserNavIntent(userQuery) {
@@ -1055,10 +1108,13 @@ Quelle est votre activité ou votre idée de projet ?</div>
     if (role === 'assistant' && navTarget) {
       const banner = document.createElement('div');
       banner.className = 'rq-nav-banner';
-      const label = navTarget.startsWith('#')
-        ? `📍 Naviguer vers ${navTarget.replace('#', '')}`
-        : `🔗 Ouvrir ${navTarget}`;
-      banner.innerHTML = `<span>🧭</span> <span>${label}</span>`;
+      const icon = document.createElement('span');
+      icon.textContent = String.fromCodePoint(0x1F9ED);
+      const label = document.createElement('span');
+      label.textContent = navTarget.startsWith('#')
+        ? `Naviguer vers ${navTarget.replace('#', '')}`
+        : `Ouvrir ${navTarget}`;
+      banner.append(icon, label);
       banner.addEventListener('click', (e) => {
         e.stopPropagation();
         executeNavigationAction(navTarget, true);
@@ -1071,24 +1127,31 @@ Quelle est votre activité ou votre idée de projet ?</div>
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
   }
 
+  let isSendingChat = false;
   async function sendChatMessage(text) {
-    if (!text || !text.trim()) return;
+    if (!text || !text.trim() || isSendingChat) return;
+    isSendingChat = true;
     const userMsg = text.trim();
     appendChatMessage(userMsg, 'user');
     inputField.value = '';
 
     if (suggestionsContainer) suggestionsContainer.style.display = 'none';
+    const submitButton = chatForm.querySelector('button[type="submit"]');
+    if (submitButton) submitButton.disabled = true;
 
     const loadingEl = document.createElement('div');
     loadingEl.className = 'rq-loading';
-    loadingEl.textContent = 'Le concierge formule sa réponse...';
+    loadingEl.textContent = 'Le concierge formule sa reponse...';
     messagesContainer.appendChild(loadingEl);
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
     try {
       const response = await fetch(`${API_BASE}/api/v1/inbound/portfolio/message`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        signal: controller.signal,
         body: JSON.stringify({
           message: userMsg,
           conversation_id: conversationId,
@@ -1096,21 +1159,26 @@ Quelle est votre activité ou votre idée de projet ?</div>
           site_key: currentSiteKey,
         }),
       });
-
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.detail || `Erreur serveur (${response.status}).`);
       loadingEl.remove();
-
       if (data.conversation_id) {
         conversationId = data.conversation_id;
         sessionStorage.setItem(conversationStorageKey(currentSiteKey), conversationId);
       }
-
-      const rawReply = data.reply || "Je n'ai pas pu obtenir de réponse.";
+      const rawReply = data.reply || "Je n'ai pas pu obtenir de reponse.";
       const parsed = parseAndExecuteNav(rawReply);
       appendChatMessage(parsed.cleanText, 'assistant', parsed.navTarget);
     } catch (err) {
       loadingEl.remove();
-      appendChatMessage('Erreur réseau. Vous pouvez contacter Rockib : rockibdev@gmail.com.', 'assistant');
+      const message = err.name === 'AbortError'
+        ? 'La reponse prend trop de temps. Veuillez reessayer.'
+        : (err.message || 'Le service est momentanement indisponible. Veuillez reessayer.');
+      appendChatMessage(message, 'assistant');
+    } finally {
+      clearTimeout(timeoutId);
+      isSendingChat = false;
+      if (submitButton) submitButton.disabled = false;
     }
   }
 
@@ -1455,7 +1523,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'fr-FR';
-    utterance.rate = 1.02;
+    utterance.rate = 0.97;
     utterance.pitch = preferredGender === 'female' ? 1.02 : 0.98;
 
     const bestVoice = pickBestBrowserFrenchVoice(preferredGender);
@@ -1526,9 +1594,9 @@ Quelle est votre activité ou votre idée de projet ?</div>
           sumSq += d * d;
         }
         const rms = Math.sqrt(sumSq / micTimeData.length);
-        if (rms > 28) {
+        if (rms > 24) {
           loudFrames++;
-          if (loudFrames >= 5) {
+          if (loudFrames >= 4) {
             clearInterval(bargeInCheckInterval);
             bargeInCheckInterval = null;
             interruptAiSpeaking();
@@ -1578,6 +1646,41 @@ Quelle est votre activité ou votre idée de projet ?</div>
     }
   }
 
+  async function openVoiceSession() {
+    const response = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+      body: JSON.stringify({ page_url: window.location.href, site_key: currentSiteKey }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !data.session_id) {
+      throw new Error(data.detail || `Impossible d'ouvrir la session vocale (${response.status}).`);
+    }
+    voiceSessionId = data.session_id;
+    return data;
+  }
+
+  async function sendVoiceTurn(userText) {
+    if (!voiceSessionId) await openVoiceSession();
+    const send = async () => {
+      const response = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/turn`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
+        body: JSON.stringify({ session_id: voiceSessionId, user_speech_transcript: userText, site_key: currentSiteKey }),
+      });
+      return { response, data: await response.json().catch(() => ({})) };
+    };
+    let result = await send();
+    if (result.data.status === 'session_expired') {
+      await openVoiceSession();
+      result = await send();
+    }
+    if (!result.response.ok || result.data.status !== 'ok') {
+      throw new Error(result.data.detail || result.data.agent_reply_text || 'La session vocale est indisponible.');
+    }
+    return result.data;
+  }
+
   async function startVoiceCall() {
     // 0. Synchronously unlock Web Audio Context on user gesture
     try {
@@ -1605,13 +1708,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
 
     try {
       setOrbUiState('thinking', 'Connexion vocale...', 'Initialisation de la session temps réel');
-      const resp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
-        body: JSON.stringify({ page_url: window.location.href, site_key: currentSiteKey }),
-      });
-      const data = await resp.json();
-      voiceSessionId = data.session_id;
+      const data = await openVoiceSession();
 
       isCalling = true;
       isProcessingTurn = false;
@@ -1629,7 +1726,8 @@ Quelle est votre activité ou votre idée de projet ?</div>
         if (isCalling) listenToUser();
       });
     } catch (err) {
-      setOrbUiState('idle', 'Erreur de connexion', 'Impossible de joindre le serveur vocal.');
+      stopVoiceCall();
+      setOrbUiState('idle', 'Erreur de connexion', err.message || 'Impossible de joindre le serveur vocal.');
     }
   }
 
@@ -1651,6 +1749,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
     var finishTimeout = null;
     var turnSubmitted = false;
     var recognitionActive = false;
+    var groqRecorderActive = false;
 
     function submitRecognizedText(textToSubmit) {
       if (turnSubmitted || !isCalling || isSpeaking || isProcessingTurn) return;
@@ -1693,10 +1792,20 @@ Quelle est votre activité ou votre idée de projet ?</div>
             setOrbUiState('user_speaking', 'Micro actif · Je vous entends...', 'Parlez librement...');
             setVoiceTranscript('Vous (en direct)', spoken);
             clearTimeout(finishTimeout);
-            // 980ms of silence after speaking auto-submits turn
-            finishTimeout = setTimeout(function () {
-              submitRecognizedText(capturedSpeech);
-            }, 980);
+            if (groqRecorderActive) {
+              // Use browser speech events only to find the end of the phrase;
+              // Groq still receives and transcribes the complete audio recording.
+              finishTimeout = setTimeout(function () {
+                if (mediaRecorder && mediaRecorder.state === 'recording') {
+                  try { mediaRecorder.stop(); } catch (e) {}
+                }
+              }, 1200);
+            } else {
+              // Native speech recognition fallback when audio recording is unavailable.
+              finishTimeout = setTimeout(function () {
+                submitRecognizedText(capturedSpeech);
+              }, 980);
+            }
           }
         };
 
@@ -1709,9 +1818,11 @@ Quelle est votre activité ou votre idée de projet ?</div>
         recognition.onend = function () {
           recognitionActive = false;
           if (turnSubmitted) return;
-          if (capturedSpeech.trim().length > 1) {
+          // Prefer one complete Groq transcription of the recorded turn. The
+          // browser transcript remains a fallback if recording/STT is unavailable.
+          if (!groqRecorderActive && capturedSpeech.trim().length > 1) {
             submitRecognizedText(capturedSpeech);
-          } else if (isCalling && !isSpeaking && !isProcessingTurn && !isMuted) {
+          } else if (!groqRecorderActive && isCalling && !isSpeaking && !isProcessingTurn && !isMuted) {
             // Keep speech recognition continuously running!
             setTimeout(function () {
               if (isCalling && !isSpeaking && !isProcessingTurn && !turnSubmitted && !recognitionActive) {
@@ -1730,10 +1841,19 @@ Quelle est votre activité ou votre idée de projet ?</div>
       ensureMicAudioGraph(micStream);
       try {
         audioChunks = [];
-        var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : (MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm' : '');
+        var mimeType = '';
+        ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4'].some(function (candidate) {
+          if (MediaRecorder.isTypeSupported(candidate)) {
+            mimeType = candidate;
+            return true;
+          }
+          return false;
+        });
         mediaRecorder = mimeType ? new MediaRecorder(micStream, { mimeType: mimeType }) : new MediaRecorder(micStream);
+        var recorderMimeType = mediaRecorder.mimeType || mimeType || 'audio/webm';
+        var audioExtension = recorderMimeType.toLowerCase().split(';')[0].split('/')[1];
+        if (audioExtension === 'x-m4a') audioExtension = 'm4a';
+        if (!['webm', 'ogg', 'mp4', 'm4a', 'wav'].includes(audioExtension)) audioExtension = 'webm';
 
         mediaRecorder.ondataavailable = function (e) {
           if (e.data && e.data.size > 0) audioChunks.push(e.data);
@@ -1741,13 +1861,11 @@ Quelle est votre activité ou votre idée de projet ?</div>
 
         mediaRecorder.onstop = async function () {
           if (turnSubmitted || !isCalling || isSpeaking || isProcessingTurn || isMuted) return;
-          if (capturedSpeech.trim().length > 1) {
-            submitRecognizedText(capturedSpeech);
-            return;
-          }
-          var blob = new Blob(audioChunks, { type: mimeType || 'audio/webm' });
+          var blob = new Blob(audioChunks, { type: recorderMimeType });
           if (blob.size < 600) {
-            if (isCalling && !isSpeaking && !isProcessingTurn) {
+            if (capturedSpeech.trim().length > 1) {
+              submitRecognizedText(capturedSpeech);
+            } else if (isCalling && !isSpeaking && !isProcessingTurn) {
               setTimeout(listenToUser, 200);
             }
             return;
@@ -1758,7 +1876,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
               method: 'POST',
               headers: {
                 'Content-Type': 'application/octet-stream',
-                'X-Audio-Ext': 'webm', 'ngrok-skip-browser-warning': 'true'
+                'X-Audio-Ext': audioExtension, 'ngrok-skip-browser-warning': 'true'
               },
               body: blob,
             });
@@ -1772,12 +1890,18 @@ Quelle est votre activité ou votre idée de projet ?</div>
               }
             }
           } catch (err) {}
+          if (capturedSpeech.trim().length > 1) {
+            submitRecognizedText(capturedSpeech);
+            return;
+          }
           if (isCalling && !isSpeaking && !isProcessingTurn) {
             setTimeout(listenToUser, 250);
           }
         };
 
         mediaRecorder.start(250);
+        groqRecorderActive = true;
+        clearTimeout(finishTimeout);
 
         // Real-time audio VU Meter + VAD loop
         var vuBars = chatWindow.querySelectorAll('.rq-vu-bar');
@@ -1814,12 +1938,12 @@ Quelle est votre activité ou votre idée de projet ?</div>
             vuBars[4].style.height = Math.max(3, baseH * 0.65) + 'px';
           }
 
-          var threshold = Math.max(2.6, Math.min(7.5, noiseFloor * 1.9));
+          var threshold = Math.max(4, Math.min(12, noiseFloor * 2.3));
 
           if (rms > threshold) {
             speechFrames++;
             silenceStart = 0;
-            if (speechFrames >= 2) {
+            if (speechFrames >= 3) {
               hasSpokenAudio = true;
               if (orbState !== 'user_speaking') {
                 setOrbUiState('user_speaking', 'Micro actif · Je vous entends...', 'Parlez librement...');
@@ -1837,7 +1961,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
                 // 950ms pause after speaking -> auto-submit!
                 clearInterval(vadInterval);
                 vadInterval = null;
-                if (capturedSpeech.trim().length > 1) {
+                if (capturedSpeech.trim().length > 1 && (!mediaRecorder || mediaRecorder.state !== 'recording')) {
                   submitRecognizedText(capturedSpeech);
                 } else if (mediaRecorder && mediaRecorder.state === 'recording') {
                   try { mediaRecorder.stop(); } catch (e) {}
@@ -1851,14 +1975,14 @@ Quelle est votre activité ou votre idée de projet ?</div>
 
     if (btnSendSpeech) {
       btnSendSpeech.onclick = function () {
-        if (capturedSpeech.trim().length > 1) {
-          submitRecognizedText(capturedSpeech);
-        } else if (mediaRecorder && mediaRecorder.state === 'recording') {
+        if (mediaRecorder && mediaRecorder.state === 'recording') {
           if (vadInterval) {
             clearInterval(vadInterval);
             vadInterval = null;
           }
           try { mediaRecorder.stop(); } catch (e) {}
+        } else if (capturedSpeech.trim().length > 1) {
+          submitRecognizedText(capturedSpeech);
         }
       };
     }
@@ -1878,27 +2002,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
     }
 
     try {
-      if (!voiceSessionId) {
-        const sResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/session`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
-          body: JSON.stringify({ page_url: window.location.href, site_key: currentSiteKey }),
-        });
-        const sData = await sResp.json();
-        voiceSessionId = sData.session_id;
-      }
-
-      const resp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/turn`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
-        body: JSON.stringify({
-          session_id: voiceSessionId,
-          user_speech_transcript: userText.trim(),
-          site_key: currentSiteKey,
-        }),
-      });
-
-      const data = await resp.json();
+      const data = await sendVoiceTurn(userText.trim());
       isProcessingTurn = false;
       const parsedVoice = parseAndExecuteNav(data.agent_reply_text);
       setVoiceTranscript('Concierge', parsedVoice.cleanText);
@@ -2047,6 +2151,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
   const cbPhone = chatWindow.querySelector('#rq-cb-phone');
   const cbName = chatWindow.querySelector('#rq-cb-name');
   const cbTopic = chatWindow.querySelector('#rq-cb-topic');
+  const cbConsent = chatWindow.querySelector('#rq-cb-consent');
 
   callbackForm.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -2067,16 +2172,18 @@ Quelle est votre activité ou votre idée de projet ?</div>
           topic: cbTopic.value.trim() || undefined,
           channel: channel,
           preferred_time: 'immediate',
+          consent: Boolean(cbConsent && cbConsent.checked),
           site_key: currentSiteKey,
         }),
       });
 
-      const data = await resp.json();
-      callbackSuccess.textContent = data.message;
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) throw new Error(data.detail || `Erreur serveur (${resp.status}).`);
+      callbackSuccess.textContent = data.message || 'Votre demande est enregistree.';
       callbackSuccess.style.display = 'block';
       callbackForm.reset();
     } catch (err) {
-      alert("Erreur lors de la réservation de l'appel. Vous pouvez écrire directement à rockibdev@gmail.com.");
+      alert(err.message || "Impossible d'enregistrer votre demande. Reessayez plus tard.");
     } finally {
       submitBtn.disabled = false;
       submitBtn.innerHTML = '<span>📲 Me faire appeler</span>';
@@ -2152,25 +2259,31 @@ Quelle est votre activité ou votre idée de projet ?</div>
       }
     }
 
-    if (Array.isArray(cfg.quick_chips) && cfg.quick_chips.length > 0 && suggestionsContainer) {
-      suggestionsContainer.innerHTML = cfg.quick_chips
-        .map((chipText) => {
-          const clean = String(chipText).replace(/"/g, '&quot;');
-          return `<button class="rq-chip" data-query="${clean}">${clean}</button>`;
-        })
-        .join('');
+    if (Array.isArray(cfg.quick_chips) && suggestionsContainer) {
+      suggestionsContainer.replaceChildren();
+      cfg.quick_chips.slice(0, 6).forEach((chipText) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'rq-chip';
+        button.textContent = String(chipText).slice(0, 200);
+        button.setAttribute('data-query', String(chipText).slice(0, 200));
+        suggestionsContainer.appendChild(button);
+      });
     }
 
     // 6. Voice Topic Chips
     const voiceTopicsWrap = chatWindow.querySelector('#rq-panel-voice .rq-voice-topic-chip')?.parentElement;
-    if (voiceTopicsWrap && Array.isArray(cfg.voice_topic_chips) && cfg.voice_topic_chips.length > 0) {
-      voiceTopicsWrap.innerHTML = cfg.voice_topic_chips
-        .map((vc) => {
-          const lbl = String(vc.label || '').replace(/"/g, '&quot;');
-          const prm = String(vc.prompt || vc.label || '').replace(/"/g, '&quot;');
-          return `<button type="button" class="rq-voice-topic-chip" data-prompt="${prm}" style="background:rgba(${sitePrimaryRgb},0.1); border:1px solid rgba(${sitePrimaryRgb},0.35); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;">${lbl}</button>`;
-        })
-        .join('');
+    if (voiceTopicsWrap && Array.isArray(cfg.voice_topic_chips)) {
+      voiceTopicsWrap.replaceChildren();
+      cfg.voice_topic_chips.slice(0, 4).forEach((vc) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'rq-voice-topic-chip';
+        button.style.cssText = `background:rgba(${sitePrimaryRgb},0.1); border:1px solid rgba(${sitePrimaryRgb},0.35); color:#EDF5FF; border-radius:999px; padding:4px 9px; font-size:10px; cursor:pointer;`;
+        button.textContent = String(vc.label || '').slice(0, 50);
+        button.setAttribute('data-prompt', String(vc.prompt || vc.label || '').slice(0, 400));
+        voiceTopicsWrap.appendChild(button);
+      });
       bindVoiceTopicChips();
     }
   }
