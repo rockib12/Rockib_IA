@@ -11,6 +11,7 @@ import DashboardPanel from './components/DashboardPanel';
 import CyberTerminal from './components/CyberTerminal';
 import EventTimeline from './components/EventTimeline';
 import SocialConnectorsPanel from './components/SocialConnectorsPanel';
+import ObservabilityPanel from './components/ObservabilityPanel';
 import { authFetch } from './lib/authFetch';
 
 // Workspace par défaut pour l'environnement local
@@ -42,6 +43,7 @@ export default function App() {
   const [isTimelineOpen, setIsTimelineOpen] = useState(false);
   const [isGovernanceOpen, setIsGovernanceOpen] = useState(false);
   const [isConnectorsOpen, setIsConnectorsOpen] = useState(false);
+  const [isObservabilityOpen, setIsObservabilityOpen] = useState(false);
 
   const addToast = useCallback((message, type = 'info') => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -457,6 +459,8 @@ export default function App() {
           }
           setIsConnectorsOpen(!isConnectorsOpen);
         }}
+        isObservabilityOpen={isObservabilityOpen}
+        onToggleObservability={() => setIsObservabilityOpen(!isObservabilityOpen)}
       />
 
       {/* Zone de rendu 3D & HUD */}
@@ -660,6 +664,14 @@ export default function App() {
         currentUser={currentUser}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         addToast={addToast}
+      />
+
+      {/* Observabilité Unifiée, Télémétrie Groq LLM & Quotas */}
+      <ObservabilityPanel
+        isOpen={isObservabilityOpen}
+        onClose={() => setIsObservabilityOpen(false)}
+        workspaceId={agents[0]?.workspace_id || workspaceId}
+        onNotify={addToast}
       />
 
       {/* Modal de création d'une nouvelle mission DAG */}

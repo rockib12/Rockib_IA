@@ -65,7 +65,8 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
 ---
 
 ## 🧪 Statut des Tests
-- **728 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
+- **730 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
+  - `tests/test_execution_observability_api.py` ✅ *(2 tests : API Observabilité & Exécution — Calcul en direct des quotas/budgets multi-tenant 403, journal des réservations, et réconciliation formelle d'actions UNKNOWN avec preuve)*
   - `tests/test_agent_financial_reliability_e2e.py` ✅ *(5 tests : Fiabilité agents de bout en bout — Cohérence financière stricte, rejet immédiat des floats/devises invalides, blocage des dépassements de plafond de budget `BUDGET_CEILING_VIOLATION`, sérialisation PostgreSQL advisory lock et épuisement de quota `QUOTA_EXCEEDED`, persistance `HELD` post-crash réseau avec réconciliation formelle sur preuve `reconcile_unknown_attempt`, et monotonie budgétaire descendante parent-enfant $child \le parent$)*
   - `tests/test_concierge_commercial_onboarding.py` ✅ *(2 tests : Cycle de vie complet des prospects — Onboarding multi-tenant, capture de devis, mise à jour de statut `received -> contacted -> converted`, rejet des statuts illégaux, isolation multi-tenant et export CSV, sonde de disponibilité tunnel)*
   - `tests/test_concierge_quality_benchmark.py` ✅ *(8 tests : Suite Golden Benchmark — 6 scénarios standardisés évaluant la posture, l'exactitude de capture de leads, le respect des garde-fous zéro-fuite anti-jailbreak, l'étanchéité multi-tenant et la détection automatique de régression)*
@@ -305,3 +306,15 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
      - En cas d'exception non gérée ou de timeout ambigu (`TimeoutError`), l'action bascule à l'état `EffectCertainty.unknown` et sa réservation reste scellée en `ReservationStatus.HELD` pour protéger le solde financier.
      - Réconciliation formelle via `reconcile_unknown_attempt` exigeant une référence de preuve (`evidence_reference`). La réconciliation met à jour l'enregistrement `ExecutionResultRecord` existant sans violation de clé unique et libère (`RELEASED`) ou consomme (`CONSUMED`) définitivement la réservation.
    - **Non-Régression Globale Absolue** : Suite de tests portée à **728 tests unitaires et d'intégration réussis (100% verts, 0 échec, 0 warning)**.
+
+30. **Observabilité Unifiée dans le Cockpit Frontend, Télémétrie Groq LLM & API d'Exécution** :
+   - **Panneau d'Observabilité Unifiée (`frontend/src/components/ObservabilityPanel.jsx`)** :
+     - Intégration complète dans le Cockpit 3D avec bouton dédié dans le `CockpitHeader` (`Observabilité`) et onglets interactifs.
+     - *Onglet 1 — Télémétrie IA & Coûts LLM* : Tuiles KPI dynamiques (coût total USD selon grille officielle Groq, tokens consommés, latence moyenne, taux de transfert Telegram), état de sonde du tunnel public en direct, et journal détaillé des 30 dernières traces d'exécution (modèle, durée, outils appelés, statut).
+     - *Onglet 2 — Budgets & Verrous PostgreSQL* : Jauges de consommation en temps réel par devise (`currency:EUR`, etc.) affichant plafond déclaré, engagé (`HELD`), consommé (`CONSUMED`) et disponible ; liste des réservations atomiques avec bouton de réconciliation directe.
+     - *Onglet 3 — Pipeline Prospects CRM* : Suivi des prospects capturés avec sélecteur de statut interactif (`received -> contacted -> converted`), boutons d'action 1-clic WhatsApp et export CSV instantané.
+     - *Runner Live du Golden Benchmark* : Bouton de déclenchement interactif lançant l'évaluation des 6 scénarios de sécurité et affichant le score global et le détail par scénario.
+   - **Routeur FastAPI d'Exécution (`app/execution/router.py`) & Tests E2E (`tests/test_execution_observability_api.py`)** :
+     - Endpoints sécurisés `GET /api/v1/execution/budgets` (calcul dérivé HELD/CONSUMED), `GET /api/v1/execution/reservations` et `POST /api/v1/execution/reconcile`.
+     - Isolation multi-tenant formelle protégée par vérification d'appartenance au workspace (HTTP 403 pour tout tenant étranger).
+   - **Non-Régression Globale Absolue** : Suite de tests portée à **730 tests unitaires et d'intégration réussis (100% verts, 0 échec, 0 warning)** ; compilation de production React/Vite validée en 8.33s.

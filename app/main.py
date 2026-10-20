@@ -10,6 +10,7 @@ from app.decision_engine.router import router as decision_router
 from app.goal_engine.router import router as goal_router
 from app.inbound.router import router as inbound_router
 from app.connectors.router import router as connectors_router
+from app.execution.router import execution_router
 
 from contextlib import asynccontextmanager
 
@@ -151,6 +152,7 @@ app.include_router(decision_router, prefix="/api/v1")
 app.include_router(goal_router, prefix="/api/v1")
 app.include_router(inbound_router, prefix="/api/v1")
 app.include_router(connectors_router, prefix="/api/v1")
+app.include_router(execution_router, prefix="/api/v1")
 
 
 @app.get("/")

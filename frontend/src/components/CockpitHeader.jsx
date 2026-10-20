@@ -44,6 +44,8 @@ export default function CockpitHeader({
   onToggleGovernance,
   isConnectorsOpen = false,
   onToggleConnectors,
+  isObservabilityOpen = false,
+  onToggleObservability,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isHealthy = healthStatus?.status === 'healthy';
@@ -145,6 +147,15 @@ export default function CockpitHeader({
           >
             <BarChart3 size={15} />
             <span>Dashboard</span>
+          </button>
+
+          <button
+            onClick={onToggleObservability}
+            className={`btn-cyber ${isObservabilityOpen ? 'active-panel' : 'secondary'}`}
+            title="Observabilité Unifiée, Télémétrie Groq LLM & Budgets"
+          >
+            <Activity size={15} />
+            <span>Observabilité</span>
           </button>
 
           <button
