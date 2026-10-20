@@ -65,7 +65,8 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
 ---
 
 ## 🧪 Statut des Tests
-- **730 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
+- **734 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
+  - `tests/test_celery_reconciliation_tasks.py` ✅ *(4 tests : Réconciliation automatique Celery Beat & Workers — Dispatch périodique, inspecteur fs avec confirmation et consommation du quota HELD, inspecteur fs avec libération RELEASED sans effet, et maintien strict HELD sans preuve concluante)*
   - `tests/test_execution_observability_api.py` ✅ *(2 tests : API Observabilité & Exécution — Calcul en direct des quotas/budgets multi-tenant 403, journal des réservations, et réconciliation formelle d'actions UNKNOWN avec preuve)*
   - `tests/test_agent_financial_reliability_e2e.py` ✅ *(5 tests : Fiabilité agents de bout en bout — Cohérence financière stricte, rejet immédiat des floats/devises invalides, blocage des dépassements de plafond de budget `BUDGET_CEILING_VIOLATION`, sérialisation PostgreSQL advisory lock et épuisement de quota `QUOTA_EXCEEDED`, persistance `HELD` post-crash réseau avec réconciliation formelle sur preuve `reconcile_unknown_attempt`, et monotonie budgétaire descendante parent-enfant $child \le parent$)*
   - `tests/test_concierge_commercial_onboarding.py` ✅ *(2 tests : Cycle de vie complet des prospects — Onboarding multi-tenant, capture de devis, mise à jour de statut `received -> contacted -> converted`, rejet des statuts illégaux, isolation multi-tenant et export CSV, sonde de disponibilité tunnel)*
@@ -318,3 +319,15 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
      - Endpoints sécurisés `GET /api/v1/execution/budgets` (calcul dérivé HELD/CONSUMED), `GET /api/v1/execution/reservations` et `POST /api/v1/execution/reconcile`.
      - Isolation multi-tenant formelle protégée par vérification d'appartenance au workspace (HTTP 403 pour tout tenant étranger).
    - **Non-Régression Globale Absolue** : Suite de tests portée à **730 tests unitaires et d'intégration réussis (100% verts, 0 échec, 0 warning)** ; compilation de production React/Vite validée en 8.33s.
+
+31. **Réconciliation Automatique en Tâche de Fond (Celery Beat & Inspecteurs)** :
+   - **Tâche Périodique Celery Beat (`app/core/celery_app.py`, `app/execution/tasks.py`)** :
+     - Ajout de la pulsation `reconcile-pending-attempts-every-30s` interrogeant la base de données toutes les 30 secondes pour détecter toute tentative en statut `UNKNOWN` (post-timeout ou crash réseau).
+     - Dispatch asynchrone non-bloquant `reconcile_attempt_task.delay(attempt_id)` dans les workers Celery / Redis.
+   - **Architecture Extensible d'Inspecteurs de Preuve (`InspectorFunc`)** :
+     - Registre `_RECONCILIATION_INSPECTORS[(tool, operation)]` interdisant toute conclusion arbitraire sans preuve formelle (respect strict du principe *« Rien n'est décidé sans preuve »* / INV-09).
+     - Inspecteur `fs.write` / `fs.write_file` : vérifie sur le disque la présence réelle et la taille du fichier. Si présent $ightarrow$ effet confirmé et consommation de la réservation (`CONSUMED`) ; si absent $ightarrow$ effet exclu et libération immédiate de la réservation (`RELEASED`).
+     - Inspecteur `meta_ads.create` : vérifie la confirmation officielle de la référence fournisseur.
+     - Mode Fail-Closed garanti : en l'absence d'inspecteur ou de preuve concluante, la réservation reste impérativement scellée en `HELD` pour protéger le solde financier.
+     - Notification automatique sur le compte Telegram de Rockib (`@masterrockibot`) dès qu'une action est réconciliée.
+   - **Non-Régression Globale Absolue** : Suite de tests portée à **734 tests unitaires et d'intégration réussis (100% verts, 0 échec, 0 warning)** en 179 secondes.

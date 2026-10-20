@@ -11,7 +11,7 @@ celery_app = Celery(
     "rockib_ia",
     broker=settings.REDIS_URL,
     backend=settings.REDIS_URL,
-    include=["app.goal_engine.tasks"],
+    include=["app.goal_engine.tasks", "app.execution.tasks"],
 )
 
 celery_app.conf.update(
@@ -20,11 +20,15 @@ celery_app.conf.update(
     result_serializer="json",
     timezone="UTC",
     enable_utc=True,
-    # Celery Beat schedule: pulse régulier pour réveiller les Goals actifs sans boucle while
+    # Celery Beat schedule: pulse régulier pour réveiller les Goals et réconcilier les actions
     beat_schedule={
         "dispatch-active-goals-every-5s": {
             "task": "app.goal_engine.tasks.dispatch_active_goals",
             "schedule": 5.0,
+        },
+        "reconcile-pending-attempts-every-30s": {
+            "task": "app.execution.tasks.reconcile_pending_attempts",
+            "schedule": 30.0,
         },
     },
 )
