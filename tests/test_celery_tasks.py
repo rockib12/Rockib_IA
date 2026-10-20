@@ -76,7 +76,7 @@ async def test_celery_worker_crash_simulation_recovers_via_m6():
         goal_id=goal_id,
         description="Task interrupted by worker crash",
         status=TaskStatus.RUNNING,
-        updated_at=datetime.utcnow() - timedelta(seconds=120),
+        updated_at=datetime.now(timezone.utc) - timedelta(seconds=120),
     )
 
 

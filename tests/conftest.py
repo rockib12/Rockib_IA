@@ -51,6 +51,14 @@ async def db_session() -> AsyncSession:
     await engine.dispose()
 
 
+@pytest_asyncio.fixture(autouse=True)
+async def cleanup_global_async_engine():
+    """Dispose global async_engine pool after each test to prevent event loop closed errors."""
+    yield
+    from app.core.database import async_engine
+    await async_engine.dispose()
+
+
 @pytest_asyncio.fixture
 async def workspace_agent(db_session: AsyncSession) -> tuple[Workspace, Agent]:
     """Crée un workspace et un agent persistés, supprimés à la fin du test."""

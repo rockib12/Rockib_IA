@@ -286,14 +286,40 @@ async def whatsapp_send_handler(action: ActionRecord) -> ExecutionResult:
 
 async def meta_ads_create_handler(action: ActionRecord) -> ExecutionResult:
     """Connecteur 'meta_ads.create' avec validation budgétaire stricte et HMAC-SHA256."""
+    from app.execution.services.financial_governance import (
+        validate_financial_amount,
+        validate_financial_currency,
+        FinancialGovernanceError,
+    )
+
     args = action.arguments or {}
     name = args.get("name") or args.get("campaign_name")
     if not name:
         return ExecutionResult(success=False, output=None, error="Missing 'name' argument")
 
     objective = args.get("objective", "OUTCOME_SALES")
-    daily_budget_cents = int(args.get("daily_budget_cents") or args.get("daily_budget", 1000))
     status = args.get("status", "PAUSED")  # Sécurité : toujours PAUSED par défaut
+
+    # Validation financière stricte contractuelle (FIN-INV-01 à FIN-INV-03)
+    raw_amount = args.get("amount") or args.get("daily_budget")
+    if raw_amount is None and "daily_budget_cents" in args:
+        raw_amount = Decimal(str(args["daily_budget_cents"])) / Decimal("100")
+    if raw_amount is None:
+        raw_amount = Decimal("10.00")  # 10.00 EUR par défaut
+
+    raw_curr = args.get("currency") or "EUR"
+    try:
+        valid_amount = validate_financial_amount(raw_amount)
+        valid_curr = validate_financial_currency(raw_curr)
+    except FinancialGovernanceError as e:
+        return ExecutionResult(
+            success=False,
+            output=None,
+            error=f"Financial validation failed: {e}",
+            error_code="FINANCIAL_VALIDATION_ERROR",
+        )
+
+    daily_budget_cents = int(valid_amount * Decimal("100"))
 
     # Règle de garde-fou financier formel : bloquer les budgets exorbitants non autorisés
     max_allowed_daily_budget = 50000  # 500.00 EUR max par défaut

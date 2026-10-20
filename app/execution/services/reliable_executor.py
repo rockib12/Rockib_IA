@@ -162,6 +162,33 @@ async def dispatch_authorized_action(
             "Action hors du workspace de l'appelant.",
         )
 
+    # 0. Vérification de cohérence financière et respect des plafonds (FIN-INV-01 à FIN-INV-04)
+    from app.execution.services.financial_governance import (
+        verify_action_financial_consistency,
+        validate_budget_ceiling,
+        FinancialGovernanceError,
+    )
+    from app.execution.models import ResourceBudget
+
+    try:
+        fin_scope = verify_action_financial_consistency(action)
+    except FinancialGovernanceError as exc:
+        raise AuthorizationError("FINANCIAL_CONSISTENCY_ERROR", str(exc))
+
+    if fin_scope is not None and action.arguments:
+        ceil_amount = action.arguments.get("budget_ceiling") or action.arguments.get("ceiling_amount")
+        ceil_currency = action.arguments.get("budget_currency") or action.arguments.get("ceiling_currency") or fin_scope.currency
+        if ceil_amount is not None:
+            try:
+                validate_budget_ceiling(
+                    requested_amount=fin_scope.amount,
+                    requested_currency=fin_scope.currency,
+                    ceiling_amount=ceil_amount,
+                    ceiling_currency=ceil_currency,
+                )
+            except FinancialGovernanceError as exc:
+                raise AuthorizationError("BUDGET_CEILING_VIOLATION", str(exc))
+
     # 1. Revérification des conditions mutables sous verrou (révocation, expiration,
     #    empreinte, version) : dernier contrôle avant l'effet.
     authorization = await authorizations.lock_authorization(db, authorization_id)
@@ -178,13 +205,28 @@ async def dispatch_authorized_action(
 
     # 2. Réservation avant l'effet : un quota insuffisant n'engage rien.
     reservation = None
-    if resource is not None:
+    target_resource = resource
+    target_units = Decimal(units if units is not None else 0)
+
+    if target_resource is None and fin_scope is not None:
+        # Si un budget de dépenses existe pour cette devise dans le workspace, le lier automatiquement
+        res_budget = await db.execute(
+            select(ResourceBudget).where(
+                ResourceBudget.workspace_id == action.workspace_id,
+                ResourceBudget.resource == f"currency:{fin_scope.currency}",
+            )
+        )
+        if res_budget.scalar_one_or_none() is not None:
+            target_resource = f"currency:{fin_scope.currency}"
+            target_units = fin_scope.amount
+
+    if target_resource is not None:
         reservation = await reservations.reserve_quota(
             db,
             action=action,
             authorization_id=authorization.id,
-            resource=resource,
-            units=Decimal(units if units is not None else 0),
+            resource=target_resource,
+            units=target_units,
             idempotency_key=action.idempotency_key,
             actor=actor,
         )

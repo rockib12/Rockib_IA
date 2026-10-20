@@ -1,8 +1,11 @@
 """Pydantic schemas for Inbound Portfolio Gateway."""
 from __future__ import annotations
 
+from datetime import datetime
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from uuid import UUID
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+import re
 
 
 class PortfolioInboundMessageRequest(BaseModel):
@@ -60,21 +63,59 @@ class VoiceCallTurnResponse(BaseModel):
 class CallMeBackRequest(BaseModel):
     """Request by visitor to receive a phone or WhatsApp voice call."""
     phone_number: str = Field(..., min_length=6, max_length=30, description="International phone number")
+    consent: bool = Field(default=True, description="Explicit consent to store the callback request")
     site_key: Optional[str] = Field(default="rockib-portfolio", max_length=63, pattern=r"^[a-z0-9][a-z0-9_-]{1,62}$")
     contact_name: Optional[str] = Field(default=None, max_length=120, description="Visitor's name")
     topic: Optional[str] = Field(default="Discussion projet", max_length=500, description="Reason for call")
     channel: str = Field(default="whatsapp", pattern=r"(?i)^(whatsapp|phone)$", description="'whatsapp' or 'phone'")
     preferred_time: Optional[str] = Field(default="immediate", max_length=100, description="'immediate' or scheduled slot")
 
+    @field_validator("phone_number")
+    @classmethod
+    def validate_international_phone(cls, value: str) -> str:
+        cleaned = value.strip()
+        digits = re.sub(r"\D", "", cleaned)
+        if not 8 <= len(digits) <= 15:
+            raise ValueError("Le numéro doit contenir entre 8 et 15 chiffres.")
+        return cleaned
+
 
 class CallMeBackResponse(BaseModel):
-    """Confirmation of callback registration."""
+    """Acknowledgement that the callback request was durably recorded."""
     callback_id: str
     status: str = "scheduled"
     channel: str
     phone_number: str
     message: str
-    estimated_wait_minutes: int = 5
+    estimated_wait_minutes: Optional[int] = None
+
+
+class ConciergeLeadSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    site_key: str
+    contact_name: Optional[str] = None
+    phone_number: str
+    topic: Optional[str] = None
+    channel: str
+    status: str
+    created_at: datetime
+
+
+class ConciergeLeadStatusUpdateRequest(BaseModel):
+    """Request to update a lead's follow-up state (contacted, converted, archived)."""
+    status: str = Field(..., pattern=r"^(received|contacted|converted|archived)$")
+
+
+class ConciergeTunnelStatusResponse(BaseModel):
+    """Public healthcheck and tunnel diagnostics for the Concierge gateway."""
+    status: str = "operational"
+    backend_time: datetime
+    active_sites_count: int
+    groq_llm_ready: bool
+    voice_tts_ready: bool
+    tunnel_reachable: bool = True
 
 
 class VoiceTTSRequest(BaseModel):
@@ -149,6 +190,64 @@ class ConciergeSiteConfigUpsertResponse(BaseModel):
     client_token: str
     embed_script: str
     embed_snippet: str
+
+
+class ConciergeTraceSummary(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    conversation_id: str
+    site_key: str
+    channel: str
+    model: str
+    duration_ms: float
+    prompt_tokens: int
+    completion_tokens: int
+    total_tokens: int
+    estimated_cost_usd: float
+    tools_called: List[str] = Field(default_factory=list)
+    result_status: str
+    lead_captured: bool
+    transferred_to_rockib: bool
+    error_message: Optional[str] = None
+    created_at: datetime
+
+
+class ConciergeMetricsResponse(BaseModel):
+    site_key: Optional[str] = None
+    total_requests: int
+    avg_duration_ms: float
+    total_prompt_tokens: int
+    total_completion_tokens: int
+    total_tokens: int
+    total_cost_usd: float
+    success_rate: float
+    lead_captured_count: int
+    lead_capture_rate: float
+    transferred_count: int
+    by_channel: dict[str, int] = Field(default_factory=dict)
+    by_model: dict[str, int] = Field(default_factory=dict)
+
+
+class BenchmarkScenarioResult(BaseModel):
+    scenario_id: str
+    name: str
+    passed: bool
+    score: float
+    duration_ms: float
+    checks: dict[str, bool] = Field(default_factory=dict)
+    reply_snippet: str
+    details: str = ""
+
+
+class BenchmarkSuiteReport(BaseModel):
+    total_scenarios: int
+    passed_scenarios: int
+    overall_score: float
+    avg_duration_ms: float
+    results: List[BenchmarkScenarioResult]
+    timestamp: datetime
+
 
 
 

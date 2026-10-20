@@ -51,14 +51,10 @@ async def _dispatch_active_goals_async() -> List[str]:
 
 def _run_async(coro):
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
+        return asyncio.run(coro)
     except RuntimeError:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-    return loop.run_until_complete(coro)
+        loop = asyncio.get_event_loop_policy().get_event_loop()
+        return loop.run_until_complete(coro)
 
 
 @celery_app.task(name="app.goal_engine.tasks.dispatch_active_goals")

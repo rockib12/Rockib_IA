@@ -436,7 +436,7 @@ async def _recover_one_orphan(
             elif updated.tzinfo is None:
                 updated = updated.replace(tzinfo=timezone.utc)
             else:
-                updated = updated + _timestamp_interpretation_skew()
+                updated = updated.astimezone(timezone.utc)
             if updated > moment - timedelta(seconds=orphan_grace_seconds):
                 await db.commit()
                 return RecoverResult(recovered=False, reason="GRACE_NOT_EXPIRED")

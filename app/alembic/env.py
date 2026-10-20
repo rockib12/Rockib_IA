@@ -28,6 +28,7 @@ from app.execution.models import (  # noqa: F401
     ExecutionResultRecord,
     ResourceBudget,
 )
+from app.inbound.models import ConciergeExecutionTrace, ConciergeLead  # noqa: F401
 
 # This is the Alembic Config object, which provides access to the values
 # within the .ini file in use.

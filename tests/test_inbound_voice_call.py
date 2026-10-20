@@ -85,15 +85,16 @@ async def test_voice_turn_lead_capture_and_end_call():
     mock_provider.generate.return_value = "Entendu, nous vous recontacterons au revoir !"
 
     service = VoiceCallService(ai_provider=mock_provider)
-    session_resp = service.start_call_session(VoiceCallSessionRequest())
+    session_resp = service.start_call_session(VoiceCallSessionRequest(), client_ip="192.168.1.155")
 
     turn_req = VoiceCallTurnRequest(
         session_id=session_resp.session_id,
         user_speech_transcript="Mon email est ceo@entreprise.bj, merci au revoir !",
     )
 
-    turn_resp = await service.handle_voice_turn(turn_req)
+    turn_resp = await service.handle_voice_turn(turn_req, client_ip="192.168.1.155")
     assert turn_resp.lead_captured is True
+
     assert turn_resp.should_end_call is True
 
 

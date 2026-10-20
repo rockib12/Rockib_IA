@@ -618,6 +618,48 @@ async def test_auth_login_rate_limiting_blocks_bruteforce(db_session):
 
 
 @pytest.mark.asyncio
+async def test_auth_rate_limiting_ignores_forged_x_forwarded_for_from_untrusted_client(db_session):
+    """Vérifie qu'un client direct non autorisé ne peut pas contourner le rate-limit en forgeant X-Forwarded-For."""
+    from app.core.database import get_async_db
+    from app.identity.router import _auth_ip_attempts, _AUTH_MAX_ATTEMPTS
+
+    untrusted_peer = "198.51.100.5"
+    _auth_ip_attempts.pop(untrusted_peer, None)
+
+    async def _override_db():
+        yield db_session
+
+    app.dependency_overrides[get_async_db] = _override_db
+    try:
+        # Le client se connecte directement avec l'IP untrusted_peer
+        async with AsyncClient(
+            transport=ASGITransport(app=app, client=(untrusted_peer, 54321)),
+            base_url="http://test",
+        ) as client:
+            for i in range(_AUTH_MAX_ATTEMPTS):
+                # Il tente de contourner en simulant une IP différente à chaque requête dans X-Forwarded-For
+                forged_ip = f"10.0.{i // 256}.{i % 256 + 1}"
+                res = await client.post(
+                    "/api/v1/auth/login",
+                    json={"email": "hacker@example.com", "password": "wrongpassword"},
+                    headers={"X-Forwarded-For": forged_ip},
+                )
+                assert res.status_code == 401
+
+            # La tentative suivante doit être bloquée en 429 sur son IP réelle untrusted_peer
+            res_blocked = await client.post(
+                "/api/v1/auth/login",
+                json={"email": "hacker@example.com", "password": "wrongpassword"},
+                headers={"X-Forwarded-For": "10.0.99.99"},
+            )
+            assert res_blocked.status_code == 429
+            assert untrusted_peer in _auth_ip_attempts
+    finally:
+        _auth_ip_attempts.pop(untrusted_peer, None)
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
 async def test_x_request_id_header_injection_and_sanitization():
     """Vérifie l'injection automatique et la validation stricte du header X-Request-ID."""
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
@@ -668,6 +710,18 @@ async def test_inbound_voice_session_and_callback_rate_limited():
     test_ip = "198.51.100.77"
     _ip_request_history.pop(test_ip, None)
 
+    async def _clean_redis():
+        try:
+            import redis.asyncio as aioredis
+            r_client = aioredis.from_url(settings.REDIS_URL, socket_connect_timeout=1)
+            keys = await r_client.keys(f"concierge:rate:*{test_ip}*")
+            if keys:
+                await r_client.delete(*keys)
+            await r_client.aclose()
+        except Exception:
+            pass
+
+    await _clean_redis()
     try:
         async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
             for _ in range(_MAX_REQUESTS_PER_WINDOW):
@@ -699,6 +753,7 @@ async def test_inbound_voice_session_and_callback_rate_limited():
             assert res_cb_blocked.status_code == 429
     finally:
         _ip_request_history.pop(test_ip, None)
+        await _clean_redis()
 
 
 def test_inbound_rate_limiter_evicts_stale_ips_on_capacity(monkeypatch):
@@ -734,6 +789,30 @@ async def test_deep_health_check_endpoint_returns_db_and_redis(db_session):
             assert data["status"] == "healthy"
             assert data["components"]["database"] == "up"
             assert data["components"]["redis"] == "up"
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_deep_health_check_returns_503_when_degraded():
+    """Vérifie que GET /api/v1/health renvoie HTTP 503 Service Unavailable quand la DB ou Redis est down."""
+    from app.core.database import get_async_db
+
+    class BrokenDB:
+        async def execute(self, *args, **kwargs):
+            raise RuntimeError("Database connection refused")
+
+    async def _override_broken_db():
+        yield BrokenDB()
+
+    app.dependency_overrides[get_async_db] = _override_broken_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            res = await client.get("/api/v1/health")
+            assert res.status_code == 503
+            data = res.json()
+            assert data["status"] == "degraded"
+            assert data["components"]["database"] == "down"
     finally:
         app.dependency_overrides.clear()
 

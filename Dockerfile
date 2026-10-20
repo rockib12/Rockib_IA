@@ -88,9 +88,9 @@ RUN useradd -m -u 10001 -s /bin/sh rockib \
 # Expose ports: 80 (Nginx web & reverse proxy), 8000 (direct FastAPI backend)
 EXPOSE 80 8000
 
-# Healthcheck testing HTTP endpoint on Nginx
+# Deep healthcheck testing real availability of FastAPI, PostgreSQL and Redis via Nginx
 HEALTHCHECK --interval=20s --timeout=5s --retries=3 \
-    CMD curl -f http://localhost/ || exit 1
+    CMD curl -f http://localhost/api/v1/health || exit 1
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]

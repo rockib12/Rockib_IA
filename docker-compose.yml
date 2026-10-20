@@ -4,15 +4,15 @@ services:
     container_name: rockib_ia_postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: rockib
-      POSTGRES_PASSWORD: rockib_dev_password
-      POSTGRES_DB: rockib_ia
+      POSTGRES_USER: ${POSTGRES_USER:-rockib}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-rockib_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-rockib_ia}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"  # Accès direct limité à localhost (anti-exposition réseau externe)
     volumes:
       - rockib_pg_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U rockib -d rockib_ia"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rockib} -d ${POSTGRES_DB:-rockib_ia}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,7 +22,7 @@ services:
     container_name: rockib_ia_redis
     restart: unless-stopped
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"  # Accès direct limité à localhost (anti-exposition réseau externe)
     volumes:
       - rockib_redis_data:/data
     healthcheck:
@@ -47,14 +47,20 @@ services:
     volumes:
       - ./data:/app/data
     environment:
-      ASYNC_DATABASE_URL: postgresql+asyncpg://rockib:rockib_dev_password@postgres:5432/rockib_ia
-      DATABASE_URL: postgresql://rockib:rockib_dev_password@postgres:5432/rockib_ia
+      ASYNC_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-rockib}:${POSTGRES_PASSWORD:-rockib_dev_password}@postgres:5432/${POSTGRES_DB:-rockib_ia}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-rockib}:${POSTGRES_PASSWORD:-rockib_dev_password}@postgres:5432/${POSTGRES_DB:-rockib_ia}
       REDIS_URL: redis://redis:6379/0
+      TRUSTED_PROXY_CIDRS: '["127.0.0.0/8", "::1/128", "172.16.0.0/12"]'
       PUBLIC_API_URL: https://dion-beaverlike-preceptively.ngrok-free.dev
       CONCIERGE_WIDGET_URL: https://rockib-quenum.netlify.app/rockib-concierge.js
       GROQ_MODEL: openai/gpt-oss-120b
       APP_ENV: production
       DEBUG: "false"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost/api/v1/health || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
     depends_on:
       postgres:
         condition: service_healthy

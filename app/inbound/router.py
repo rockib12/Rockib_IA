@@ -2,21 +2,30 @@
 from __future__ import annotations
 
 import secrets
-from typing import Optional
+from typing import List, Optional
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.proxy import get_client_ip
 from app.core.database import get_async_db
 from app.telegram.services.telegram_service import telegram_service
 
+from datetime import datetime, timezone
+
 from app.inbound.schemas import (
+    BenchmarkSuiteReport,
     CallMeBackRequest,
     CallMeBackResponse,
+    ConciergeLeadStatusUpdateRequest,
+    ConciergeLeadSummary,
+    ConciergeMetricsResponse,
     ConciergeSiteConfigPublic,
     ConciergeSiteConfigPrivate,
     ConciergeSiteConfigUpsertRequest,
     ConciergeSiteConfigUpsertResponse,
+    ConciergeTraceSummary,
+    ConciergeTunnelStatusResponse,
     PortfolioInboundMessageRequest,
     PortfolioInboundResponse,
     VoiceCallSessionRequest,
@@ -25,9 +34,13 @@ from app.inbound.schemas import (
     VoiceCallTurnResponse,
     VoiceTTSRequest,
 )
-from app.inbound.services.portfolio_handler import PortfolioConciergeService
+from app.inbound.services.portfolio_handler import PortfolioConciergeService, is_request_rate_limited
 from app.inbound.services.site_config_service import site_config_service
+from app.inbound.services.leads import export_leads_csv, list_site_leads, record_callback_lead, update_lead_status
 from app.inbound.services.voice_call_service import VoiceCallService
+from app.inbound.services.tracing import concierge_tracing_service
+from app.inbound.services.quality_evaluator import ConciergeQualityEvaluator
+
 
 router = APIRouter(prefix="/inbound", tags=["Inbound Portfolio"])
 concierge_service = PortfolioConciergeService()
@@ -63,6 +76,82 @@ async def get_manage_concierge_site_config(
         raise HTTPException(status_code=404, detail="Concierge site not found.")
 
 
+@router.get("/sites/{site_key}/leads", response_model=list[ConciergeLeadSummary])
+async def get_site_leads(
+    site_key: str,
+    request: Request,
+    x_concierge_token: Optional[str] = Header(default=None),
+    db: AsyncSession = Depends(get_async_db),
+) -> list[ConciergeLeadSummary]:
+    """Lists only the recent lead records belonging to the authenticated site."""
+    client_ip = get_client_ip(request)
+    if await is_request_rate_limited(client_ip, "list-leads", site_key=site_key, limit=20, site_limit=120):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="Trop de consultations. Veuillez patienter une minute.",
+            headers={"Retry-After": "60"},
+        )
+    if not site_config_service.can_manage_site(site_key, x_concierge_token):
+        raise HTTPException(status_code=403, detail="Invalid concierge management token.")
+    try:
+        site_config_service.get_site_dict(site_key)
+    except KeyError:
+        raise HTTPException(status_code=404, detail="Concierge site not found.")
+    return await list_site_leads(db, site_key)
+
+
+@router.patch("/sites/{site_key}/leads/{lead_id}/status", response_model=ConciergeLeadSummary)
+async def update_tenant_lead_status(
+    site_key: str,
+    lead_id: str,
+    body: ConciergeLeadStatusUpdateRequest,
+    request: Request,
+    x_concierge_token: Optional[str] = Header(default=None),
+    db: AsyncSession = Depends(get_async_db),
+) -> ConciergeLeadSummary:
+    """Updates a lead's follow-up state (contacted, converted, archived)."""
+    if not site_config_service.can_manage_site(site_key, x_concierge_token):
+        raise HTTPException(status_code=403, detail="Invalid concierge management token.")
+    lead = await update_lead_status(db, site_key=site_key, lead_id=lead_id, new_status=body.status)
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found for this site.")
+    return lead
+
+
+@router.get("/sites/{site_key}/leads/export")
+async def export_tenant_leads_csv(
+    site_key: str,
+    request: Request,
+    x_concierge_token: Optional[str] = Header(default=None),
+    db: AsyncSession = Depends(get_async_db),
+) -> Response:
+    """Exports tenant leads as CSV for CRM or spreadsheet import."""
+    if not site_config_service.can_manage_site(site_key, x_concierge_token):
+        raise HTTPException(status_code=403, detail="Invalid concierge management token.")
+    csv_data = await export_leads_csv(db, site_key=site_key)
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="leads-{site_key}.csv"'},
+    )
+
+
+@router.get("/tunnel/status", response_model=ConciergeTunnelStatusResponse)
+async def get_tunnel_status() -> ConciergeTunnelStatusResponse:
+    """Returns gateway availability, Groq LLM readiness, and multi-site status."""
+    sites_count = len(site_config_service.list_public_configs())
+    groq_ok = bool(settings.GROQ_API_KEY)
+    return ConciergeTunnelStatusResponse(
+        status="operational",
+        backend_time=datetime.now(timezone.utc),
+        active_sites_count=sites_count,
+        groq_llm_ready=groq_ok,
+        voice_tts_ready=True,
+        tunnel_reachable=True,
+    )
+
+
+
 @router.put("/sites/{site_key}/config", response_model=ConciergeSiteConfigUpsertResponse)
 async def upsert_concierge_site_config(
     site_key: str,
@@ -70,14 +159,10 @@ async def upsert_concierge_site_config(
     request: Request,
 ) -> ConciergeSiteConfigUpsertResponse:
     """Creates or updates a client site's customizable concierge & knowledge base."""
-    from app.inbound.services.portfolio_handler import is_rate_limited
 
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[-1].strip()
+    client_ip = get_client_ip(request)
 
-    if is_rate_limited(client_ip):
+    if await is_request_rate_limited(client_ip, "manage-config", site_key=site_key, limit=10, site_limit=60):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Trop de modifications en peu de temps. Veuillez patienter une minute.",
@@ -117,22 +202,20 @@ async def upsert_concierge_site_config(
 async def post_portfolio_message(
     body: PortfolioInboundMessageRequest,
     request: Request,
+    db: AsyncSession = Depends(get_async_db),
 ) -> PortfolioInboundResponse:
     """Public gateway for the embeddable portfolio chat widget.
 
     Receives visitor questions, provides informed answers about Rockib's work,
     and captures leads for Agence IIA.
     """
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[-1].strip()
+    client_ip = get_client_ip(request)
 
     try:
         site_config_service.get_site_dict(body.site_key)
     except KeyError:
         raise HTTPException(status_code=404, detail="Concierge site not found.")
-    return await concierge_service.handle_message(body, client_ip=client_ip)
+    return await concierge_service.handle_message(body, client_ip=client_ip, db=db)
 
 
 @router.post("/portfolio/voice/session", response_model=VoiceCallSessionResponse)
@@ -141,14 +224,10 @@ async def start_voice_call_session(
     request: Request,
 ) -> VoiceCallSessionResponse:
     """Initiates an in-browser live voice calling session."""
-    from app.inbound.services.portfolio_handler import is_rate_limited
 
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[-1].strip()
+    client_ip = get_client_ip(request)
 
-    if is_rate_limited(client_ip):
+    if await is_request_rate_limited(client_ip, "voice-session", site_key=body.site_key or "rockib-portfolio", limit=20, site_limit=120):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Trop de sessions vocales ouvertes. Veuillez patienter une minute.",
@@ -158,21 +237,20 @@ async def start_voice_call_session(
         site_config_service.get_site_dict(body.site_key)
     except KeyError:
         raise HTTPException(status_code=404, detail="Concierge site not found.")
-    return voice_service.start_call_session(body)
+    return voice_service.start_call_session(body, client_ip=client_ip)
 
 
 @router.post("/portfolio/voice/turn", response_model=VoiceCallTurnResponse)
 async def handle_voice_turn(
     body: VoiceCallTurnRequest,
     request: Request,
+    db: AsyncSession = Depends(get_async_db),
 ) -> VoiceCallTurnResponse:
     """Exchanges a vocal speech turn between the visitor and the Concierge."""
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[-1].strip()
+    client_ip = get_client_ip(request)
 
-    return await voice_service.handle_voice_turn(body, client_ip=client_ip)
+    return await voice_service.handle_voice_turn(body, client_ip=client_ip, db=db)
+
 
 
 @router.post("/portfolio/voice/tts")
@@ -181,14 +259,10 @@ async def synthesize_voice_tts(
     request: Request,
 ) -> Response:
     """Synthesizes Neural HD MP3 audio (fr-FR-HenriNeural / fr-FR-VivienneMultilingualNeural)."""
-    from app.inbound.services.portfolio_handler import is_rate_limited
 
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[-1].strip()
+    client_ip = get_client_ip(request)
 
-    if is_rate_limited(client_ip):
+    if await is_request_rate_limited(client_ip, "tts", limit=20, site_key="shared", site_limit=180):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Trop de requêtes de synthèse vocale. Veuillez patienter une minute.",
@@ -217,22 +291,34 @@ async def transcribe_voice_stt(
     request: Request,
 ):
     """Transcribes raw audio bytes from the visitor's microphone via Groq Whisper."""
-    from app.inbound.services.portfolio_handler import is_rate_limited
 
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[-1].strip()
+    client_ip = get_client_ip(request)
 
-    if is_rate_limited(client_ip):
+    if await is_request_rate_limited(client_ip, "stt", limit=10, site_key="shared", site_limit=90):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Trop de requêtes vocales. Veuillez patienter une minute.",
             headers={"Retry-After": "60"},
         )
 
-    audio_bytes = await request.body()
-    if not audio_bytes or len(audio_bytes) > 2 * 1024 * 1024:
+    max_audio_bytes = 2 * 1024 * 1024
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > max_audio_bytes:
+                raise HTTPException(status_code=413, detail="Audio trop volumineux (limite 2 Mo).")
+        except ValueError:
+            raise HTTPException(status_code=400, detail="En-t?te Content-Length invalide.")
+
+    chunks: list[bytes] = []
+    received_bytes = 0
+    async for chunk in request.stream():
+        received_bytes += len(chunk)
+        if received_bytes > max_audio_bytes:
+            raise HTTPException(status_code=413, detail="Audio trop volumineux (limite 2 Mo).")
+        chunks.append(chunk)
+    audio_bytes = b"".join(chunks)
+    if not audio_bytes:
         return {"transcript": "", "status": "empty"}
 
     ext = request.headers.get("x-audio-ext", "webm").strip().lower()
@@ -248,36 +334,102 @@ async def transcribe_voice_stt(
 async def request_callback(
     body: CallMeBackRequest,
     request: Request,
+    db: AsyncSession = Depends(get_async_db),
 ) -> CallMeBackResponse:
-    """Schedules a direct phone call or WhatsApp call from Rockib or an agency agent."""
-    from app.inbound.services.portfolio_handler import is_rate_limited
+    """Persists an explicitly consented callback request for its site owner."""
 
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[-1].strip()
+    client_ip = get_client_ip(request)
 
-    if is_rate_limited(client_ip):
+    if await is_request_rate_limited(client_ip, "callback", site_key=body.site_key or "rockib-portfolio", limit=20, site_limit=120):
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail="Trop de demandes de rappel. Veuillez patienter une minute.",
             headers={"Retry-After": "60"},
         )
     try:
-        site_config_service.get_site_dict(body.site_key)
+        site_cfg = site_config_service.get_site_dict(body.site_key)
     except KeyError:
         raise HTTPException(status_code=404, detail="Concierge site not found.")
-    return await voice_service.schedule_callback(body)
+    if not body.consent:
+        raise HTTPException(status_code=400, detail="Le consentement est requis pour enregistrer cette demande.")
+    try:
+        lead = await record_callback_lead(db, site_cfg["site_key"], body)
+        # Notify Rockib on Telegram
+        await concierge_tracing_service.forward_lead_to_telegram(
+            site_key=site_cfg["site_key"],
+            business_name=site_cfg["business_name"],
+            contact_name=body.contact_name,
+            phone_number=lead.phone_number,
+            topic=body.topic,
+            channel=body.channel,
+            conversation_id=str(lead.id),
+        )
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Impossible d'enregistrer la demande pour le moment. Réessayez plus tard.",
+        ) from exc
+
+    channel_label = "WhatsApp" if body.channel.lower() == "whatsapp" else "téléphone"
+    return CallMeBackResponse(
+        callback_id=str(lead.id),
+        status="scheduled",
+        channel=body.channel,
+        phone_number=lead.phone_number,
+        message=(
+            f"Votre demande de rappel par {channel_label} est enregistrée. "
+            f"L'équipe de {site_cfg['business_name']} pourra la consulter et vous recontacter dès que possible."
+        ),
+        estimated_wait_minutes=5 if (body.preferred_time or "immediate") == "immediate" else 60,
+    )
+
+
+@router.get("/traces", response_model=List[ConciergeTraceSummary])
+async def get_concierge_traces(
+    site_key: Optional[str] = None,
+    conversation_id: Optional[str] = None,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_async_db),
+) -> List[ConciergeTraceSummary]:
+    """Returns conversation and execution traces with latency, cost, and tools called."""
+    return await concierge_tracing_service.get_traces(
+        conversation_id=conversation_id,
+        site_key=site_key,
+        limit=min(100, max(1, limit)),
+        db=db,
+    )
+
+
+@router.get("/metrics", response_model=ConciergeMetricsResponse)
+async def get_concierge_metrics(
+    site_key: Optional[str] = None,
+) -> ConciergeMetricsResponse:
+    """Returns aggregated performance, usage cost, and conversion metrics."""
+    return concierge_tracing_service.get_metrics_summary(site_key=site_key)
+
+
+@router.post("/benchmark/run", response_model=BenchmarkSuiteReport)
+async def run_concierge_benchmark() -> BenchmarkSuiteReport:
+    """Runs the 6 golden reference scenarios and reports quality, safety and precision."""
+    evaluator = ConciergeQualityEvaluator(concierge_service=concierge_service)
+    return await evaluator.run_benchmark()
 
 
 @router.get("/portfolio/health")
 async def get_portfolio_inbound_health():
-    """Health check for the portfolio concierge integration."""
+    """Liveness and configuration summary; does not claim external provider uptime."""
+    groq_configured = bool(settings.GROQ_API_KEY)
     return {
-        "status": "healthy",
+        "status": "healthy" if groq_configured else "degraded",
         "service": "Portfolio Concierge Inbound Gateway & Voice Engine",
         "portfolio_target": "https://rockib-quenum.netlify.app/",
-        "features": ["text_chat", "voice_calling", "neural_tts", "callback_scheduling"],
+        "model": settings.GROQ_MODEL,
+        "components": {
+            "chat_and_transcription_credentials": "configured" if groq_configured else "missing",
+            "lead_storage": "postgresql",
+            "lead_retention_days": settings.CONCIERGE_LEAD_RETENTION_DAYS,
+        },
+        "features": ["text_chat", "voice_calling", "neural_tts", "consented_callback_intake", "quality_benchmark"],
     }
 
 
@@ -302,4 +454,5 @@ async def telegram_inbound_webhook(
 
     update = await request.json()
     return await telegram_service.process_update(update, db)
+
 

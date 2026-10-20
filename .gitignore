@@ -18,3 +18,4 @@ temp_*
 rendered_dom.html
 docker_logs.txt
 launch_mission.py
+.gstack/

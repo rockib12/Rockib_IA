@@ -9,6 +9,7 @@ from app.core.security import hash_password, verify_password, create_access_toke
 from app.identity.models import User, UserRole, Workspace, workspace_memberships
 from app.identity.schemas import Token, UserCreate, UserLogin, UserRead
 from app.core.dependencies import get_current_user, get_user_workspace_ids
+from app.core.proxy import get_client_ip
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
@@ -20,10 +21,7 @@ _DUMMY_PASSWORD_HASH = hash_password("rockib-dummy-timing-guard-secret")
 
 
 def _check_auth_rate_limit(request: Request) -> None:
-    client_ip = request.client.host if request.client else "127.0.0.1"
-    forwarded = request.headers.get("x-forwarded-for")
-    if forwarded:
-        client_ip = forwarded.split(",")[0].strip()
+    client_ip = get_client_ip(request)
 
     now = time.time()
     history = _auth_ip_attempts[client_ip]

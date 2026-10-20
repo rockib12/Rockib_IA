@@ -614,7 +614,7 @@
       color: #00FF9D;
       border: 1px solid rgba(0, 255, 157, 0.4);
     }
-    @media (max-width: 480px) {
+    @media (max-width: 768px) {
       .rq-launcher {
         right: 16px;
         bottom: max(16px, env(safe-area-inset-bottom));

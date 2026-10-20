@@ -14,7 +14,7 @@ class ExecutionResult:
 
     success: bool
     output: str | None
-    error: str | None
+    error: str | None = None
     error_code: str | None = None
     provider_reference: str | None = None
     cost_amount: Decimal | None = None

@@ -292,6 +292,7 @@
     <a href="index.html" class="brand">
       <span>⚡ Rockib Concierge Studio</span>
       <span class="brand-badge">Multi-Sites SaaS</span>
+      <span id="tunnel-status-badge" class="brand-badge" style="background:rgba(0,255,157,0.12); border:1px solid rgba(0,255,157,0.4); color:var(--emerald);">● Tunnel : Vérification...</span>
     </a>
     <div class="topbar-actions">
       <a href="index.html" class="btn">← Retour au Portfolio</a>
@@ -494,6 +495,21 @@
         </div>
       </div>
     </form>
+
+    <section class="card" style="margin-top:24px;">
+      <div class="card-title">
+        <span>📋 Suivi & Gestion des Prospects du Site</span>
+        <span style="font-size:11px; color:var(--cyan); font-family:'JetBrains Mono',monospace;">Cycle de Vente (Reçu → Contacté → Converti)</span>
+      </div>
+      <p class="card-sub">
+        Consultez les demandes de devis et rappels capturés par votre Concierge IA. Modifiez le statut en direct ou exportez vers votre CRM.
+      </p>
+      <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;">
+        <button type="button" class="btn btn-primary" id="btn-load-leads">🔄 Actualiser les Prospects</button>
+        <button type="button" class="btn" id="btn-export-leads">📥 Exporter en CSV</button>
+      </div>
+      <div id="lead-records" role="status" aria-live="polite"></div>
+    </section>
   </main>
 
   <!-- Inject the live customizable widget right on the Studio page -->
@@ -512,6 +528,10 @@
       const btnLoadSite = document.getElementById('btn-load-site');
       const btnNewClient = document.getElementById('btn-new-client');
       const statusBanner = document.getElementById('status-banner');
+      const leadRecords = document.getElementById('lead-records');
+      const btnLoadLeads = document.getElementById('btn-load-leads');
+      const btnExportLeads = document.getElementById('btn-export-leads');
+      const tunnelStatusBadge = document.getElementById('tunnel-status-badge');
 
       const fRole = document.getElementById('field-assistant-role');
       const fKb = document.getElementById('field-knowledge-base');
@@ -707,6 +727,200 @@
         }
       }
 
+      async function checkTunnelStatus() {
+        if (!tunnelStatusBadge) return;
+        try {
+          const resp = await fetch(`${API_BASE}/api/v1/inbound/tunnel/status`, {
+            headers: { 'ngrok-skip-browser-warning': 'true' }
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            tunnelStatusBadge.textContent = `● Tunnel IA : En Ligne (${data.active_sites_count} sites)`;
+            tunnelStatusBadge.style.color = 'var(--emerald)';
+            tunnelStatusBadge.style.borderColor = 'rgba(0,255,157,0.4)';
+          } else {
+            tunnelStatusBadge.textContent = `⚠️ Tunnel IA : Dégradé (${resp.status})`;
+            tunnelStatusBadge.style.color = 'var(--amber)';
+            tunnelStatusBadge.style.borderColor = 'rgba(245,158,11,0.4)';
+          }
+        } catch (err) {
+          tunnelStatusBadge.textContent = '❌ Tunnel IA : Déconnecté';
+          tunnelStatusBadge.style.color = '#FCA5A5';
+          tunnelStatusBadge.style.borderColor = 'rgba(239,68,68,0.4)';
+        }
+      }
+
+      async function updateLeadStatus(leadId, newStatus, statusSelect) {
+        const key = (inputSiteKey.value || '').trim();
+        const token = fToken.value.trim();
+        if (!key || !token) return;
+        statusSelect.disabled = true;
+        try {
+          const resp = await fetch(`${API_BASE}/api/v1/inbound/sites/${encodeURIComponent(key)}/leads/${encodeURIComponent(leadId)}/status`, {
+            method: 'PATCH',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Concierge-Token': token,
+              'ngrok-skip-browser-warning': 'true'
+            },
+            body: JSON.stringify({ status: newStatus })
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.detail || `Erreur (${resp.status})`);
+          }
+          showToast(`✅ Statut du prospect mis à jour : "${newStatus}".`, false);
+        } catch (err) {
+          showToast(`❌ Erreur mise à jour : ${err.message}`, true);
+        } finally {
+          statusSelect.disabled = false;
+        }
+      }
+
+      async function exportLeadsCSV() {
+        const key = (inputSiteKey.value || '').trim();
+        const token = fToken.value.trim();
+        if (!key || !token) {
+          showToast('Veuillez d\'abord charger un site et sa clé d\'édition.', true);
+          return;
+        }
+        try {
+          const resp = await fetch(`${API_BASE}/api/v1/inbound/sites/${encodeURIComponent(key)}/leads/export`, {
+            headers: { 'X-Concierge-Token': token, 'ngrok-skip-browser-warning': 'true' }
+          });
+          if (!resp.ok) {
+            const errData = await resp.json().catch(() => ({}));
+            throw new Error(errData.detail || `Erreur serveur (${resp.status}).`);
+          }
+          const blob = await resp.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `leads-${key}.csv`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          URL.revokeObjectURL(url);
+          showToast(`📥 Fichier "leads-${key}.csv" téléchargé avec succès !`, false);
+        } catch (err) {
+          showToast(`❌ Impossible d'exporter les prospects : ${err.message}`, true);
+        }
+      }
+
+      async function loadSiteLeads() {
+        const key = (inputSiteKey.value || '').trim();
+        const token = fToken.value.trim();
+        if (!key || !token) {
+          showToast('Chargez le site et sa clé client avant de consulter les prospects.', true);
+          return;
+        }
+        btnLoadLeads.disabled = true;
+        leadRecords.textContent = 'Chargement des prospects...';
+        try {
+          const resp = await fetch(`${API_BASE}/api/v1/inbound/sites/${encodeURIComponent(key)}/leads`, {
+            headers: { 'X-Concierge-Token': token, 'ngrok-skip-browser-warning': 'true' }
+          });
+          const data = await resp.json().catch(() => []);
+          if (!resp.ok) throw new Error(data.detail || `Erreur serveur (${resp.status}).`);
+          leadRecords.replaceChildren();
+          if (!Array.isArray(data) || data.length === 0) {
+            leadRecords.textContent = 'Aucun prospect enregistré pour le moment pour ce site.';
+            return;
+          }
+          data.forEach((lead) => {
+            const card = document.createElement('article');
+            card.style.cssText = 'border:1px solid rgba(0,240,255,.2);border-radius:10px;padding:14px;margin-top:10px;background:rgba(11,17,32,0.85);display:flex;flex-direction:column;gap:8px;';
+
+            const headerRow = document.createElement('div');
+            headerRow.style.cssText = 'display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;';
+
+            const title = document.createElement('strong');
+            title.style.cssText = 'font-size:15px;color:var(--text);';
+            title.textContent = lead.contact_name ? `👤 ${lead.contact_name}` : '👤 Visiteur Sans Nom';
+
+            const badge = document.createElement('span');
+            badge.className = 'brand-badge';
+            const channelIcon = lead.channel === 'whatsapp' ? '📲 WhatsApp' : (lead.channel === 'voice' ? '🎙️ Vocal' : '💬 Chat');
+            badge.textContent = channelIcon;
+            headerRow.append(title, badge);
+
+            const phone = document.createElement('p');
+            phone.style.cssText = 'font-size:13px;color:var(--cyan);font-family:\'JetBrains Mono\',monospace;';
+            phone.textContent = `📞 ${lead.phone_number}`;
+
+            const topic = document.createElement('p');
+            topic.style.cssText = 'font-size:13px;color:var(--muted);';
+            topic.textContent = lead.topic ? `📝 Besoin : ${lead.topic}` : '📝 Besoin : Prise de contact / Devis général';
+
+            const actionRow = document.createElement('div');
+            actionRow.style.cssText = 'display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-top:6px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.08);';
+
+            const quickBtns = document.createElement('div');
+            quickBtns.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
+
+            const cleanDigits = (lead.phone_number || '').replace(/\D/g, '');
+            if (cleanDigits) {
+              const waBtn = document.createElement('a');
+              waBtn.className = 'btn';
+              waBtn.style.cssText = 'padding:5px 10px;font-size:11px;background:rgba(0,255,157,0.15);color:var(--emerald);border-color:rgba(0,255,157,0.4);';
+              waBtn.href = `https://wa.me/${cleanDigits}`;
+              waBtn.target = '_blank';
+              waBtn.rel = 'noopener';
+              waBtn.textContent = '💬 WhatsApp';
+              quickBtns.appendChild(waBtn);
+
+              const callBtn = document.createElement('a');
+              callBtn.className = 'btn';
+              callBtn.style.cssText = 'padding:5px 10px;font-size:11px;background:rgba(0,240,255,0.15);color:var(--cyan);border-color:rgba(0,240,255,0.4);';
+              callBtn.href = `tel:${lead.phone_number}`;
+              callBtn.textContent = '📞 Appeler';
+              quickBtns.appendChild(callBtn);
+            }
+
+            const statusWrap = document.createElement('div');
+            statusWrap.style.cssText = 'display:flex;align-items:center;gap:6px;';
+            const statusLabel = document.createElement('span');
+            statusLabel.style.cssText = 'font-size:11px;color:var(--muted);';
+            statusLabel.textContent = 'Statut :';
+
+            const statusSelect = document.createElement('select');
+            statusSelect.style.cssText = 'padding:4px 8px;font-size:11.5px;background:#030712;color:var(--text);border:1px solid rgba(0,240,255,0.3);border-radius:6px;';
+            [
+              { val: 'received', label: '📥 Reçu' },
+              { val: 'contacted', label: '📞 Contacté' },
+              { val: 'converted', label: '✅ Converti' },
+              { val: 'archived', label: '📁 Archivé' }
+            ].forEach(opt => {
+              const o = document.createElement('option');
+              o.value = opt.val;
+              o.textContent = opt.label;
+              if (lead.status === opt.val) o.selected = true;
+              statusSelect.appendChild(o);
+            });
+            statusSelect.addEventListener('change', () => {
+              updateLeadStatus(lead.id, statusSelect.value, statusSelect);
+            });
+
+            statusWrap.append(statusLabel, statusSelect);
+            actionRow.append(quickBtns, statusWrap);
+
+            const created = document.createElement('small');
+            created.style.cssText = 'color:rgba(148,163,184,0.6);font-size:11px;';
+            created.textContent = `Enregistré le ${new Date(lead.created_at).toLocaleString()}`;
+
+            card.append(headerRow, phone, topic, actionRow, created);
+            leadRecords.appendChild(card);
+          });
+        } catch (err) {
+          leadRecords.textContent = err.message || 'Impossible de charger les prospects.';
+        } finally {
+          btnLoadLeads.disabled = false;
+        }
+      }
+
+      btnLoadLeads.addEventListener('click', loadSiteLeads);
+      if (btnExportLeads) btnExportLeads.addEventListener('click', exportLeadsCSV);
+
       selectExisting.addEventListener('change', () => {
         inputSiteKey.value = selectExisting.value;
         loadSiteFromServer(selectExisting.value);
@@ -818,6 +1032,8 @@
 
       // Initial load
       window.addEventListener('DOMContentLoaded', async () => {
+        checkTunnelStatus();
+        setInterval(checkTunnelStatus, 30000);
         await refreshSitesDropdown('rockib-portfolio');
         await loadSiteFromServer('rockib-portfolio');
       });

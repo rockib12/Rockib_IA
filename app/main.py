@@ -1,4 +1,7 @@
-from fastapi import FastAPI
+import asyncio
+
+from fastapi import FastAPI, Depends, status
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
@@ -55,6 +58,23 @@ async def lifespan(app: FastAPI):
         stop_event = asyncio.Event()
         polling_task = asyncio.create_task(run_telegram_polling_loop(stop_event=stop_event))
 
+    async def purge_old_concierge_leads() -> None:
+        while True:
+            try:
+                from app.core.database import AsyncSessionLocal
+                from app.inbound.services.leads import purge_expired_leads
+
+                async with AsyncSessionLocal() as session:
+                    await purge_expired_leads(session)
+            except Exception as exc:
+                import logging
+                logging.getLogger("rockib.concierge").warning(
+                    "Lead retention cleanup failed (%s)", type(exc).__name__
+                )
+            await asyncio.sleep(24 * 60 * 60)
+
+    retention_task = asyncio.create_task(purge_old_concierge_leads())
+
     yield
 
     if polling_task and stop_event:
@@ -64,6 +84,18 @@ async def lifespan(app: FastAPI):
             await polling_task
         except Exception:
             pass
+
+    retention_task.cancel()
+    try:
+        await retention_task
+    except asyncio.CancelledError:
+        pass
+
+    try:
+        from app.inbound.services.portfolio_handler import close_rate_limiter
+        await close_rate_limiter()
+    except Exception:
+        pass
 
     try:
         from app.core.database import async_engine
@@ -153,12 +185,18 @@ async def api_health_check(db=Depends(get_async_db)):
     except Exception:
         redis_ok = False
 
-    return {
-        "status": "healthy" if (db_ok and redis_ok) else "degraded",
-        "app_name": settings.APP_NAME,
-        "environment": settings.APP_ENV,
-        "components": {
-            "database": "up" if db_ok else "down",
-            "redis": "up" if redis_ok else "down",
+    is_healthy = db_ok and redis_ok
+    status_code = status.HTTP_200_OK if is_healthy else status.HTTP_503_SERVICE_UNAVAILABLE
+
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "healthy" if is_healthy else "degraded",
+            "app_name": settings.APP_NAME,
+            "environment": settings.APP_ENV,
+            "components": {
+                "database": "up" if db_ok else "down",
+                "redis": "up" if redis_ok else "down",
+            },
         },
-    }
+    )

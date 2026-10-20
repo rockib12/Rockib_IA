@@ -1,9 +1,11 @@
-from __future__ import annotations
-
+from dataclasses import dataclass
 import json
 import logging
+import time
+from typing import Any
 
 import httpx
+
 
 from app.core.config import settings
 from app.intelligence.exceptions import (
@@ -21,6 +23,45 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 GROQ_CHAT_COMPLETIONS_PATH = "/chat/completions"
 # Timeout explicite : jamais d'appel bloquant indéfiniment.
 DEFAULT_TIMEOUT_SECONDS = 30.0
+
+
+@dataclass(frozen=True)
+class ProviderGenerationResult:
+    """Rich execution result with model, usage and latency metrics."""
+    content: str
+    model: str
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    total_tokens: int = 0
+    duration_ms: float = 0.0
+    estimated_cost_usd: float = 0.0
+
+
+def compute_token_cost(
+    model: Any,
+    prompt_tokens: int,
+    completion_tokens: int,
+) -> float:
+    """Estimates USD cost based on standard model pricing."""
+    m = model.lower() if isinstance(model, str) else str(model or "").lower()
+    if "70b" in m:
+
+        # llama-3.3-70b-versatile: $0.59 / 1M prompt, $0.79 / 1M completion
+        cost = (prompt_tokens * 0.59 + completion_tokens * 0.79) / 1_000_000.0
+    elif "8b" in m:
+        # llama-3.1-8b-instant: $0.05 / 1M prompt, $0.08 / 1M completion
+        cost = (prompt_tokens * 0.05 + completion_tokens * 0.08) / 1_000_000.0
+    elif "mixtral" in m:
+        # mixtral-8x7b-32768: $0.24 / 1M prompt, $0.24 / 1M completion
+        cost = (prompt_tokens * 0.24 + completion_tokens * 0.24) / 1_000_000.0
+    elif "whisper" in m:
+        # whisper transcription approximation
+        cost = (prompt_tokens + completion_tokens) * 0.000001
+    else:
+        # Generic fallback
+        cost = (prompt_tokens * 0.50 + completion_tokens * 0.50) / 1_000_000.0
+    return round(cost, 6)
+
 
 
 class GroqProvider:
@@ -89,20 +130,12 @@ class GroqProvider:
     # ------------------------------------------------------------------
     # AIProvider contract
     # ------------------------------------------------------------------
-    async def generate(
+    async def generate_with_meta(
         self,
         messages: list[dict[str, str]],
         json_mode: bool = True,
-    ) -> str:
-        """Appelle Groq et renvoie le texte brut de la réponse.
-
-        Lève une exception de la hiérarchie ``AIProviderError`` en cas d'erreur :
-        - ``AIProviderAuthError``  : clé absente ou 401/403
-        - ``AIProviderTimeoutError`` : timeout HTTP
-        - ``AIProviderNetworkError`` : erreur réseau
-        - ``AIProviderResponseError`` : erreur HTTP (4xx/5xx)
-        - ``AIProviderParsingError``  : réponse non exploitable / JSON malformé
-        """
+    ) -> ProviderGenerationResult:
+        """Appelle Groq et renvoie un résultat enrichi (texte, tokens, coût, latence)."""
         api_key = self._require_api_key()
         if not self._model:
             raise AIProviderError("No model configured for GroqProvider.")
@@ -111,6 +144,7 @@ class GroqProvider:
         payload = self._build_payload(self._model, messages, json_mode=json_mode)
         headers = self._build_headers(api_key)
 
+        start_time = time.perf_counter()
         owns_client = self._client is None
         client = self._client_or_create()
         try:
@@ -135,10 +169,52 @@ class GroqProvider:
                     f"Groq returned HTTP {response.status_code}: {response.text}"
                 )
 
-            return self._extract_content(response, json_mode=json_mode)
+            duration_ms = (time.perf_counter() - start_time) * 1000.0
+            content = self._extract_content(response, json_mode=json_mode)
+
+            # Extraire usage et model réels
+            try:
+                data = response.json()
+            except Exception:
+                data = {}
+
+            model_used = data.get("model", self._model)
+            usage = data.get("usage", {}) if isinstance(data, dict) else {}
+            prompt_tokens = usage.get("prompt_tokens") or max(1, sum(len(m.get("content", "")) for m in messages) // 4)
+            completion_tokens = usage.get("completion_tokens") or max(1, len(content) // 4)
+            total_tokens = usage.get("total_tokens") or (prompt_tokens + completion_tokens)
+            cost_usd = compute_token_cost(model_used, prompt_tokens, completion_tokens)
+
+            return ProviderGenerationResult(
+                content=content,
+                model=model_used,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                duration_ms=round(duration_ms, 2),
+                estimated_cost_usd=cost_usd,
+            )
         finally:
             if owns_client:
                 await client.aclose()
+
+    async def generate(
+        self,
+        messages: list[dict[str, str]],
+        json_mode: bool = True,
+    ) -> str:
+        """Appelle Groq et renvoie le texte brut de la réponse.
+
+        Lève une exception de la hiérarchie ``AIProviderError`` en cas d'erreur :
+        - ``AIProviderAuthError``  : clé absente ou 401/403
+        - ``AIProviderTimeoutError`` : timeout HTTP
+        - ``AIProviderNetworkError`` : erreur réseau
+        - ``AIProviderResponseError`` : erreur HTTP (4xx/5xx)
+        - ``AIProviderParsingError``  : réponse non exploitable / JSON malformé
+        """
+        result = await self.generate_with_meta(messages, json_mode=json_mode)
+        return result.content
+
 
     @staticmethod
     def _extract_content(response: httpx.Response, json_mode: bool = True) -> str:

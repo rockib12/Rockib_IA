@@ -70,6 +70,35 @@ async def agent_spawn_handler(action: ActionRecord) -> ExecutionResult:
                 parent_applied_autonomy=effective_parent_cap,
             )
 
+            # Monotonie budgétaire parent-enfant (FIN-INV-09)
+            from app.execution.services.financial_governance import (
+                validate_parent_child_ceiling,
+                FinancialGovernanceError,
+            )
+            child_ceiling = args.get("budget_ceiling")
+            child_currency = args.get("budget_currency") or "EUR"
+            if child_ceiling is not None:
+                parent_ceiling = None
+                parent_currency = "EUR"
+                if pgoal and pgoal.goal_metadata:
+                    parent_ceiling = pgoal.goal_metadata.get("budget_ceiling")
+                    parent_currency = pgoal.goal_metadata.get("budget_currency", "EUR")
+                if parent_ceiling is not None:
+                    try:
+                        validate_parent_child_ceiling(
+                            parent_ceiling_amount=parent_ceiling,
+                            parent_ceiling_currency=parent_currency,
+                            child_ceiling_amount=child_ceiling,
+                            child_ceiling_currency=child_currency,
+                        )
+                    except FinancialGovernanceError as e:
+                        return ExecutionResult(
+                            success=False,
+                            output=None,
+                            error=f"Parent-child budget ceiling violation: {e}",
+                            error_code="BUDGET_CEILING_VIOLATION",
+                        )
+
             # 1. Création de l'Agent
             new_agent = Agent(
                 id=uuid.uuid4(),
@@ -80,8 +109,18 @@ async def agent_spawn_handler(action: ActionRecord) -> ExecutionResult:
                 default_autonomy_level=child_default,
             )
             db.add(new_agent)
+            await db.flush()
             
             # 2. Création du Goal assigné
+            goal_meta = {
+                "spawned_by_decision": str(action.decision_id),
+                "spawned_by": str(action.agent_id),
+                "limits": {"max_steps": 10},
+            }
+            if child_ceiling is not None:
+                goal_meta["budget_ceiling"] = str(child_ceiling)
+                goal_meta["budget_currency"] = child_currency
+
             new_goal = Goal(
                 id=uuid.uuid4(),
                 workspace_id=action.workspace_id,
@@ -92,10 +131,11 @@ async def agent_spawn_handler(action: ActionRecord) -> ExecutionResult:
                 requested_autonomy_level=req_autonomy,
                 applied_autonomy_level=child_applied_autonomy,
                 parent_goal_id=parent_goal_id,
-                goal_metadata={"spawned_by_decision": str(action.decision_id), "spawned_by": str(action.agent_id), "limits": {"max_steps": 10}},
+                goal_metadata=goal_meta,
             )
 
             db.add(new_goal)
+            await db.flush()
             
             # 3. Première tâche minimale pour l'agent
             t = Task(

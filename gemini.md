@@ -57,7 +57,7 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
 | **Credentials**| ✅ Opérationnel | `app/credentials/models.py`, `app/credentials/services/vault.py` | Coffre-fort de secrets multi-tenant chiffré AEAD AES-256-GCM |
 | **Skills**    | ✅ Opérationnel | `app/skills/models.py`, `app/skills/schemas.py`, `app/skills/services/registry.py`, `app/skills/services/selector.py` | Modèles relationnels, hachage SHA-256, registre et sélection JIT |
 | **Catalog**   | ✅ Opérationnel | `app/skills/catalog.py` | Les 5 skills scellés (Portfolio Ambassador, Lead Qualif, React 19, Django 5.2, Cyberdéfense) |
-| **Inbound**   | ✅ Opérationnel | `app/inbound/router.py`, `app/inbound/services/portfolio_handler.py`, `app/inbound/services/voice_call_service.py` | Gateway public pour widget portfolio, Voice Calling, capture de leads et rappels téléphoniques pour Agence IIA |
+| **Inbound**   | ✅ Opérationnel | `app/inbound/router.py`, `app/inbound/services/portfolio_handler.py`, `app/inbound/services/tracing.py`, `app/inbound/services/quality_evaluator.py` | Gateway multi-tenant Concierge, traces d'exécution (coût, latence, tokens), Golden Benchmark & Voice Calling |
 | **Widget JS** | ✅ Opérationnel | `frontend/public/rockib-concierge.js` | Chatbot flottant & Appel vocal direct in-browser (Web Speech) + demande de rappel |
 | **Frontend**  | ✅ Opérationnel | `frontend/` | Cockpit 3D Three.js, DAG Panel, Agents Cards |
 | **Docker**    | ✅ Opérationnel | `Dockerfile`, `docker-compose.yml`, `nginx.conf`, `supervisord.conf` | Image unifiée Front + Back + Nginx |
@@ -65,11 +65,15 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
 ---
 
 ## 🧪 Statut des Tests
-- **702 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
+- **728 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
+  - `tests/test_agent_financial_reliability_e2e.py` ✅ *(5 tests : Fiabilité agents de bout en bout — Cohérence financière stricte, rejet immédiat des floats/devises invalides, blocage des dépassements de plafond de budget `BUDGET_CEILING_VIOLATION`, sérialisation PostgreSQL advisory lock et épuisement de quota `QUOTA_EXCEEDED`, persistance `HELD` post-crash réseau avec réconciliation formelle sur preuve `reconcile_unknown_attempt`, et monotonie budgétaire descendante parent-enfant $child \le parent$)*
+  - `tests/test_concierge_commercial_onboarding.py` ✅ *(2 tests : Cycle de vie complet des prospects — Onboarding multi-tenant, capture de devis, mise à jour de statut `received -> contacted -> converted`, rejet des statuts illégaux, isolation multi-tenant et export CSV, sonde de disponibilité tunnel)*
+  - `tests/test_concierge_quality_benchmark.py` ✅ *(8 tests : Suite Golden Benchmark — 6 scénarios standardisés évaluant la posture, l'exactitude de capture de leads, le respect des garde-fous zéro-fuite anti-jailbreak, l'étanchéité multi-tenant et la détection automatique de régression)*
+  - `tests/test_concierge_traces_and_metrics.py` ✅ *(5 tests : Calcul précis du coût par tokens Groq LLM, enregistrement des traces d'exécution chat/vocal, routage instantané Telegram des leads et endpoints télémétrie `/traces` et `/metrics`)*
   - `tests/test_social_connectors_hmac.py` ✅ *(16 tests : Signature officielle Meta `appsecret_proof` HMAC-SHA256, validation webhooks `X-Hub-Signature-256` timing-safe, rejet d'altération Anti-Tampering, connecteur Meta Ads avec garde-fou budgétaire formel `FINANCIAL_POLICY_VIOLATION`, connecteurs Facebook, Instagram Business, WhatsApp Cloud API, Twitter v2, LinkedIn UGC et Discord)*
   - `tests/test_system_handlers.py` & `tests/test_connectors.py` ✅ *(Connecteurs production, dont `content.create` sandboxed, zero-spend)*
   - `tests/test_celery_tasks.py` & `tests/test_wake_runner.py` ✅ *(Boucle de réveil Celery Beat et workers)*
-  - `tests/test_security_hardening.py` ✅ *(37 tests : Hardening P0/P1/P4/P5/P6/P7 — Telegram Webhook Secret, SSRF & DNS resolution + immunité DNS Rebinding par épinglage IP socket, Credential Vault fail-fast, Auth & Multi-tenant isolation sur `/api/v1/decisions/`, CSP Sandbox `/preview/`, Anti-Bruteforce Auth, `X-Request-ID`, TTL Sessions, Rate-Limiting Vocal, Healthcheck DB/Redis & Validation stricte Pydantic)*
+  - `tests/test_security_hardening.py` ✅ *(39 tests : Hardening P0/P1/P2/P4/P5/P6/P7 — Anti-spoofing rate limit via proxy fiable, Healthcheck 503 sur dégradation DB/Redis, Telegram Webhook Secret, SSRF & DNS resolution + immunité DNS Rebinding par épinglage IP socket, Credential Vault fail-fast, Auth & Multi-tenant isolation sur `/api/v1/decisions/`, CSP Sandbox `/preview/`, Anti-Bruteforce Auth, `X-Request-ID`, TTL Sessions, Rate-Limiting Vocal & Validation stricte Pydantic)*
   - `tests/test_goal_engine_auth.py` ✅ *(27 tests : Authentification OAuth2/JWT sur tous les endpoints Goal Engine, isolation stricte multi-tenant 403/404, URLs signées HMAC-SHA256 avec TTL 1h et domaine séparé, prévention anti-énumération)*
   - `tests/test_skill_system.py` ✅ *(47 tests : 107 Skills Catalog, scellement SHA-256, Core 5 immuables, Registry, Selector JIT, dépendances DAG, exclusion mutuelle, priorisation déterministe workspace/system, alignement enum SkillCategory)*
   - `tests/test_agent_connectors.py` & `tests/test_goal_manager.py` ✅ *(Autonomie hiérarchique bornée strictement : parent >= enfant, scénarios 1 à 5 + test adversarial)*
@@ -222,6 +226,82 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
    - **Directives de Capture Proactive (Chat & Vocal)** : L'IA demande proactivement son numéro de téléphone ou WhatsApp et son nom au visiteur dès qu'il s'intéresse à un projet, devis ou demande de rappel, avec confirmation chaleureuse d'enregistrement.
    - **Routage et Alertes Multi-Tenant sur Telegram** : Transmission instantanée des leads à Rockib sur Telegram (`@masterrockibot`) incluant le nom de l'entreprise cliente, le site source (`site_key`), le nom du prospect, son numéro, le besoin exprimé et les contacts de rappel du client.
    - **Synchronisation & Déploiement en Production Confirmés** : Dépôts `rockib12/Rockib_IA` (commit `b7aa31d`) et `rockib12/rockib-portfolio` (commit `2b0c1fd`) synchronisés à 100% sur GitHub `master` et déployés en direct sur Netlify (**HTTP 200 OK**).
+24. **Refonte Responsive Complète & Correction des Déformations Mobiles sur le Portfolio** :
+   - **Diagrammes d'Architecture (`.project-visual-diagram`)** : Remplacement du flexbox avec flèches orphelines et coupures par une grille CSS native 2x2 compacte (`display: grid; grid-template-columns: repeat(2, 1fr)`), masquage propre des flèches sur mobile, et conteneurs auto-ajustés (`min-height: 215px`) préservant l'intégralité des métadonnées (107 Skills SHA-256, Vault AES-256-GCM).
+   - **Garantie Anti-Collision des Badges (`.project-badge-bar`)** : Flex-wrap adaptatif et dimensionnement proportionnel des badges de statut évitant tout chevauchement sur les écrans étroits (&le; 390px).
+   - **Métriques Hero (`.hero-metrics`)** : Grille 2 colonnes équilibrée sur tablettes et mobiles, avec valeurs typographiques fluides (`clamp(1.2rem, 5.2vw, 1.55rem)`) empêchant tout débordement des devises multi-monnaies ("FCFA · € · $").
+   - **Pôles Sociaux du Portrait (`.portrait-socials`)** : Grille 2 colonnes avec GitHub pleine largeur pour éliminer les retours à la ligne inesthétiques sur téléphones compacts (< 400px).
+   - **Bandeau de Technologies & Connaissances (`.tech-banner`)** : Remplacement des styles inline rigides par des classes CSS modulaires avec padding et tailles adaptées, assurant une lecture nette sans perte d'espace.
+   - **Recherche & Filtres de Connaissances (`.knowledge-search-bar`, `.knowledge-filter-row`)** : Réorganisation de la barre de recherche en grille (icône + champ sur la ligne 1, bouton sur la ligne 2) et mise en place d'un ruban de filtres horizontal défilable ("touch-scroll pill bar") éliminant l'empilement vertical excessif.
+   - **Studio d'Idées & Onglets Sectoriels (`.sector-tabs`)** : Ruban tactile horizontal fluide pour naviguer entre les secteurs (E-Commerce, B2B, Fintech, SaaS) sans encombrer la vue mobile.
+   - **Cartes de Canaux de Contact (`.contact-channel-card`)** : Espacement et typographie réajustés pour les coordonnées téléphoniques et emails longs.
+   - **Menu Mobile Navigation & Concierge Widget** : Intégration de raccourcis directs d'appel vocal et d'action projet dans le menu hamburger (`z-index: 100000`), et optimisation du positionnement du widget avec support `env(safe-area-inset-bottom)` sur iOS.
+   - **Déploiement en Production Confirmé** : Commit `08c2900` poussé sur `origin/master` de `rockib-portfolio`.
+25. **Refonte Responsive Exhaustive par Section & Déploiement Haute Résilience** :
+   - **Audit Visuel Mobile Exhaustif & Diagnostic des Ruptures** :
+     - *Header / Navbar* : Masquage strict sous `980px` des boutons d'actions desktop (`.btn-voice`, `.btn-primary`) et du sous-titre verbeux (`.brand-role`) qui écrasaient la marque "Rockib" hors de l'écran. Découpage épuré en logo `RQ` + marque "Rockib Quenum" à gauche, et sélecteur de langue `FR/EN` + menu burger `☰` à droite (`justify-content: space-between`).
+     - *Hero Section & Status Pill* : Compacité accrue de la pastille de disponibilité (`clamp(0.68rem, 2.5vw, 0.74rem)`), centrage et retour à la ligne maîtrisé ; fluidité typographique du titre principal via `clamp(1.55rem, 6.2vw, 2.1rem)` avec `overflow-wrap: break-word` ; boutons CTA du Hero restructurés en grille 1 colonne pleine largeur avec cibles tactiles de 48px min.
+     - *Grille de Métriques* : Disposition stricte 2x2 avec cartes vitrées (`rgba(255,255,255,0.025)`), typographie adaptative et `word-break: break-word` sur les devises multi-monnaies ("FCFA · € · $").
+     - *Portrait & Réseaux Sociaux* : Aspect-ratio contraint 1:1 (`max-height: 300px`), cadre cyberpunk stabilisé, et grille sociale à 2 rangées (GitHub 100%, LinkedIn & Email à 50%).
+     - *Bandeau Tech Banner* : Remplacement des styles inline par des classes CSS réactives avec empilement vertical optimisé sous 600px.
+     - *Section 01 (4 Flagship Projects)* : Grille 2x2 compacte des diagrammes topologiques avec suppression des flèches orphelines, repositionnement static des barres de badges anti-chevauchement.
+     - *Section 02 (AI Idea Studio)* : Barre d'onglets sectoriels en défilement tactile horizontal (`-webkit-overflow-scrolling: touch`), cartes de simulateurs empilées proprement à 100% de largeur.
+     - *Section 1.5 (Knowledge Hub)* : Barre de recherche structurée en 2 lignes (icône + input au rang 1, bouton "Chercher" au rang 2), ruban de pills de catégories à défilement horizontal et cartes de technologies pleine largeur avec boutons d'action 100%.
+     - *Section 03 & 04 (Services, Tarifs & Contact)* : Cartes tarifaires et canaux de contact en flux unitaire vertical avec cibles tactiles élargies et typographie anti-débordement sur les numéros de téléphone.
+     - *Lanceur Concierge Flottant* : Redimensionnement automatique sous 768px en une pastille circulaire sleek de 50px (`📞`) avec support `env(safe-area-inset-bottom)`, éliminant l'énorme pilule horizontale qui masquait le contenu.
+   - **Diagnostic Déploiement Netlify vs Render** :
+     - Détection de la limitation de compte Netlify : `"error_message": "Skipped due to account credit usage exceeded"` sur l'équipe Free `rockib12` (quota de 300 minutes de build mensuel épuisé).
+     - Code source intégralement synchronisé et poussé sur GitHub `origin/master` (commit `c94d4a1`).
+     - Déploiement automatique réussi et validé en direct sur le serveur de production Render `https://rockib-portfolio.onrender.com/` (**HTTP 200 OK**, `Has 768px in Render JS: True`, styles mobiles actifs).
+26. **Durcissement P1 (Sécurité Réseau & Proxy Fiable) & P2 (Santé Profonde Docker & Disponibilité Réelle)** :
+   - **Fermeture de l'Exposition Réseau Directe & Mots de Passe Dynamiques (`docker-compose.yml`)** : Restriction de l'écoute des ports PostgreSQL et Redis sur `127.0.0.1:5432` et `127.0.0.1:6379` (interdiction d'écoute sur `0.0.0.0` non filtrée) ; remplacement des mots de passe en dur par les variables dynamiques `${POSTGRES_USER:-rockib}`, `${POSTGRES_PASSWORD:-rockib_dev_password}`, `${POSTGRES_DB:-rockib_ia}` injectées dans les services `postgres` et `app`.
+   - **Protection Anti-Spoofing du Limiteur d'Authentification (`app/identity/router.py`)** : Remplacement de la lecture brute non filtrée de l'en-tête `X-Forwarded-For` par l'utilitaire centralisé et validé `get_client_ip(request)` (`app/core/proxy.py`). Tout client direct non listé dans les plages CIDR de proxies de confiance (`settings.TRUSTED_PROXY_CIDRS`) voit son IP directe retenue, interdisant le contournement du rate limiting par injection d'adresses falsifiées.
+   - **Sonde de Disponibilité Réelle & Alerte Docker (`app/main.py`, `Dockerfile`, `docker-compose.yml`)** : La sonde `/api/v1/health` renvoie désormais un code de statut `HTTP 503 Service Unavailable` (au lieu de 200 dégradé) dès que PostgreSQL ou Redis est indisponible. Le healthcheck Docker (`CMD curl -f http://localhost/api/v1/health || exit 1`) isole ou redémarre immédiatement les conteneurs incapables de servir le Concierge.
+   - **Nettoyage & Rigueur Temporelle** : Harmonisation des calculs d'orphelins W1 dans l'Autonomous Loop (`updated.astimezone(timezone.utc)`), élimination des avertissements de dépréciation de boucle d'événements asyncio et migration `datetime.now(timezone.utc)` dans Celery tasks.
+   - **Non-Régression Globale Absolue** : Suite de tests portée à **708 tests unitaires et d'intégration réussis (100% verts, 0 warning)**.
+27. **Priorité 3 — Qualité de l'IA, Traces de Conversation & Benchmark de Référence (Golden Benchmark Suite)** :
+   - **Moteur de Télémétrie Groq & Calcul des Coûts Réels (`app/intelligence/services/providers/groq_provider.py`)** :
+     - Implémentation de `generate_with_meta(...) -> ProviderGenerationResult` retournant le contenu textuel, le modèle effectif, les tokens de prompt, de complétion et totaux, la latence mesurée en millisecondes, et le coût unitaire calculé en USD selon la grille tarifaire officielle Groq (`llama-3.3-70b-versatile`: $0.59 / $0.79 par million de tokens ; `llama-3.1-8b-instant`: $0.05 / $0.08 ; Whisper audio).
+     - Maintien d'une rétrocompatibilité stricte de la méthode synchrone/asynchrone `generate(...) -> str`.
+   - **Persistance des Traces & Migration Alembic 013 (`app/inbound/models.py`, `013_create_concierge_traces.py`)** :
+     - Création de la table `concierge_execution_traces` stockant le canal (`chat` / `voice`), le modèle, les tokens, la durée, le coût estimé en USD, les outils invoqués (`site_knowledge_base`, `voice_prosody`, `lead_capture`, `telegram_notify`), le résultat (`ok`, `fallback`, `error`, `rate_limited`), et le statut de transfert vers Telegram.
+     - Indexation composite `(site_key, created_at)` et `(conversation_id, created_at)` pour des requêtes de monitoring instantanées.
+   - **Service Centralisé de Traçabilité & Alertes Telegram (`app/inbound/services/tracing.py`)** :
+     - Buffer circulaire in-memory de 1 000 traces avec persistance asynchrone automatique en base de données.
+     - `forward_lead_to_telegram` : Notification en temps réel vers le compte Telegram de Rockib (`@masterrockibot`) avec horodatage scellé, détails du prospect et canal d'origine.
+     - Endpoints d'inspection et d'analytique : `GET /api/v1/inbound/traces` (filtrable par site et conversation) et `GET /api/v1/inbound/metrics` (taux de succès, coût total USD, nombre de leads capturés, ratio de transferts).
+   - **Suite d'Évaluation de Référence (Golden Benchmark Suite) (`app/inbound/services/quality_evaluator.py`)** :
+     - 6 scénarios standardisés évaluant la posture d'accueil, la présentation de la stack (MARTISTORE, CLIP, Celery), la capture proactive de coordonnées de devis, la résistance zéro-fuite aux tentatives d'injection de prompt et jailbreak, l'étanchéité multi-tenant entre sites clients, et la détection immédiate de toute fuite d'informations confidentielles.
+     - Endpoint d'évaluation automatisé `POST /api/v1/inbound/benchmark/run` renvoyant le score global, le taux de conformité par scénario et les métriques de latence.
+   - **Isolation Fixture PostgreSQL & Teardown Auto (`tests/conftest.py`)** :
+     - Ajout de la fixture autouse `cleanup_global_async_engine` nettoyant systématiquement le pool de connexions après chaque test pour immuniser la suite contre toute fermeture prématurée d'event loop asyncio.
+   - **Non-Régression Globale Absolue** : Suite de tests portée à **721 tests unitaires et d'intégration réussis (100% verts, 0 échec)**.
+28. **Priorité 4 — Offre Commerciale, Onboarding Rapide, Cycle de Vie des Prospects (CRM) & Diagnostic Tunnel** :
+   - **Gestion Complète du Cycle de Vie des Prospects (`app/inbound/services/leads.py`, `app/inbound/router.py`)** :
+     - Implémentation de `update_lead_status(db, site_key, lead_id, new_status)` et de l'endpoint sécurisé `PATCH /api/v1/inbound/sites/{site_key}/leads/{lead_id}/status`.
+     - Prise en charge stricte de la machine d'états commerciale : `received` (reçu) $\rightarrow$ `contacted` (contacté) $\rightarrow$ `converted` (converti) ou `archived` (archivé), avec validation regex Pydantic interdisant tout statut arbitraire (code 422).
+     - Isolation multi-tenant formelle vérifiée par test d'intrusion : un token étranger ne peut ni modifier ni consulter les leads d'un autre site (HTTP 403 / 404).
+   - **Exportation CSV des Prospects pour CRM & Tableurs** :
+     - Implémentation de `export_leads_csv` et de l'endpoint `GET /api/v1/inbound/sites/{site_key}/leads/export` avec en-têtes RFC et encodage UTF-8 conforme pour intégration immédiate dans Excel, Google Sheets ou un CRM.
+   - **Sonde de Diagnostic de Tunnel & Haute Disponibilité Réelle (`GET /api/v1/inbound/tunnel/status`)** :
+     - Endpoint public de supervision du tunnel indiquant la joignabilité du backend, le nombre de sites configurés, la disponibilité effective de Groq LLM et de la synthèse vocale HD.
+     - Badge dynamique dans la topbar de `concierge-studio.html` avec heartbeat automatique toutes les 30 secondes (`● Tunnel IA : En Ligne`).
+   - **Interface Interactive du Studio Concierge (`frontend/public/concierge-studio.html`)** :
+     - Section "Suivi & Gestion des Prospects" enrichie avec badges de canaux (`WhatsApp`, `Vocal`, `Chat`), boutons d'actions directes en un clic (`💬 Contacter sur WhatsApp` avec numéro pré-formaté, `📞 Appeler`), sélecteur de statut interactif sauvegardé en direct en base de données, et bouton de téléchargement CSV.
+   - **Non-Régression Globale Absolue** : Suite de tests portée à **723 tests unitaires et d'intégration réussis (100% verts, 0 échec)**.
 
-
-
+29. **Priorité 5 — Fiabilité des Agents de Bout en Bout, Verrous PostgreSQL & Gouvernance Financière Inviolable** :
+   - **Câblage Automatique du Contrôle Budgétaire dans l'Exécuteur Fiable (`app/execution/services/reliable_executor.py`)** :
+     - Intégration systématique de `verify_action_financial_consistency` et `validate_budget_ceiling` dès l'étape pré-vol de `dispatch_authorized_action`.
+     - Réservation automatique de quota sous verrou de base de données PostgreSQL (`pg_advisory_xact_lock`) pour toute devise (`currency:EUR`, `currency:USD`, etc.) configurée dans `resource_budgets`.
+     - Élimination des doubles dépenses concurrentes : toute tentative dépassant le budget restant lève immédiatement l'erreur `QUOTA_EXCEEDED` sans exécuter le handler.
+   - **Garde-Fous Financiers Stricts sur les Connecteurs Réels (`app/connectors/social_connectors.py`)** :
+     - Rejet formel et immédiat des nombres à virgule flottante (`float`), prévenant tout bogue d'imprécision IEEE-754.
+     - Contrôle strict des devises selon la norme ISO-4217 en majuscules (ex: rejet de `"eur"`, exigence de `"EUR"`).
+   - **Monotonie Budgétaire Hiérarchique lors du Frai d'Agents (`app/connectors/agent_connectors.py`)** :
+     - Intégration de `validate_parent_child_ceiling` dans `agent_spawn_handler` (FIN-INV-09). Tout sous-agent créé via l'opération `spawn` ne peut en aucun cas revendiquer un plafond supérieur à celui de son objectif parent (`BUDGET_CEILING_VIOLATION`).
+     - Ordonnancement transactionnel strict avec `await db.flush()` pour satisfaire les contraintes d'intégrité référentielle (`goals_agent_id_fkey`).
+   - **Résilience Post-Crash Réseau & Réconciliation Formelle sur Preuve (`app/execution/services/attempts.py`, `app/execution/services/reliable_executor.py`)** :
+     - En cas d'exception non gérée ou de timeout ambigu (`TimeoutError`), l'action bascule à l'état `EffectCertainty.unknown` et sa réservation reste scellée en `ReservationStatus.HELD` pour protéger le solde financier.
+     - Réconciliation formelle via `reconcile_unknown_attempt` exigeant une référence de preuve (`evidence_reference`). La réconciliation met à jour l'enregistrement `ExecutionResultRecord` existant sans violation de clé unique et libère (`RELEASED`) ou consomme (`CONSUMED`) définitivement la réservation.
+   - **Non-Régression Globale Absolue** : Suite de tests portée à **728 tests unitaires et d'intégration réussis (100% verts, 0 échec, 0 warning)**.

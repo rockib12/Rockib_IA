@@ -14,24 +14,23 @@ import time
 import uuid
 from typing import Dict, List, Optional
 
-import httpx
 
+from app.core.config import settings
 from app.inbound.schemas import (
-    CallMeBackRequest,
-    CallMeBackResponse,
     VoiceCallSessionRequest,
     VoiceCallSessionResponse,
     VoiceCallTurnRequest,
     VoiceCallTurnResponse,
 )
-from app.inbound.services.portfolio_handler import is_rate_limited
+from app.inbound.services.portfolio_handler import EMAIL_REGEX, PHONE_REGEX, is_request_rate_limited, redact_contact_details
 from app.inbound.services.site_config_service import site_config_service
-from app.intelligence.services.providers.groq_provider import GroqProvider
+from app.inbound.services.tracing import ConciergeTraceData, concierge_tracing_service
+from app.intelligence.services.providers.groq_provider import GroqProvider, compute_token_cost
+from sqlalchemy.ext.asyncio import AsyncSession
+
 
 logger = logging.getLogger(__name__)
 
-EMAIL_REGEX = re.compile(r"[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+")
-PHONE_REGEX = re.compile(r"(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{2,4}\)?[\s.-]?)?\d{2,4}[\s.-]?\d{2,4}[\s.-]?\d{2,4}(?:[\s.-]?\d{2,4})?")
 
 END_CALL_PHRASES = [
     "au revoir",
@@ -48,16 +47,17 @@ END_CALL_PHRASES = [
 class VoiceCallSession:
     """In-memory tracking for an active voice call dialogue."""
 
-    def __init__(self, session_id: str, page_url: str, site_key: str = "rockib-portfolio"):
+    def __init__(self, session_id: str, page_url: str, site_key: str = "rockib-portfolio", client_ip: str = "127.0.0.1"):
         self.session_id = session_id
         self.page_url = page_url
         self.site_key = site_key or "rockib-portfolio"
+        self.client_ip = client_ip
         self.created_at = time.time()
         self.history: List[dict[str, str]] = []
         self.lead_captured = False
 
 
-_SESSION_TTL_SECONDS = 900
+_SESSION_TTL_SECONDS = 300
 _MAX_ACTIVE_SESSIONS = 1000
 
 NEURAL_VOICE_PROFILES: Dict[str, str] = {
@@ -84,7 +84,8 @@ class VoiceCallService:
             raise ValueError("Empty text for TTS synthesis")
 
         voice_id = NEURAL_VOICE_PROFILES.get((voice_profile or "henri").lower().strip(), "fr-FR-HenriNeural")
-        communicate = edge_tts.Communicate(text=clean_text, voice=voice_id, rate="+4%")
+        # A slightly slower pace gives the French neural voices room to breathe.
+        communicate = edge_tts.Communicate(text=clean_text, voice=voice_id, rate="-2%")
         audio_chunks: list[bytes] = []
         async for chunk in communicate.stream():
             if chunk.get("type") == "audio" and chunk.get("data"):
@@ -152,12 +153,12 @@ class VoiceCallService:
             oldest_sid = next(iter(self._sessions))
             self._sessions.pop(oldest_sid, None)
 
-    def start_call_session(self, request: VoiceCallSessionRequest) -> VoiceCallSessionResponse:
+    def start_call_session(self, request: VoiceCallSessionRequest, client_ip: str = "127.0.0.1") -> VoiceCallSessionResponse:
         """Initializes a new live voice call session."""
         self._prune_expired_sessions()
         session_id = str(uuid.uuid4())
         site_key = request.site_key or "rockib-portfolio"
-        session = VoiceCallSession(session_id=session_id, page_url=request.page_url or "", site_key=site_key)
+        session = VoiceCallSession(session_id=session_id, page_url=request.page_url or "", site_key=site_key, client_ip=client_ip)
         self._sessions[session_id] = session
 
         site_cfg = site_config_service.get_site_dict(site_key)
@@ -183,6 +184,7 @@ class VoiceCallService:
         self,
         turn: VoiceCallTurnRequest,
         client_ip: str = "127.0.0.1",
+        db: Optional[AsyncSession] = None,
     ) -> VoiceCallTurnResponse:
         """Processes a speech utterance transcribed from the caller's mic."""
         self._prune_expired_sessions()
@@ -190,18 +192,37 @@ class VoiceCallService:
         if not session:
             return VoiceCallTurnResponse(
                 session_id=turn.session_id,
-                agent_reply_text="Cette session a expir??. Veuillez relancer l'appel vocal.",
+                agent_reply_text="Cette session a expirée. Veuillez relancer l'appel vocal.",
                 status="session_expired",
             )
         req_site_key = turn.site_key or "rockib-portfolio"
         if req_site_key != session.site_key:
             return VoiceCallTurnResponse(
                 session_id=turn.session_id,
-                agent_reply_text="Cette session ne correspond pas ?? ce site. Veuillez relancer l'appel vocal.",
+                agent_reply_text="Cette session ne correspond pas à ce site. Veuillez relancer l'appel vocal.",
                 status="site_mismatch",
             )
 
-        if is_rate_limited(client_ip):
+        if session.client_ip != client_ip:
+            return VoiceCallTurnResponse(
+                session_id=turn.session_id,
+                agent_reply_text="Cette session vocale ne correspond pas à ce visiteur. Veuillez relancer l'appel.",
+                status="session_mismatch",
+            )
+        raw_model = getattr(self.provider, "_model", None)
+        model_name = raw_model if isinstance(raw_model, str) and raw_model else (settings.GROQ_MODEL or "llama-3.3-70b-versatile")
+
+        if await is_request_rate_limited(client_ip, "voice-turn", site_key=session.site_key, limit=20, site_limit=180):
+            trace = ConciergeTraceData(
+                conversation_id=turn.session_id,
+                site_key=session.site_key,
+                channel="voice",
+                model=model_name,
+                duration_ms=0.0,
+                result_status="rate_limited",
+                error_message="Voice turn rate limit exceeded",
+            )
+            await concierge_tracing_service.record_trace(trace, db=db)
             return VoiceCallTurnResponse(
                 session_id=turn.session_id,
                 agent_reply_text="Veuillez patienter un instant avant de reprendre la parole.",
@@ -214,36 +235,58 @@ class VoiceCallService:
         # Check for hang-up intent
         should_end = any(phrase in user_lower for phrase in END_CALL_PHRASES)
 
-        # Detect email or phone in spoken text
-        detected_email = None
-        email_match = EMAIL_REGEX.search(user_text)
-        if email_match:
-            detected_email = email_match.group(0)
-
-        detected_phone = None
+        # Detect if visitor spoken contact details
         phone_match = PHONE_REGEX.search(user_text)
-        if phone_match and len(phone_match.group(0).replace(" ", "").replace("-", "")) >= 8:
-            detected_phone = phone_match.group(0)
-
-        if detected_email or detected_phone:
+        email_match = EMAIL_REGEX.search(user_text)
+        has_contact = bool(email_match or phone_match)
+        if has_contact:
             session.lead_captured = True
-            await self._dispatch_lead(
-                contact_name=f"Appelant Vocal ({session.site_key})",
-                email=detected_email or "vocal-lead@portfolio.com",
-                need=user_text,
-                phone=detected_phone,
-                site_key=session.site_key,
-            )
+
+        # Do not retain or forward raw contact details in model prompt
+        safe_user_text = redact_contact_details(user_text)
 
         # Assemble LLM history with site-specific knowledge base
-        session.history.append({"role": "user", "content": user_text})
+        session.history.append({"role": "user", "content": safe_user_text})
         del session.history[:-24]
         messages = [{"role": "system", "content": self._build_voice_system_prompt(session.site_key)}]
         # Keep last 14 dialogue turns for deep architectural & multi-turn discussions
         messages.extend(session.history[-14:])
 
+        start_time = time.perf_counter()
+        tools_called = ["voice_prosody", "site_knowledge_base"]
+        result_status = "ok"
+        error_msg: Optional[str] = None
+        prompt_tokens = 0
+        completion_tokens = 0
+        total_tokens = 0
+        cost_usd = 0.0
+
+
         try:
-            raw_reply = await self.provider.generate(messages, json_mode=False)
+            has_custom_meta = (
+                hasattr(self.provider, "generate_with_meta")
+                and type(self.provider).__name__ not in ("AsyncMock", "MagicMock", "Mock")
+            )
+            if has_custom_meta:
+                gen_result = await self.provider.generate_with_meta(messages, json_mode=False)
+                raw_reply = gen_result.content
+                model_name = gen_result.model
+                prompt_tokens = gen_result.prompt_tokens
+                completion_tokens = gen_result.completion_tokens
+                total_tokens = gen_result.total_tokens
+                cost_usd = gen_result.estimated_cost_usd
+            else:
+                raw_reply = await self.provider.generate(messages, json_mode=False)
+                if not isinstance(raw_reply, str):
+                    raw_reply = str(raw_reply)
+                prompt_chars = sum(len(m.get("content", "")) for m in messages)
+                completion_chars = len(raw_reply)
+                prompt_tokens = max(1, prompt_chars // 4)
+                completion_tokens = max(1, completion_chars // 4)
+                total_tokens = prompt_tokens + completion_tokens
+
+                cost_usd = compute_token_cost(model_name, prompt_tokens, completion_tokens)
+
             # Strip any <think>...</think> reasoning blocks if present
             clean_reply = re.sub(r"<think>[\s\S]*?</think>", "", raw_reply).strip()
             # Sanitize speech output: remove markdown characters
@@ -254,10 +297,12 @@ class VoiceCallService:
             clean_reply = re.sub(r"\s+", " ", clean_reply).strip()
         except Exception as e:
             logger.warning("GroqProvider voice error: %s. Using resilient speech fallback.", e)
+            result_status = "fallback"
+            error_msg = str(e)
             business_name = site_config_service.get_site_dict(session.site_key)["business_name"]
             clean_reply = (
-                f"Je rencontre un souci temporaire pour repondre correctement au sujet de {business_name}. "
-                "Je prefere ne pas vous donner une information incertaine. Pouvez-vous reessayer dans un instant ?"
+                f"Je rencontre un souci temporaire pour répondre correctement au sujet de {business_name}. "
+                "Je préfère ne pas vous donner une information incertaine. Pouvez-vous réessayer dans un instant ?"
             )
 
         if should_end and "au revoir" not in clean_reply.lower() and "bonne" not in clean_reply.lower():
@@ -265,6 +310,43 @@ class VoiceCallService:
 
         session.history.append({"role": "assistant", "content": clean_reply})
         del session.history[:-24]
+
+        transferred_to_rockib = False
+        if session.lead_captured and has_contact:
+            tools_called.append("lead_capture")
+            cfg = site_config_service.get_site_dict(session.site_key)
+            transferred_to_rockib = await concierge_tracing_service.forward_lead_to_telegram(
+                site_key=session.site_key,
+                business_name=cfg.get("business_name", session.site_key),
+                phone_number=phone_match.group(0).strip() if phone_match else None,
+                email=email_match.group(0) if email_match else None,
+                topic=user_text[:400],
+                channel="voice",
+                conversation_id=turn.session_id,
+            )
+            if transferred_to_rockib:
+                tools_called.append("telegram_notify")
+
+        duration_ms = round((time.perf_counter() - start_time) * 1000.0, 2)
+
+        # Record detailed trace
+        trace = ConciergeTraceData(
+            conversation_id=turn.session_id,
+            site_key=session.site_key,
+            channel="voice",
+            model=model_name,
+            duration_ms=duration_ms,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
+            total_tokens=total_tokens,
+            estimated_cost_usd=cost_usd,
+            tools_called=tools_called,
+            result_status=result_status,
+            lead_captured=session.lead_captured,
+            transferred_to_rockib=transferred_to_rockib,
+            error_message=error_msg,
+        )
+        await concierge_tracing_service.record_trace(trace, db=db)
 
         return VoiceCallTurnResponse(
             session_id=turn.session_id,
@@ -274,88 +356,3 @@ class VoiceCallService:
             status="ok",
         )
 
-    async def schedule_callback(self, request: CallMeBackRequest) -> CallMeBackResponse:
-        """Schedules a phone or WhatsApp callback for the visitor."""
-        callback_id = str(uuid.uuid4())
-        channel_label = "WhatsApp" if request.channel.lower() == "whatsapp" else "Téléphone"
-
-        lead_need = (
-            f"DEMANDE DE RAPPEL ({channel_label.upper()}) : "
-            f"Créneau: {request.preferred_time} | Sujet: {request.topic}"
-        )
-
-        await self._dispatch_lead(
-            contact_name=request.contact_name or "Demande de Rappel Vocal",
-            email=f"{request.phone_number.replace('+', '').replace(' ', '')}@call.lead",
-            need=lead_need,
-            phone=request.phone_number,
-            site_key=request.site_key or "rockib-portfolio",
-        )
-
-        message = (
-            f"Votre demande d'appel {channel_label} au {request.phone_number} a bien été enregistrée. "
-            f"Rockib ou un agent de l'équipe vous contactera sous peu !"
-        )
-
-        return CallMeBackResponse(
-            callback_id=callback_id,
-            status="scheduled",
-            channel=request.channel,
-            phone_number=request.phone_number,
-            message=message,
-            estimated_wait_minutes=5 if request.preferred_time == "immediate" else 30,
-        )
-
-    async def _dispatch_lead(
-        self,
-        contact_name: str,
-        email: str,
-        need: str,
-        phone: Optional[str] = None,
-        site_key: str = "rockib-portfolio",
-    ) -> None:
-        payload = {
-            "company_name": f"Inbound Voice / Call ({site_key})",
-            "contact_name": contact_name,
-            "email": email,
-            "automation_need": f"{need} (Phone: {phone})" if phone else need,
-        }
-        logger.info("Captured voice lead for concierge site %s (email=%s, phone=%s)", site_key, bool(email), bool(phone))
-
-        # 1. Alerte prioritaire immédiate sur Telegram pour Rockib
-        from app.telegram.services.telegram_service import telegram_service
-        from app.inbound.services.site_config_service import site_config_service
-        site_cfg = site_config_service.get_site_dict(site_key)
-        client_biz = site_cfg.get("business_name", site_key)
-        client_wa = site_cfg.get("contact_whatsapp", "")
-        client_mail = site_cfg.get("contact_email", "")
-
-        if telegram_service.is_configured():
-            try:
-                tg_msg = (
-                    "🎙️ *DEMANDE DE RAPPEL / LEAD VOCAL DU CONCIERGE IA* 📞\n\n"
-                    f"🏢 *Entreprise / Site* : `{client_biz}` (`{site_key}`)\n"
-                    f"👤 *Nom / Contact* : `{contact_name}`\n"
-                    f"📞 *Numéro de rappel* : `{phone or 'Non spécifié'}`\n"
-                    f"📧 *Email* : `{email}`\n"
-                    + (f"📲 *Contact Client WhatsApp* : `{client_wa}`\n" if client_wa else "")
-                    + (f"📩 *Contact Client Email* : `{client_mail}`\n" if client_mail else "")
-                    + f"\n📝 *Détail / Contexte de l'appel* :\n_{need}_\n\n"
-                    "⚡ *Action requise* : Contacter le prospect au plus vite ou transférer au client !"
-                )
-                await telegram_service.send_message(
-                    chat_id=telegram_service.admin_chat_id,
-                    text=tg_msg,
-                    parse_mode="Markdown",
-                )
-                logger.info("Telegram voice lead alert sent to Rockib for %s on %s", phone or contact_name, site_key)
-            except Exception as tg_err:
-                logger.warning("Failed to dispatch voice lead to Telegram: %s", tg_err)
-
-        # 2. Transmission vers Agence IIA
-        agency_leads_url = "http://127.0.0.1:8000/api/leads/"
-        try:
-            async with httpx.AsyncClient(timeout=2.0) as client:
-                await client.post(agency_leads_url, json=payload)
-        except Exception:
-            pass

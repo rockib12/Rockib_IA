@@ -61,6 +61,8 @@ class Settings(BaseSettings):
     DEFAULT_MODEL_NAME: str = "openai/gpt-oss-120b"
     GROQ_MODEL: str = "openai/gpt-oss-120b"
     ANALYTICAL_MODEL_NAME: str = "deepseek-coder"
+    CONCIERGE_LEAD_RETENTION_DAYS: int = 90
+    TRUSTED_PROXY_CIDRS: list[str] = ["127.0.0.0/8", "::1/128"]
 
     # Execution / Sandboxing
     WORKSPACES_ROOT: str = "/tmp/rockib_workspaces"

@@ -333,18 +333,36 @@ async def reconcile_attempt(
         attempt.status = AttemptStatus.FAILED
     await db.flush()
 
-    db.add(
-        ExecutionResultRecord(
-            attempt_id=attempt.id,
-            effect=resolved_effect,
-            success=resolved_effect == EffectCertainty.confirmed,
-            evidence_reference=evidence_reference,
-            provider_reference=provider_reference,
-            cost_amount=cost_amount,
-            cost_unit=cost_unit,
-            observed_at=_utcnow(),
-        )
+    existing_res_stmt = select(ExecutionResultRecord).where(
+        ExecutionResultRecord.attempt_id == attempt.id
     )
+    res_exec = await db.execute(existing_res_stmt)
+    existing_result = res_exec.scalars().first()
+
+    if existing_result is not None:
+        existing_result.effect = resolved_effect
+        existing_result.success = resolved_effect == EffectCertainty.confirmed
+        existing_result.evidence_reference = evidence_reference
+        if provider_reference is not None:
+            existing_result.provider_reference = provider_reference
+        if cost_amount is not None:
+            existing_result.cost_amount = cost_amount
+        if cost_unit is not None:
+            existing_result.cost_unit = cost_unit
+        existing_result.observed_at = _utcnow()
+    else:
+        db.add(
+            ExecutionResultRecord(
+                attempt_id=attempt.id,
+                effect=resolved_effect,
+                success=resolved_effect == EffectCertainty.confirmed,
+                evidence_reference=evidence_reference,
+                provider_reference=provider_reference,
+                cost_amount=cost_amount,
+                cost_unit=cost_unit,
+                observed_at=_utcnow(),
+            )
+        )
     await db.flush()
     await audit.record(
         db,
