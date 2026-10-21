@@ -331,3 +331,22 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
      - Mode Fail-Closed garanti : en l'absence d'inspecteur ou de preuve concluante, la réservation reste impérativement scellée en `HELD` pour protéger le solde financier.
      - Notification automatique sur le compte Telegram de Rockib (`@masterrockibot`) dès qu'une action est réconciliée.
    - **Non-Régression Globale Absolue** : Suite de tests portée à **734 tests unitaires et d'intégration réussis (100% verts, 0 échec, 0 warning)** en 179 secondes.
+
+
+32. **Alignement Frontend, Synchronisation GitHub master & Validation Live Docker 100/100** :
+   - **Alignement des Clés du Benchmark Frontend (rontend/src/components/ObservabilityPanel.jsx)** :
+     - Synchronisation des accesseurs de l'interface (data.overall_score ?? data.global_score et 
+esults || scenarios) garantissant l'affichage sans faille du score et des 6 tuiles de scénarios dans le Cockpit.
+     - Compilation de production React/Vite validée sans erreur (dist/ généré en 6.25s).
+   - **Fusion & Synchronisation Complète avec GitHub Remote (origin/master)** :
+     - Intégration et résolution sans heurt des conflits de la PR #1 (codex/security-ops-hardening), combinant la protection anti-bruteforce LRU, l'anti-spoofing IP, le deep health check 503 et la flexibilité des variables d'environnement (POSTGRES_USER, POSTGRES_HOST_PORT, REDIS_HOST_PORT).
+     - Push réussi sur le dépôt officiel : branche master 100% à jour avec origin/master (arbre propre).
+   - **Validation E2E en Conteneurs Docker de Production (
+ockib_ia_app)** :
+     - Statut des conteneurs : 
+ockib_ia_app (Up, healthy), 
+ockib_ia_postgres (Up, healthy), 
+ockib_ia_redis (Up, healthy).
+     - Validation de la sonde /api/v1/health en direct (HTTP 200 OK avec PostgreSQL et Redis UP).
+     - Validation en direct de la suite Golden Benchmark (POST /api/v1/inbound/benchmark/run) : **6/6 scénarios réussis avec un score parfait de 100.0/100**.
+     - Correction du service vocal (oice_call_service.py) avec import de httpx pour la transcription Groq Whisper STT.
