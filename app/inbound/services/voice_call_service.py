@@ -14,6 +14,8 @@ import time
 import uuid
 from typing import Dict, List, Optional
 
+import httpx
+
 
 from app.core.config import settings
 from app.inbound.schemas import (
