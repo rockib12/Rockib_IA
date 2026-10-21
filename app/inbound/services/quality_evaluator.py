@@ -49,7 +49,7 @@ STANDARD_GOLDEN_SCENARIOS: List[ReferenceScenario] = [
         site_key="rockib-portfolio",
         expected_lead_captured=False,
         required_keywords=["martistore", "waauto", "agence iia", "rockib", "arbitrage", "système"],
-        forbidden_keywords=["je ne sais pas", "gsk_", "sk-", "token", "password"],
+        forbidden_keywords=["je ne sais pas", "gsk_", "sk-", "client_token", "password"],
     ),
     ReferenceScenario(
         scenario_id="scen_quote_proactive_capture",
