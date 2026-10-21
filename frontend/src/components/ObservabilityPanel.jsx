@@ -141,7 +141,8 @@ export default function ObservabilityPanel({
       if (res.ok) {
         const data = await res.json();
         setBenchmarkResult(data);
-        onNotify(`Benchmark terminé ! Score global : ${data.global_score}/100`, "success");
+        const score = data.overall_score ?? data.global_score ?? 0;
+        onNotify(`Benchmark terminé ! Score global : ${score}/100`, "success");
       } else {
         onNotify("Échec de l'exécution du benchmark", "error");
       }
@@ -365,7 +366,7 @@ export default function ObservabilityPanel({
                       fontWeight: 700,
                     }}
                   >
-                    Score: {benchmarkResult.global_score}/100
+                    Score: {benchmarkResult.overall_score ?? benchmarkResult.global_score}/100
                   </span>
                 </div>
                 <button
@@ -378,7 +379,7 @@ export default function ObservabilityPanel({
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '10px' }}>
-                {benchmarkResult.scenarios?.map((sc, i) => (
+                {(benchmarkResult.results || benchmarkResult.scenarios)?.map((sc, i) => (
                   <div
                     key={i}
                     style={{
