@@ -179,7 +179,8 @@ async def api_health_check(db=Depends(get_async_db)):
     redis_ok = False
     try:
         import redis.asyncio as aioredis
-        r_client = aioredis.from_url(settings.REDIS_URL, socket_connect_timeout=1.5)
+        redis_url = settings.REDIS_URL.replace("://localhost:", "://127.0.0.1:")
+        r_client = aioredis.from_url(redis_url, socket_connect_timeout=1.5)
         try:
             redis_ok = bool(await r_client.ping())
         finally:

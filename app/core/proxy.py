@@ -17,6 +17,7 @@ def _is_trusted_proxy(address: str) -> bool:
 
 
 def get_client_ip(request: Request) -> str:
+    """Use X-Forwarded-For only when the direct peer is explicitly trusted."""
     peer = request.client.host if request.client else "127.0.0.1"
     if not _is_trusted_proxy(peer):
         return peer
@@ -25,7 +26,8 @@ def get_client_ip(request: Request) -> str:
     if not forwarded:
         return peer
 
-    # Walk from the application outward, skipping only explicitly trusted proxies.
+    # The header is ordered client -> proxies. Walk from the nearest proxy outward,
+    # skipping only addresses that are explicitly configured as trusted proxies.
     chain = [part.strip() for part in forwarded.split(",") if part.strip()]
     for address in reversed(chain):
         try:

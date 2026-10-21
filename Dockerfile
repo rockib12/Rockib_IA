@@ -89,8 +89,8 @@ RUN useradd -m -u 10001 -s /bin/sh rockib \
 EXPOSE 80 8000
 
 # Deep healthcheck testing real availability of FastAPI, PostgreSQL and Redis via Nginx
-HEALTHCHECK --interval=20s --timeout=5s --retries=3 \
-    CMD curl -f http://localhost/api/v1/health || exit 1
+HEALTHCHECK --interval=20s --timeout=5s --start-period=30s --retries=3 \
+    CMD curl -fsS http://127.0.0.1/api/v1/health >/dev/null || exit 1
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
