@@ -117,12 +117,15 @@ class GroqProvider:
         model: str,
         messages: list[dict[str, str]],
         json_mode: bool = True,
+        max_tokens: int | None = None,
     ) -> dict:
         payload = {
             "model": model,
             "messages": messages,
             "temperature": 0.0 if json_mode else 0.25,
         }
+        if max_tokens is not None:
+            payload["max_tokens"] = max_tokens
         if json_mode:
             payload["response_format"] = {"type": "json_object"}
         return payload
@@ -134,6 +137,7 @@ class GroqProvider:
         self,
         messages: list[dict[str, str]],
         json_mode: bool = True,
+        max_tokens: int | None = None,
     ) -> ProviderGenerationResult:
         """Appelle Groq et renvoie un résultat enrichi (texte, tokens, coût, latence)."""
         api_key = self._require_api_key()
@@ -141,7 +145,7 @@ class GroqProvider:
             raise AIProviderError("No model configured for GroqProvider.")
 
         url = f"{self._base_url}{GROQ_CHAT_COMPLETIONS_PATH}"
-        payload = self._build_payload(self._model, messages, json_mode=json_mode)
+        payload = self._build_payload(self._model, messages, json_mode=json_mode, max_tokens=max_tokens)
         headers = self._build_headers(api_key)
 
         start_time = time.perf_counter()
@@ -202,6 +206,7 @@ class GroqProvider:
         self,
         messages: list[dict[str, str]],
         json_mode: bool = True,
+        max_tokens: int | None = None,
     ) -> str:
         """Appelle Groq et renvoie le texte brut de la réponse.
 
@@ -212,7 +217,7 @@ class GroqProvider:
         - ``AIProviderResponseError`` : erreur HTTP (4xx/5xx)
         - ``AIProviderParsingError``  : réponse non exploitable / JSON malformé
         """
-        result = await self.generate_with_meta(messages, json_mode=json_mode)
+        result = await self.generate_with_meta(messages, json_mode=json_mode, max_tokens=max_tokens)
         return result.content
 
 

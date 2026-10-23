@@ -340,10 +340,19 @@ async def fs_write_handler(action: ActionRecord) -> ExecutionResult:
             meta = await provider.generate_with_meta([
                 {"role": "system", "content": "You are a professional code synthesis assistant. Output only the complete code inside a single markdown code block."},
                 {"role": "user", "content": prompt}
-            ], json_mode=False)
+            ], json_mode=False, max_tokens=8192)
             raw_llm = meta.content
             match = re.search(r"```(?:\w+)?\s*([\s\S]*?)```", raw_llm)
             content = match.group(1).strip() if match else raw_llm.strip()
+
+            # Ensure complete HTML structure and inject Concierge widget if missing
+            if requested_path.endswith(".html"):
+                if "</body>" in content and "/static/rockib-concierge.js" not in content:
+                    content = content.replace("</body>", '  <script src="/static/rockib-concierge.js" data-site-key="rockib-portfolio" defer></script>\n</body>')
+                if not content.endswith("</html>"):
+                    if "</body>" not in content:
+                        content += "\n</body>"
+                    content += "\n</html>"
         except Exception as exc:
             logger.warning(f"Groq code generation failed ({exc}), falling back to built-in template.")
             content = _generate_fallback_template(requested_path, action.objective)
