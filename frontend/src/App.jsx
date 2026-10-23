@@ -83,14 +83,18 @@ export default function App() {
   // Charger les agents depuis l'API
   const fetchAgents = useCallback(async () => {
     try {
-      const res = await authFetch('/api/v1/agents');
+      const res = await authFetch('/api/v1/agents?active_only=true');
       if (res.ok) {
         const data = await res.json();
-        setAgents(data);
-        if (data.length > 0 && !selectedAgentId) {
-          setSelectedAgentId(data[0].id);
+        // Conserve uniquement les orchestrateurs et les sous-agents en cours de mission
+        const activeAgents = data.filter((a) => !(a.is_ephemeral && a.is_finished));
+        setAgents(activeAgents);
+        if (activeAgents.length > 0) {
+          if (!selectedAgentId || !activeAgents.some((a) => a.id === selectedAgentId)) {
+            setSelectedAgentId(activeAgents[0].id);
+          }
         }
-        return data;
+        return activeAgents;
       }
     } catch (e) {
       console.warn("Backend FastAPI non joignable pour les agents, initialisation démo...", e);

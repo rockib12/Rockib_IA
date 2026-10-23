@@ -94,6 +94,43 @@ function createLabelSprite(text, color = '#FFFFFF') {
   return sprite;
 }
 
+// ─── Particle Bursts (Spawn Shockwave & Dematerialization Dissolution) ──
+function triggerParticleBurst(scene, particleBurstRef, position, color = '#00F0FF', isDissolve = false) {
+  const pGroup = new THREE.Group();
+  pGroup.position.copy(position);
+  pGroup.userData = { age: 0, maxAge: isDissolve ? 1.4 : 2.0 };
+
+  const colors = isDissolve
+    ? [color, '#FFFFFF', '#6366F1', '#38BDF8']
+    : [color, '#00F0FF', '#A855F7', '#10B981'];
+  const count = isDissolve ? 65 : 50;
+
+  for (let i = 0; i < count; i++) {
+    const geo = new THREE.SphereGeometry(0.1 + Math.random() * 0.08, 6, 6);
+    const mat = new THREE.MeshBasicMaterial({
+      color: colors[i % colors.length],
+      transparent: true,
+      opacity: 1,
+    });
+    const p = new THREE.Mesh(geo, mat);
+    const velocity = isDissolve
+      ? new THREE.Vector3(
+          (Math.random() - 0.5) * 12,
+          Math.random() * 14 + 5, // ascension orbitale quantique
+          (Math.random() - 0.5) * 12
+        )
+      : new THREE.Vector3(
+          (Math.random() - 0.5) * 16,
+          Math.random() * 10 + 3,
+          (Math.random() - 0.5) * 16
+        );
+    p.userData = { velocity };
+    pGroup.add(p);
+  }
+  scene.add(pGroup);
+  particleBurstRef.current.push(pGroup);
+}
+
 // ─── Component ───────────────────────────────────────────────────────
 
 export default function ThreeCanvas({
@@ -311,8 +348,25 @@ export default function ThreeCanvas({
       starField.rotation.y = elapsed * 0.012;
       dustField.rotation.y = -elapsed * 0.008;
 
-      // Animate agent pods
+      // Animate agent pods (including smooth pop-in spawn and quantum dematerialization)
+      const dematFinished = [];
       agentMeshesRef.current.forEach((group, id) => {
+        // Dématérialisation douce : rétrécissement quantique et ascension vers l'orbite
+        if (group.userData.dematerializing) {
+          group.userData.dematProgress = (group.userData.dematProgress || 0) + delta * 1.8;
+          const p = Math.min(1.0, group.userData.dematProgress);
+          const s = Math.max(0.0001, (1.0 - p) * (group.userData.baseScale || 1.0));
+          group.scale.set(s, s, s);
+          group.position.y += delta * 4.5;
+          if (group.userData.label) {
+            group.userData.label.material.opacity = Math.max(0, 1.0 - p * 1.5);
+          }
+          if (p >= 1.0) {
+            dematFinished.push(id);
+          }
+          return;
+        }
+
         const isSelected = id === selectedAgentId;
         const speed = isSelected ? 2.0 : 1.0;
 
@@ -342,9 +396,20 @@ export default function ThreeCanvas({
           group.userData.halo.scale.set(pulse, pulse, pulse);
         }
 
-        // Breathing scale on entire group
-        const breath = 1 + Math.sin(elapsed * 1.2 + group.userData.phase * 2) * 0.025;
-        group.scale.set(breath, breath, breath);
+        // Pop-in d'apparition (spawn) ou respiration normale
+        if (group.userData.spawning) {
+          group.userData.spawnProgress = (group.userData.spawnProgress || 0) + delta * 2.2;
+          const sp = Math.min(1.0, group.userData.spawnProgress);
+          const s = Math.sin(sp * Math.PI * 0.5) * 1.08;
+          group.scale.set(s, s, s);
+          if (sp >= 1.0) {
+            group.userData.spawning = false;
+          }
+        } else {
+          // Breathing scale on entire group
+          const breath = 1 + Math.sin(elapsed * 1.2 + group.userData.phase * 2) * 0.025;
+          group.scale.set(breath, breath, breath);
+        }
 
         // Label always faces camera (sprites do this automatically)
         if (group.userData.label) {
@@ -353,16 +418,26 @@ export default function ThreeCanvas({
         }
       });
 
+      // Nettoyer définitivement les pods dématérialisés
+      dematFinished.forEach((id) => {
+        const g = agentMeshesRef.current.get(id);
+        if (g) {
+          scene.remove(g);
+          agentMeshesRef.current.delete(id);
+        }
+      });
+
       // Animate particle bursts
       for (let i = particleBurstRef.current.length - 1; i >= 0; i--) {
         const pGroup = particleBurstRef.current[i];
         pGroup.userData.age += delta;
+        const maxAge = pGroup.userData.maxAge || 2.0;
         pGroup.children.forEach((p) => {
           p.position.addScaledVector(p.userData.velocity, delta);
-          p.material.opacity = Math.max(0, 1 - pGroup.userData.age / 2.0);
+          p.material.opacity = Math.max(0, 1 - pGroup.userData.age / maxAge);
           p.scale.multiplyScalar(0.995);
         });
-        if (pGroup.userData.age > 2.0) {
+        if (pGroup.userData.age > maxAge) {
           scene.remove(pGroup);
           particleBurstRef.current.splice(i, 1);
         }
@@ -473,12 +548,16 @@ export default function ThreeCanvas({
     const currentIds = new Set(agentMeshesRef.current.keys());
     const newIds = new Set(agents.map((ag) => ag.id));
 
-    // Remove deleted
+    // Dématérialisation progressive des agents sortants (mission terminée)
     currentIds.forEach((id) => {
       if (!newIds.has(id)) {
         const g = agentMeshesRef.current.get(id);
-        scene.remove(g);
-        agentMeshesRef.current.delete(id);
+        if (g && !g.userData.dematerializing) {
+          g.userData.dematerializing = true;
+          g.userData.dematProgress = 0;
+          g.userData.baseScale = g.scale.x || 1.0;
+          triggerParticleBurst(scene, particleBurstRef, g.position, g.userData.primaryColor || '#00F0FF', true);
+        }
       }
     });
 
@@ -496,10 +575,16 @@ export default function ThreeCanvas({
       if (!agentGroup) {
         // ── Build new 3D Agent Pod ──
         agentGroup = new THREE.Group();
+        agentGroup.scale.set(0.01, 0.01, 0.01);
         agentGroup.userData = {
           agentId: agent.id,
+          primaryColor: primaryColor,
           phase: Math.random() * Math.PI * 2,
+          spawning: true,
+          spawnProgress: 0,
         };
+        // Onde de choc et particules d'apparition
+        triggerParticleBurst(scene, particleBurstRef, pos, primaryColor, false);
 
         // A. Holographic Pedestal
         const baseGeo = new THREE.CylinderGeometry(2.0, 2.3, 0.35, 28);
@@ -637,10 +722,12 @@ export default function ThreeCanvas({
     linkLinesRef.current = [];
 
     agents.forEach((ag) => {
+      const childMesh = agentMeshesRef.current.get(ag.id);
       if (
         ag.parent_agent_id &&
         positions.has(ag.parent_agent_id) &&
-        positions.has(ag.id)
+        positions.has(ag.id) &&
+        (!childMesh || !childMesh.userData?.dematerializing)
       ) {
         const p1 = positions.get(ag.parent_agent_id);
         const p2 = positions.get(ag.id);

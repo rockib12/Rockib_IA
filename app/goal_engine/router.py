@@ -78,6 +78,8 @@ class AgentResponse(BaseModel):
     completed_tasks_count: int = 0
     current_status: str = "READY"
     current_action: Optional[str] = None
+    is_ephemeral: bool = False
+    is_finished: bool = False
 
 
 class TaskSummary(BaseModel):
@@ -162,6 +164,10 @@ class AgentLogsResponse(BaseModel):
 @router.get("/agents", response_model=List[AgentResponse])
 async def list_agents(
     workspace_id: Optional[uuid.UUID] = None,
+    active_only: bool = Query(
+        default=False,
+        description="Filtre pour le Cockpit 3D : conserve les orchestrateurs et sous-agents en cours de mission, masque les sous-agents terminés.",
+    ),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_async_db),
 ):
@@ -231,9 +237,6 @@ async def list_agents(
         has_running = bool(running_tasks)
         running_task_desc = running_tasks[0].description if running_tasks else None
 
-        # Déduire le statut courant pour le halo 3D
-        current_status = "RUNNING" if has_running else ("READY" if active_goals else "IDLE")
-
         # Parent agent éventuel (via parent_goal ou métadonnées)
         parent_agent_id = None
         for g in goals:
@@ -251,6 +254,43 @@ async def list_agents(
                     except (ValueError, TypeError):
                         pass
 
+        # Distinguer orchestrateur permanent (racine) vs sous-agent de mission éphémère
+        name_lower = (ag.name or "").lower()
+        role_lower = (ag.role or "").lower()
+        is_root = (
+            parent_agent_id is None
+            and (
+                any(kw in role_lower for kw in ("orchestrator", "architect", "ambassador", "sentinel", "suprême", "principal", "lead"))
+                or any(kw in name_lower for kw in ("orchestrateur", "ambassador", "lead", "agent a", "agent b", "agent observability"))
+                or not goals
+            )
+        )
+        is_ephemeral = not is_root
+
+        # Un sous-agent éphémère est considéré comme ayant fini son travail quand :
+        # - Toutes ses tâches sont achevées (completed_tasks == total_tasks > 0) et aucune n'est en cours (not has_running)
+        # - Ou aucun objectif actif n'est en cours et il a des tâches passées
+        # - Ou son compte a été désactivé (is_active == False)
+        is_finished = bool(
+            is_ephemeral
+            and (
+                (total_tasks > 0 and completed_tasks == total_tasks and not has_running)
+                or (not active_goals and not has_running and total_tasks > 0)
+                or not ag.is_active
+            )
+        )
+
+        if is_finished:
+            current_status = "COMPLETED"
+            current_action = "Mission accomplie — En cours de dématérialisation"
+        else:
+            current_status = "RUNNING" if has_running else ("READY" if active_goals else "IDLE")
+            current_action = running_task_desc or (f"Supervise {len(active_goals)} objectif(s)" if active_goals else "En veille orbitale")
+
+        # Filtre cockpit 3D : si active_only est actif, les sous-agents ayant terminé disparaissent du cockpit
+        if active_only and is_ephemeral and is_finished:
+            continue
+
         result.append(
             AgentResponse(
                 id=ag.id,
@@ -265,7 +305,9 @@ async def list_agents(
                 total_tasks_count=total_tasks,
                 completed_tasks_count=completed_tasks,
                 current_status=current_status,
-                current_action=running_task_desc or (f"Supervise {len(active_goals)} objectif(s)" if active_goals else "En veille orbitale"),
+                current_action=current_action,
+                is_ephemeral=is_ephemeral,
+                is_finished=is_finished,
             )
         )
     return result
