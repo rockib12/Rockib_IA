@@ -329,24 +329,21 @@ async def fs_write_handler(action: ActionRecord) -> ExecutionResult:
             prompt = (
                 f"Tu es un architecte logiciel et développeur expert full-stack de classe mondiale de Rockib AI.\n"
                 f"L'utilisateur a donné l'objectif suivant : \"{action.objective}\".\n"
-                f"Tu dois générer le code source complet, sans aucune omission ni placeholder ('// TODO' ou '<!-- rest of code -->'), "
+                f"Tu dois générer le code source complet, authentique et prêt pour la production (sans placeholder '// TODO' ou '<!-- rest -->'), "
                 f"pour le fichier '{requested_path}'.\n\n"
                 f"DIRECTIVES :\n"
-                f"- Si c'est une page HTML ({requested_path}), elle doit être visuellement magnifique, moderne (thème cyber/futuriste/luxe selon le sujet), "
-                f"avec CSS intégré propre, typographie élégante, animations douces et responsivité complète.\n"
+                f"- Si c'est une page HTML ({requested_path}), elle doit être visuellement magnifique, moderne et adaptée exactement au sujet de l'entreprise "
+                f"(catalogue, produits réels, tarifs, formulaires, design professionnel, CSS intégré et responsive mobile).\n"
                 f"- Si c'est du Python/JS, le code doit être fonctionnel, modulaire et documenté.\n"
-                f"- Tu DOIS renvoyer UNIQUEMENT un objet JSON valide avec une seule clé 'code' contenant le texte intégral du fichier.\n"
-                f'Format attendu : {{"code": "<contenu complet du fichier>"}}'
+                f"- Renvoie UNIQUEMENT le code complet à l'intérieur d'un bloc ```{requested_path.split('.')[-1]} ... ``` sans texte d'accompagnement."
             )
-            raw_llm = await provider.generate([
-                {"role": "system", "content": "You are a professional code synthesis assistant. You output valid JSON with a single key 'code'."},
+            meta = await provider.generate_with_meta([
+                {"role": "system", "content": "You are a professional code synthesis assistant. Output only the complete code inside a single markdown code block."},
                 {"role": "user", "content": prompt}
-            ])
-            try:
-                parsed = json.loads(raw_llm)
-                content = parsed.get("code") or raw_llm
-            except Exception:
-                content = raw_llm
+            ], json_mode=False)
+            raw_llm = meta.content
+            match = re.search(r"```(?:\w+)?\s*([\s\S]*?)```", raw_llm)
+            content = match.group(1).strip() if match else raw_llm.strip()
         except Exception as exc:
             logger.warning(f"Groq code generation failed ({exc}), falling back to built-in template.")
             content = _generate_fallback_template(requested_path, action.objective)
