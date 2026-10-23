@@ -208,12 +208,20 @@ async def _reconcile_single_attempt_async(
         return result
 
 
+_worker_loop: Optional[asyncio.AbstractEventLoop] = None
+
+
+def _get_worker_loop() -> asyncio.AbstractEventLoop:
+    global _worker_loop
+    if _worker_loop is None or _worker_loop.is_closed():
+        _worker_loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_worker_loop)
+    return _worker_loop
+
+
 def _run_async(coro):
-    try:
-        return asyncio.run(coro)
-    except RuntimeError:
-        loop = asyncio.get_event_loop_policy().get_event_loop()
-        return loop.run_until_complete(coro)
+    loop = _get_worker_loop()
+    return loop.run_until_complete(coro)
 
 
 @celery_app.task(name="app.execution.tasks.reconcile_pending_attempts")
