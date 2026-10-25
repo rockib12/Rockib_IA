@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import ThreeCanvas from './components/ThreeCanvas';
-import CockpitHeader from './components/CockpitHeader';
+import CockpitSidebar from './components/CockpitSidebar';
 import AgentActivityCard from './components/AgentActivityCard';
 import TaskDAGPanel from './components/TaskDAGPanel';
 import SpawnAgentModal from './components/SpawnAgentModal';
@@ -397,8 +397,8 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Barre d'en-tête Cockpit */}
-      <CockpitHeader
+      {/* Barre latérale tactique (Sidebar) Cockpit */}
+      <CockpitSidebar
         agentsCount={agents.length}
         goalsCount={goals.length}
         healthStatus={healthStatus}
