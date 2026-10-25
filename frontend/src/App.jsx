@@ -65,6 +65,14 @@ export default function App() {
     return () => window.removeEventListener('rockib:unauthorized', handleUnauthorized);
   }, []);
 
+  // Recalculer le canvas Three.js quand la sidebar apparaît/disparaît (login/logout)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      window.dispatchEvent(new Event('resize'));
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [currentUser]);
+
   // Sonde de santé profonde PostgreSQL & Redis
   const fetchHealth = useCallback(async () => {
     try {
@@ -397,8 +405,9 @@ export default function App() {
 
   return (
     <div className="app-container">
-      {/* Barre latérale tactique (Sidebar) Cockpit */}
-      <CockpitSidebar
+      {/* Barre latérale tactique (Sidebar) Cockpit - Visible uniquement si connecté */}
+      {currentUser && (
+  <CockpitSidebar
         agentsCount={agents.length}
         goalsCount={goals.length}
         healthStatus={healthStatus}
@@ -470,6 +479,7 @@ export default function App() {
         isClientCRMOpen={isClientCRMOpen}
         onToggleClientCRM={() => setIsClientCRMOpen(!isClientCRMOpen)}
       />
+      )}
 
       {/* Zone de rendu 3D & HUD */}
       <main className="viewport-area">
