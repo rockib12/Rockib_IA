@@ -357,5 +357,137 @@
     "contact_whatsapp": "+229 01 97 11 22 33",
     "contact_email": "contact@boutiquemode.bj",
     "client_token": "tok_Swnxu2sE_k0NTvTZQsOMuAy7"
+  },
+  "boutique-test-447292d6": {
+    "site_key": "boutique-test-447292d6",
+    "business_name": "Boutique Mode Cotonou",
+    "subtitle": "Prêt-à-porter & Accessoires",
+    "launcher_label": "🛍️ Conseiller Mode IA",
+    "primary_color": "#A855F7",
+    "position": "right",
+    "default_voice": "vivienne",
+    "welcome_message": "Bienvenue chez Boutique Mode ! Comment puis-je vous aider ?",
+    "voice_greeting": "Bonjour ! Je suis votre conseillère style.",
+    "quick_chips": [
+      "Robes de soirée",
+      "Horaires"
+    ],
+    "voice_topic_chips": [],
+    "assistant_role": "Tu es la conseillère style et vente de la boutique.",
+    "knowledge_base": "CATALOGUE : Robes de soirée 25.000 FCFA, Costumes 45.000 FCFA. Livraison 24h.",
+    "pricing_rule": "Orientez vers WhatsApp pour finaliser la commande.",
+    "contact_whatsapp": "+229 01 97 11 22 33",
+    "contact_email": "contact@boutiquemode.bj",
+    "client_token": "tok_W6ayp0L06DrqY6-NSPq6RB28"
+  },
+  "other-tenant-6d48a769": {
+    "site_key": "other-tenant-6d48a769",
+    "business_name": "Autre Clinique",
+    "subtitle": "Prêt-à-porter & Accessoires",
+    "launcher_label": "🛍️ Conseiller Mode IA",
+    "primary_color": "#A855F7",
+    "position": "right",
+    "default_voice": "vivienne",
+    "welcome_message": "Bienvenue chez Boutique Mode ! Comment puis-je vous aider ?",
+    "voice_greeting": "Bonjour ! Je suis votre conseillère style.",
+    "quick_chips": [
+      "Robes de soirée",
+      "Horaires"
+    ],
+    "voice_topic_chips": [],
+    "assistant_role": "Tu es la conseillère style et vente de la boutique.",
+    "knowledge_base": "CATALOGUE : Robes de soirée 25.000 FCFA, Costumes 45.000 FCFA. Livraison 24h.",
+    "pricing_rule": "Orientez vers WhatsApp pour finaliser la commande.",
+    "contact_whatsapp": "+229 01 97 11 22 33",
+    "contact_email": "contact@boutiquemode.bj",
+    "client_token": "tok_QQr5f_p1eRka9m9MflWfzZCS"
+  },
+  "boutique-test-200a948b": {
+    "site_key": "boutique-test-200a948b",
+    "business_name": "Boutique Mode Cotonou",
+    "subtitle": "Prêt-à-porter & Accessoires",
+    "launcher_label": "🛍️ Conseiller Mode IA",
+    "primary_color": "#A855F7",
+    "position": "right",
+    "default_voice": "vivienne",
+    "welcome_message": "Bienvenue chez Boutique Mode ! Comment puis-je vous aider ?",
+    "voice_greeting": "Bonjour ! Je suis votre conseillère style.",
+    "quick_chips": [
+      "Robes de soirée",
+      "Horaires"
+    ],
+    "voice_topic_chips": [],
+    "assistant_role": "Tu es la conseillère style et vente de la boutique.",
+    "knowledge_base": "CATALOGUE : Robes de soirée 25.000 FCFA, Costumes 45.000 FCFA. Livraison 24h.",
+    "pricing_rule": "Orientez vers WhatsApp pour finaliser la commande.",
+    "contact_whatsapp": "+229 01 97 11 22 33",
+    "contact_email": "contact@boutiquemode.bj",
+    "client_token": "tok_7kp6hPplqWzv8A5KsfuxUxqv"
+  },
+  "other-tenant-8aeeeae4": {
+    "site_key": "other-tenant-8aeeeae4",
+    "business_name": "Autre Clinique",
+    "subtitle": "Prêt-à-porter & Accessoires",
+    "launcher_label": "🛍️ Conseiller Mode IA",
+    "primary_color": "#A855F7",
+    "position": "right",
+    "default_voice": "vivienne",
+    "welcome_message": "Bienvenue chez Boutique Mode ! Comment puis-je vous aider ?",
+    "voice_greeting": "Bonjour ! Je suis votre conseillère style.",
+    "quick_chips": [
+      "Robes de soirée",
+      "Horaires"
+    ],
+    "voice_topic_chips": [],
+    "assistant_role": "Tu es la conseillère style et vente de la boutique.",
+    "knowledge_base": "CATALOGUE : Robes de soirée 25.000 FCFA, Costumes 45.000 FCFA. Livraison 24h.",
+    "pricing_rule": "Orientez vers WhatsApp pour finaliser la commande.",
+    "contact_whatsapp": "+229 01 97 11 22 33",
+    "contact_email": "contact@boutiquemode.bj",
+    "client_token": "tok_0sLs__BTDtb0KYLlyJKbH8K8"
+  },
+  "boutique-test-ae533832": {
+    "site_key": "boutique-test-ae533832",
+    "business_name": "Boutique Mode Cotonou",
+    "subtitle": "Prêt-à-porter & Accessoires",
+    "launcher_label": "🛍️ Conseiller Mode IA",
+    "primary_color": "#A855F7",
+    "position": "right",
+    "default_voice": "vivienne",
+    "welcome_message": "Bienvenue chez Boutique Mode ! Comment puis-je vous aider ?",
+    "voice_greeting": "Bonjour ! Je suis votre conseillère style.",
+    "quick_chips": [
+      "Robes de soirée",
+      "Horaires"
+    ],
+    "voice_topic_chips": [],
+    "assistant_role": "Tu es la conseillère style et vente de la boutique.",
+    "knowledge_base": "CATALOGUE : Robes de soirée 25.000 FCFA, Costumes 45.000 FCFA. Livraison 24h.",
+    "pricing_rule": "Orientez vers WhatsApp pour finaliser la commande.",
+    "contact_whatsapp": "+229 01 97 11 22 33",
+    "contact_email": "contact@boutiquemode.bj",
+    "client_token": "tok_FU5e1aPXdZq93gJZHbk1mg3y"
+  },
+  "other-tenant-087ea497": {
+    "site_key": "other-tenant-087ea497",
+    "business_name": "Autre Clinique",
+    "subtitle": "Prêt-à-porter & Accessoires",
+    "launcher_label": "🛍️ Conseiller Mode IA",
+    "primary_color": "#A855F7",
+    "position": "right",
+    "default_voice": "vivienne",
+    "welcome_message": "Bienvenue chez Boutique Mode ! Comment puis-je vous aider ?",
+    "voice_greeting": "Bonjour ! Je suis votre conseillère style.",
+    "quick_chips": [
+      "Robes de soirée",
+      "Horaires"
+    ],
+    "voice_topic_chips": [],
+    "assistant_role": "Tu es la conseillère style et vente de la boutique.",
+    "knowledge_base": "CATALOGUE : Robes de soirée 25.000 FCFA, Costumes 45.000 FCFA. Livraison 24h.",
+    "pricing_rule": "Orientez vers WhatsApp pour finaliser la commande.",
+    "contact_whatsapp": "+229 01 97 11 22 33",
+    "contact_email": "contact@boutiquemode.bj",
+    "client_token": "tok_czOJQaJh7JqdJ2aTNSSWKqd4"
   }
 }

@@ -18,6 +18,7 @@ import {
   X,
   Share2,
   Lock,
+  Briefcase,
 } from 'lucide-react';
 
 export default function CockpitHeader({
@@ -46,6 +47,8 @@ export default function CockpitHeader({
   onToggleConnectors,
   isObservabilityOpen = false,
   onToggleObservability,
+  isClientCRMOpen = false,
+  onToggleClientCRM,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const isHealthy = healthStatus?.status === 'healthy';
@@ -147,6 +150,16 @@ export default function CockpitHeader({
           >
             <BarChart3 size={15} />
             <span>Dashboard</span>
+          </button>
+
+          <button
+            onClick={onToggleClientCRM}
+            className={`btn-cyber ${isClientCRMOpen ? 'active-panel' : 'secondary'}`}
+            title="Espace Commercial B2B, CRM Prospects 24h/24 & Intégration Web"
+            style={{ borderColor: 'rgba(0, 255, 157, 0.45)', background: isClientCRMOpen ? 'rgba(0, 255, 157, 0.15)' : 'rgba(0, 255, 157, 0.05)' }}
+          >
+            <Briefcase size={15} color="var(--neon-emerald)" />
+            <span style={{ color: 'var(--neon-emerald)', fontWeight: 600 }}>CRM Clients</span>
           </button>
 
           <button

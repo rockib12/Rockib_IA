@@ -9,6 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.proxy import get_client_ip
 from app.core.database import get_async_db
+from app.core.dependencies import get_optional_user
+from app.identity.models import User
 from app.telegram.services.telegram_service import telegram_service
 
 from datetime import datetime, timezone
@@ -66,9 +68,10 @@ async def get_concierge_site_config(site_key: str) -> ConciergeSiteConfigPublic:
 async def get_manage_concierge_site_config(
     site_key: str,
     x_concierge_token: Optional[str] = Header(default=None),
+    current_user: Optional[User] = Depends(get_optional_user),
 ) -> ConciergeSiteConfigPrivate:
     """Returns private setup data only to the site's owner or configured master key."""
-    if not site_config_service.can_manage_site(site_key, x_concierge_token):
+    if not (current_user or site_config_service.can_manage_site(site_key, x_concierge_token)):
         raise HTTPException(status_code=403, detail="Invalid concierge management token.")
     try:
         return site_config_service.get_private_config(site_key)
@@ -81,6 +84,7 @@ async def get_site_leads(
     site_key: str,
     request: Request,
     x_concierge_token: Optional[str] = Header(default=None),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_async_db),
 ) -> list[ConciergeLeadSummary]:
     """Lists only the recent lead records belonging to the authenticated site."""
@@ -91,7 +95,7 @@ async def get_site_leads(
             detail="Trop de consultations. Veuillez patienter une minute.",
             headers={"Retry-After": "60"},
         )
-    if not site_config_service.can_manage_site(site_key, x_concierge_token):
+    if not (current_user or site_config_service.can_manage_site(site_key, x_concierge_token)):
         raise HTTPException(status_code=403, detail="Invalid concierge management token.")
     try:
         site_config_service.get_site_dict(site_key)
@@ -107,10 +111,11 @@ async def update_tenant_lead_status(
     body: ConciergeLeadStatusUpdateRequest,
     request: Request,
     x_concierge_token: Optional[str] = Header(default=None),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_async_db),
 ) -> ConciergeLeadSummary:
     """Updates a lead's follow-up state (contacted, converted, archived)."""
-    if not site_config_service.can_manage_site(site_key, x_concierge_token):
+    if not (current_user or site_config_service.can_manage_site(site_key, x_concierge_token)):
         raise HTTPException(status_code=403, detail="Invalid concierge management token.")
     lead = await update_lead_status(db, site_key=site_key, lead_id=lead_id, new_status=body.status)
     if not lead:
@@ -123,10 +128,11 @@ async def export_tenant_leads_csv(
     site_key: str,
     request: Request,
     x_concierge_token: Optional[str] = Header(default=None),
+    current_user: Optional[User] = Depends(get_optional_user),
     db: AsyncSession = Depends(get_async_db),
 ) -> Response:
     """Exports tenant leads as CSV for CRM or spreadsheet import."""
-    if not site_config_service.can_manage_site(site_key, x_concierge_token):
+    if not (current_user or site_config_service.can_manage_site(site_key, x_concierge_token)):
         raise HTTPException(status_code=403, detail="Invalid concierge management token.")
     csv_data = await export_leads_csv(db, site_key=site_key)
     return Response(

@@ -37,16 +37,19 @@ install_production_handlers()
 async def _dispatch_active_goals_async() -> List[str]:
     """Interroge les Goals au statut ACTIVE sans bloquer l'Event Loop."""
     async with AsyncSessionLocal() as session:
-        stmt = (
-            select(Goal.id)
-            .where(
-                Goal.status == GoalStatus.ACTIVE,
-                Goal.objective != "STEP 5C concurrency probe",
+        try:
+            stmt = (
+                select(Goal.id)
+                .where(
+                    Goal.status == GoalStatus.ACTIVE,
+                    Goal.objective != "STEP 5C concurrency probe",
+                )
+                .order_by(Goal.priority.desc(), Goal.created_at.asc())
             )
-            .order_by(Goal.priority.desc(), Goal.created_at.asc())
-        )
-        result = await session.execute(stmt)
-        return [str(gid) for gid in result.scalars().all()]
+            result = await session.execute(stmt)
+            return [str(gid) for gid in result.scalars().all()]
+        finally:
+            await session.rollback()
 
 
 _worker_loop: Optional[asyncio.AbstractEventLoop] = None

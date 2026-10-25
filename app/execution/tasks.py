@@ -111,13 +111,16 @@ register_reconciliation_inspector("meta_ads", "create_campaign", _meta_ads_inspe
 async def _find_unknown_attempts_async() -> List[str]:
     """Recherche toutes les tentatives d'exécution en statut UNKNOWN."""
     async with AsyncSessionLocal() as session:
-        stmt = (
-            select(ExecutionAttempt.id)
-            .where(ExecutionAttempt.status == AttemptStatus.UNKNOWN)
-            .order_by(ExecutionAttempt.started_at.asc().nulls_last())
-        )
-        res = await session.execute(stmt)
-        return [str(aid) for aid in res.scalars().all()]
+        try:
+            stmt = (
+                select(ExecutionAttempt.id)
+                .where(ExecutionAttempt.status == AttemptStatus.UNKNOWN)
+                .order_by(ExecutionAttempt.started_at.asc().nulls_last())
+            )
+            res = await session.execute(stmt)
+            return [str(aid) for aid in res.scalars().all()]
+        finally:
+            await session.rollback()
 
 
 async def _reconcile_single_attempt_async(

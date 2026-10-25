@@ -12,6 +12,7 @@ import CyberTerminal from './components/CyberTerminal';
 import EventTimeline from './components/EventTimeline';
 import SocialConnectorsPanel from './components/SocialConnectorsPanel';
 import ObservabilityPanel from './components/ObservabilityPanel';
+import ClientCRMModal from './components/ClientCRMModal';
 import { authFetch } from './lib/authFetch';
 
 // Workspace par défaut pour l'environnement local
@@ -44,6 +45,7 @@ export default function App() {
   const [isGovernanceOpen, setIsGovernanceOpen] = useState(false);
   const [isConnectorsOpen, setIsConnectorsOpen] = useState(false);
   const [isObservabilityOpen, setIsObservabilityOpen] = useState(false);
+  const [isClientCRMOpen, setIsClientCRMOpen] = useState(false);
 
   const addToast = useCallback((message, type = 'info') => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -465,6 +467,8 @@ export default function App() {
         }}
         isObservabilityOpen={isObservabilityOpen}
         onToggleObservability={() => setIsObservabilityOpen(!isObservabilityOpen)}
+        isClientCRMOpen={isClientCRMOpen}
+        onToggleClientCRM={() => setIsClientCRMOpen(!isClientCRMOpen)}
       />
 
       {/* Zone de rendu 3D & HUD */}
@@ -668,6 +672,14 @@ export default function App() {
         currentUser={currentUser}
         onOpenAuth={() => setIsAuthModalOpen(true)}
         addToast={addToast}
+      />
+
+      {/* Espace Commercial B2B, CRM Prospects & Intégration Web */}
+      <ClientCRMModal
+        isOpen={isClientCRMOpen}
+        onClose={() => setIsClientCRMOpen(false)}
+        workspaceId={agents[0]?.workspace_id || workspaceId}
+        onNotify={addToast}
       />
 
       {/* Observabilité Unifiée, Télémétrie Groq LLM & Quotas */}

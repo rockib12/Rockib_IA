@@ -65,7 +65,8 @@ Implémenter un système d'arbitrage déterministe et une boucle autonome d'agen
 ---
 
 ## 🧪 Statut des Tests
-- **734 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
+- **735 tests unitaires et d'intégration réussis (100% verts, 0 warning)** :
+  - `tests/test_agent_lifecycle_3d.py` ✅ *(1 test : Cycle de vie 3D complet des agents — Persistance de l'orchestrateur racine, apparition dynamique des sous-agents en cours de travail, détection d'achèvement de mission `is_finished`, exclusion filtrée sur le Cockpit `active_only=true` provoquant leur dématérialisation et conservation intégrale en historique d'audit)*
   - `tests/test_celery_reconciliation_tasks.py` ✅ *(4 tests : Réconciliation automatique Celery Beat & Workers — Dispatch périodique, inspecteur fs avec confirmation et consommation du quota HELD, inspecteur fs avec libération RELEASED sans effet, et maintien strict HELD sans preuve concluante)*
   - `tests/test_execution_observability_api.py` ✅ *(2 tests : API Observabilité & Exécution — Calcul en direct des quotas/budgets multi-tenant 403, journal des réservations, et réconciliation formelle d'actions UNKNOWN avec preuve)*
   - `tests/test_agent_financial_reliability_e2e.py` ✅ *(5 tests : Fiabilité agents de bout en bout — Cohérence financière stricte, rejet immédiat des floats/devises invalides, blocage des dépassements de plafond de budget `BUDGET_CEILING_VIOLATION`, sérialisation PostgreSQL advisory lock et épuisement de quota `QUOTA_EXCEEDED`, persistance `HELD` post-crash réseau avec réconciliation formelle sur preuve `reconcile_unknown_attempt`, et monotonie budgétaire descendante parent-enfant $child \le parent$)*
@@ -350,3 +351,11 @@ ockib_ia_redis (Up, healthy).
      - Validation de la sonde /api/v1/health en direct (HTTP 200 OK avec PostgreSQL et Redis UP).
      - Validation en direct de la suite Golden Benchmark (POST /api/v1/inbound/benchmark/run) : **6/6 scénarios réussis avec un score parfait de 100.0/100**.
      - Correction du service vocal (oice_call_service.py) avec import de httpx pour la transcription Groq Whisper STT.
+
+
+33. **Cycle de Vie Dynamique des Agents 3D (Matérialisation & Dématérialisation sur le Cockpit)** :
+   - **Persistance Déterministe de l'Orchestrateur Racine** : L'orchestrateur superviseur (`is_ephemeral = False`) reste ancré en permanence au centre de la scène 3D pour recevoir les ordres et superviser le système.
+   - **Matérialisation Dynamique des Sous-Agents de Mission** : Tout agent lancé pour une mission apparaît instantanément dans l'espace 3D avec faisceau d'énergie laser parent-enfant, halo néon animé et onde de choc quantique (`triggerParticleBurst`).
+   - **Dématérialisation Automatique à l'Achèvement (`active_only=true`)** : Dès que toutes les tâches d'un sous-agent passent à `COMPLETED` et qu'aucune action n'est en cours, l'agent est marqué `is_finished = True` et exclu de la flotte active du Cockpit.
+   - **Dissolution Cinématique Three.js** : Au lieu d'une suppression brutale, les pods terminés subissent une dématérialisation douce (réduction d'échelle fluide, ascension vers l'orbite et gerbe de particules ascendantes avant suppression de la scène).
+   - **Validation par Test Dédié & 100% Non-Régression** : Nouveau test formel `tests/test_agent_lifecycle_3d.py` validé, suite portée à **735 tests unitaires et d'intégration réussis (100% verts)**.
