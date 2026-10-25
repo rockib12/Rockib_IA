@@ -3,7 +3,7 @@
 Provides:
 - Feature flag check (`ENABLE_ELEVENLABS_REALTIME` in .env).
 - Realtime Scribe v2 streaming STT capabilities.
-- Low-latency ElevenLabs Turbo v2.5 / Flash v2.5 streaming TTS.
+- Low-latency ElevenLabs Turbo v2.5 / Multilingual v2 streaming TTS.
 - Transparent, resilient auto-fallback to Edge-TTS (100% free mode) if disabled or on quota/network error.
 """
 from __future__ import annotations
@@ -18,12 +18,12 @@ from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
-# Standard ElevenLabs voice presets (with French/multilingual support)
+# Official ElevenLabs Premade Voices (100% accessible on Free & Paid tiers without library restrictions)
 ELEVENLABS_VOICE_MAP = {
-    "henri": "21m00Tcm4TlvDq8ikWAM",      # Rachel / Henri profile
-    "vivienne": "AZnzlk1XvdvUeBnXmlld",   # Domi / Vivienne profile
-    "denise": "EXAVITQu4vr4xnSDxMaL",     # Bella / Denise profile
-    "remy": "ErXwobaYiN019PkySvjV",       # Antoni / Remy profile
+    "henri": "JBFqnCBsd6RMkjVDRZzb",      # George - Warm, Captivating, Clear
+    "vivienne": "XrExE9yKIg1WjnnlVkGX",   # Matilda - Professional, Knowledgeable
+    "denise": "EXAVITQu4vr4xnSDxMaL",     # Sarah - Mature, Reassuring
+    "remy": "onwK4e9ZLuTAKqWW03F9",       # Daniel - Steady Broadcaster
 }
 
 ELEVENLABS_SCRIBE_WS_URL = "wss://api.elevenlabs.io/v1/speech-to-text/realtime"
@@ -44,8 +44,8 @@ class ElevenLabsRealtimeService:
 
     def get_voice_id(self, voice_profile: Optional[str] = None) -> str:
         """Resolves voice ID from profile name or configured default."""
-        profile = (voice_profile or "henri").lower().strip()
-        default_id = getattr(settings, "ELEVENLABS_VOICE_ID", "21m00Tcm4TlvDq8ikWAM")
+        profile = (voice_profile or "vivienne").lower().strip()
+        default_id = getattr(settings, "ELEVENLABS_VOICE_ID", "XrExE9yKIg1WjnnlVkGX")
         return ELEVENLABS_VOICE_MAP.get(profile, default_id)
 
     def get_capabilities(self) -> dict:
@@ -64,9 +64,9 @@ class ElevenLabsRealtimeService:
         self,
         text: str,
         voice_profile: Optional[str] = None,
-        timeout_seconds: float = 8.0,
+        timeout_seconds: float = 12.0,
     ) -> Optional[bytes]:
-        """Synthesizes high-fidelity audio via ElevenLabs Turbo v2.5.
+        """Synthesizes high-fidelity audio via ElevenLabs Turbo v2.5 / Multilingual v2.
         
         Returns None if disabled or on any API failure to trigger automatic 100% free fallback.
         """
