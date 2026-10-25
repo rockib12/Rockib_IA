@@ -1,9 +1,9 @@
-"""FastAPI router for Inbound Portfolio Gateway."""
+﻿"""FastAPI router for Inbound Portfolio Gateway."""
 from __future__ import annotations
 
 import secrets
 from typing import List, Optional
-from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Request, Response, WebSocket, WebSocketDisconnect, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -43,6 +43,7 @@ from app.inbound.services.leads import export_leads_csv, list_site_leads, record
 from app.inbound.services.voice_call_service import VoiceCallService
 from app.inbound.services.tracing import concierge_tracing_service
 from app.inbound.services.quality_evaluator import ConciergeQualityEvaluator
+from app.inbound.services.realtime_voice_service import RealtimeVoiceBridge
 
 
 router = APIRouter(prefix="/inbound", tags=["Inbound Portfolio"])
@@ -477,3 +478,10 @@ async def telegram_inbound_webhook(
     return await telegram_service.process_update(update, db)
 
 
+
+
+@router.websocket("/portfolio/voice/ws")
+async def voice_realtime_websocket(websocket: WebSocket, site_key: str = "rockib-portfolio", voice: str = "brian"):
+    """Full-Duplex Real-Time Voice WebSocket (P2)."""
+    bridge = RealtimeVoiceBridge(site_key=site_key, voice_profile=voice)
+    await bridge.run(websocket)

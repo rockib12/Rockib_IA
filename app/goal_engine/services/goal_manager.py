@@ -1,4 +1,4 @@
-"""GoalManager — autorité métier du cycle de vie des Goals et de leur gouvernance.
+﻿"""GoalManager — autorité métier du cycle de vie des Goals et de leur gouvernance.
 
 Garanties & Invariants (STEP 4D) :
 - Pure délégation de transition à GoalStateMachine (INV-10).
@@ -692,6 +692,24 @@ class GoalManager:
         }
         goal.goal_metadata = metadata
         flag_modified(goal, "goal_metadata")
+
+        # Auto-mémorisation épisodique vectorielle (P1 - Reflexion Memory)
+        try:
+            from app.memory.services.ingestion import store_agent_lesson
+            lesson_summary = f"Mission accomplie avec succès : {goal.title}. Preuve : {proof.evidence} (Réf : {proof.reference})"
+            await store_agent_lesson(
+                db=self.session,
+                workspace_id=goal.workspace_id,
+                agent_id=goal.agent_id,
+                lesson_text=lesson_summary,
+                memory_type="experience",
+                confidence=0.95,
+                importance=0.85,
+                metadata={"goal_id": str(goal.id), "success_proof": metadata.get("success_proof")},
+            )
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Échec non-bloquant de mémorisation vectorielle: %s", exc)
 
         await self.session.flush()
         return goal

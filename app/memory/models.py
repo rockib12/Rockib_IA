@@ -1,12 +1,19 @@
-import uuid
+﻿import uuid
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy import DateTime, Enum, ForeignKey, Numeric, String
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
+from app.identity.models import Workspace
+
+try:
+    from pgvector.sqlalchemy import Vector
+    HAS_PGVECTOR = True
+except ImportError:
+    HAS_PGVECTOR = False
 
 
 def _utcnow() -> datetime:
@@ -49,11 +56,10 @@ class Memory(Base):
     confidence_level: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
     importance_level: Mapped[float] = mapped_column(Numeric(4, 3), nullable=False)
     
-    # embedding: Mapped[Optional[List[float]]] = mapped_column(nullable=True) # Si pgvector est activé
+    # Embedding vectoriel 768 dimensions (Nomic Embed Text v1.5 / pgvector)
+    if HAS_PGVECTOR:
+        embedding: Mapped[Optional[List[float]]] = mapped_column(Vector(768), nullable=True)
     
     last_accessed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False)
-
-    # Relations
-    # workspace: Mapped["Workspace"] = relationship(back_populates="memories") # Ajouté si besoin

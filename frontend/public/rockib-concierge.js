@@ -44,6 +44,8 @@
 
   // Voice Call State
   let voiceSessionId = null;
+  let voiceWs = null;
+  let isWsActive = false;
   let isCalling = false;
   let recognition = null;
   let isSpeaking = false;
@@ -719,8 +721,8 @@ Quelle est votre activité ou votre idée de projet ?</div>
         <!-- Top Voice Selector Bar -->
         <div style="display:flex; align-items:center; justify-content:space-between; width:100%; gap:6px;">
           <div style="display:flex; align-items:center; gap:6px;">
-            <span id="rq-voice-badge" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#64748B;"></span>
-            <span id="rq-voice-mode-label" style="font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:0.08em;">Co-Architecte Vocal</span>
+            <span id="rq-voice-badge" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#00FF9D; box-shadow:0 0 8px rgba(0,255,157,0.6);"></span>
+            <span id="rq-voice-mode-label" style="font-size:10px; color:#00FF9D; font-weight:700; text-transform:uppercase; letter-spacing:0.08em;">⚡ Scribe v2 Temps Réel</span>
           </div>
           <div style="display:flex; align-items:center; gap:5px;">
             <select id="rq-voice-profile" class="rq-input" style="padding:4px 7px; font-size:10px; border-radius:999px; background:#0A101E; color:#00F0FF; border:1px solid rgba(0,240,255,0.3);">
@@ -734,7 +736,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
           </div>
         </div>
 
-        <p role="note" style="font-size:10px;line-height:1.45;color:#94A3B8;margin:8px 0;">
+        <p role="note" style="font-size:10px;line-height:1.45;color:#00FF9D; font-weight:700;margin:8px 0;">
           En mode vocal, votre audio ou sa transcription est traite par le navigateur ou Groq; la reponse vocale peut etre synthetisee par Microsoft Edge. Ne dictez pas vos coordonnees : utilisez l'onglet Rappel.
         </p>
 
@@ -1695,7 +1697,45 @@ Quelle est votre activité ou votre idée de projet ?</div>
     return result.data;
   }
 
-  async function startVoiceCall() {
+    // --- P2: Full-Duplex Audio WebSocket Bridge ---
+  function getVoiceWsUrl() {
+    var wsBase = API_BASE.replace(/^http/, 'ws');
+    var selectedProfile = (voiceProfileSelect && voiceProfileSelect.value) || 'brian';
+    return wsBase + '/api/v1/inbound/portfolio/voice/ws?site_key=' + encodeURIComponent(currentSiteKey) + '&voice=' + encodeURIComponent(selectedProfile);
+  }
+
+  function playBase64Audio(b64Data, onEnded) {
+    try {
+      var byteChars = atob(b64Data);
+      var byteNumbers = new Array(byteChars.length);
+      for (var i = 0; i < byteChars.length; i++) {
+        byteNumbers[i] = byteChars.charCodeAt(i);
+      }
+      var byteArray = new Uint8Array(byteNumbers);
+      var blob = new Blob([byteArray], { type: 'audio/mpeg' });
+      var url = URL.createObjectURL(blob);
+      var audio = new Audio(url);
+      currentAudio = audio;
+      isSpeaking = true;
+      setOrbUiState('ai_speaking', 'Le Concierge vous répond (⚡ Temps Réel)...', 'Touchez la sphère pour interrompre');
+      audio.onended = function () {
+        URL.revokeObjectURL(url);
+        currentAudio = null;
+        isSpeaking = false;
+        if (onEnded) onEnded();
+      };
+      audio.onerror = function () {
+        URL.revokeObjectURL(url);
+        currentAudio = null;
+        isSpeaking = false;
+        if (onEnded) onEnded();
+      };
+      audio.play().catch(function() { if (onEnded) onEnded(); });
+    } catch (e) {
+      if (onEnded) onEnded();
+    }
+  }
+async function startVoiceCall() {
     // 0. Synchronously unlock Web Audio Context on user gesture
     try {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
@@ -2088,6 +2128,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
 
   function stopVoiceCall() {
     isCalling = false;
+    if (voiceWs) { try { voiceWs.close(); } catch(e){} voiceWs = null; isWsActive = false; }
     isSpeaking = false;
     isProcessingTurn = false;
     isMuted = false;
