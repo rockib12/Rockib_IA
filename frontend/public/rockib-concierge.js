@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Rockib Quenum — Official Portfolio Concierge & Voice Calling Widget (Vanilla JS)
  * Embeddable script for https://rockib-quenum.netlify.app/
  *
@@ -16,7 +16,7 @@
   const widgetScript = document.currentScript || document.querySelector('script[data-site-key]') || document.querySelector('script[src*="rockib-concierge"]');
   const API_BASE = String(window.ROCKIB_API_URL || widgetScript?.getAttribute('data-api-base') || (
     window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-      ? 'http://127.0.0.1:8080'
+      ? (window.location.port === '' || window.location.port === '80' ? window.location.origin : 'http://127.0.0.1:8080')
       : 'https://dion-beaverlike-preceptively.ngrok-free.dev'
   )).replace(/\/+$/, '');
 
@@ -723,11 +723,12 @@ Quelle est votre activité ou votre idée de projet ?</div>
             <span id="rq-voice-mode-label" style="font-size:10px; color:#94A3B8; text-transform:uppercase; letter-spacing:0.08em;">Co-Architecte Vocal</span>
           </div>
           <div style="display:flex; align-items:center; gap:5px;">
-            <select id="rq-voice-profile" class="rq-input" style="padding:4px 7px; font-size:10px; border-radius:999px; background:#0A101E;">
-              <option value="henri">🎙️ Henri HD</option>
-              <option value="vivienne">🎙️ Vivienne HD</option>
-              <option value="denise">🎙️ Denise HD</option>
-              <option value="remy">🎙️ Rémy HD</option>
+            <select id="rq-voice-profile" class="rq-input" style="padding:4px 7px; font-size:10px; border-radius:999px; background:#0A101E; color:#00F0FF; border:1px solid rgba(0,240,255,0.3);">
+              <option value="brian" selected>🎙️ Brian Studio (Profond &amp; Chaleureux)</option>
+              <option value="charlie">🎙️ Charlie HD (Dynamique &amp; Confident)</option>
+              <option value="vivienne">🎙️ Vivienne HD (Professionnelle)</option>
+              <option value="eric">🎙️ Éric HD (Fluide &amp; Posé)</option>
+              <option value="denise">🎙️ Denise HD (Mature &amp; Rassurante)</option>
             </select>
             <button type="button" id="rq-btn-test-voice" title="Écouter cette voix" style="background:#0A101E; border:1px solid rgba(0,240,255,0.35); color:#00F0FF; border-radius:999px; padding:4px 8px; font-size:10px; cursor:pointer;">🔊</button>
           </div>
@@ -1456,7 +1457,9 @@ Quelle est votre activité ou votre idée de projet ?</div>
       } else {
         if (name.includes('henri') || name.includes('remy') || name.includes('rémy') || name.includes('thomas') || name.includes('paul')) score += 50;
       }
-      if (name.includes('hortense') || name.includes('desktop')) score -= 45;
+      if (name.includes('hortense') || name.includes('desktop') || name.includes('microsoft')) score -= 60;
+      if (name.includes('natural') || name.includes('neural') || name.includes('online')) score += 120;
+      if (name.includes('google')) score += 100;
       return score;
     }
 
@@ -1558,14 +1561,14 @@ Quelle est votre activité ou votre idée de projet ?</div>
     setOrbUiState(
       'ai_speaking',
       'Le Concierge vous répond...',
-      isCalling ? 'Touchez la sphère (ou parlez) pour l’interrompre' : 'Lecture de la voix Neuronale HD'
+      isCalling ? 'Touchez la sphère (ou parlez) pour interrompre' : 'Lecture de la voix Studio HD'
     );
 
     var bargeInCheckInterval = null;
     var hasEnded = false;
 
     // Watchdog timer: GUARANTEES finish() is called so it NEVER stays stuck in speaking mode!
-    var maxDuration = Math.max(3500, ((text || '').length / 12) * 1000 + 3000);
+    var maxDuration = Math.max(4000, ((text || '').length / 10) * 1000 + 4000);
     var safetyTimeout = setTimeout(function () {
       if (isSpeaking) finish();
     }, maxDuration);
@@ -1594,9 +1597,9 @@ Quelle est votre activité ou votre idée de projet ?</div>
           sumSq += d * d;
         }
         const rms = Math.sqrt(sumSq / micTimeData.length);
-        if (rms > 24) {
+        if (rms > 28) {
           loudFrames++;
-          if (loudFrames >= 4) {
+          if (loudFrames >= 5) {
             clearInterval(bargeInCheckInterval);
             bargeInCheckInterval = null;
             interruptAiSpeaking();
@@ -1607,14 +1610,14 @@ Quelle est votre activité ou votre idée de projet ?</div>
       }, 100);
     }
 
-    const selectedProfile = (voiceProfileSelect && voiceProfileSelect.value) || 'henri';
+    const selectedProfile = (voiceProfileSelect && voiceProfileSelect.value) || 'brian';
     const preferredGender = (selectedProfile === 'vivienne' || selectedProfile === 'denise') ? 'female' : 'male';
 
-    // Option 1: Server Neural HD TTS
+    // Option 1: Server Neural HD TTS (ElevenLabs Scribe / Turbo Studio or Edge Neural)
     try {
-      const ttsResp = await fetch(`${API_BASE}/api/v1/inbound/portfolio/voice/tts`, {
+      const ttsResp = await fetch(${API_BASE}/api/v1/inbound/portfolio/voice/tts, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true', },
+        headers: { 'Content-Type': 'application/json', 'ngrok-skip-browser-warning': 'true' },
         body: JSON.stringify({ text: text, voice: selectedProfile }),
       });
 
@@ -1630,17 +1633,28 @@ Quelle est votre activité ou votre idée de projet ?</div>
             currentAudio = null;
             finish();
           };
-          audio.onerror = () => {
+          audio.onerror = (e) => {
+            console.warn('[Concierge Voice] Audio play error:', e);
             URL.revokeObjectURL(audioUrl);
             currentAudio = null;
+            // Only if native audio decode fails, fallback to browser synthesis
             speakWithBrowserFallback(text, finish, preferredGender);
           };
-          await audio.play();
-          return;
+          try {
+            await audio.play();
+            return;
+          } catch (playErr) {
+            console.warn('[Concierge Voice] Autoplay blocked or error:', playErr);
+            URL.revokeObjectURL(audioUrl);
+            currentAudio = null;
+          }
         }
       }
-    } catch (e) {}
+    } catch (netErr) {
+      console.warn('[Concierge Voice] TTS server fetch failed:', netErr);
+    }
 
+    // Never play weird robotic voice if user is just tapping sphere - gracefully finish
     if (isSpeaking) {
       speakWithBrowserFallback(text, finish, preferredGender);
     }
@@ -2133,7 +2147,7 @@ Quelle est votre activité ou votre idée de projet ?</div>
   const btnTestVoice = chatWindow.querySelector('#rq-btn-test-voice');
   if (btnTestVoice) {
     btnTestVoice.addEventListener('click', () => {
-      const profile = (voiceProfileSelect && voiceProfileSelect.value) || 'henri';
+      const profile = (voiceProfileSelect && voiceProfileSelect.value) || 'brian';
       const bizName = (currentSiteConfig && currentSiteConfig.business_name) || 'Rockib Quenum';
       const sampleText =
         (currentSiteConfig && currentSiteConfig.voice_greeting) ||

@@ -1,4 +1,4 @@
-"""ElevenLabs Scribe v2 Realtime & Low-Latency Neural Voice Service for Rockib AI.
+﻿"""ElevenLabs Scribe v2 Realtime & Low-Latency Neural Voice Service for Rockib AI.
 
 Provides:
 - Feature flag check (`ENABLE_ELEVENLABS_REALTIME` in .env).
@@ -20,7 +20,10 @@ logger = logging.getLogger(__name__)
 
 # Official ElevenLabs Premade Voices (100% accessible on Free & Paid tiers without library restrictions)
 ELEVENLABS_VOICE_MAP = {
-    "henri": "JBFqnCBsd6RMkjVDRZzb",      # George - Warm, Captivating, Clear
+    "brian": "nPczCjzI2devNBz1zQrb",      # Brian - Deep, Resonant and Comforting (Multilingual French)
+    "charlie": "IKne3meq5aSn9XLyUdCD",    # Charlie - Dynamic, Energetic (Multilingual French)
+    "eric": "cjVigY5qzO86Huf0OWal",       # Eric - Smooth, Pro (Multilingual French)
+    "henri": "nPczCjzI2devNBz1zQrb",      # Default Male mapped to Brian (Ultra deep and natural)
     "vivienne": "XrExE9yKIg1WjnnlVkGX",   # Matilda - Professional, Knowledgeable
     "denise": "EXAVITQu4vr4xnSDxMaL",     # Sarah - Mature, Reassuring
     "remy": "onwK4e9ZLuTAKqWW03F9",       # Daniel - Steady Broadcaster
