@@ -35,6 +35,7 @@ from app.inbound.schemas import (
     VoiceCallTurnRequest,
     VoiceCallTurnResponse,
     VoiceTTSRequest,
+    VoiceCapabilitiesResponse,
 )
 from app.inbound.services.portfolio_handler import PortfolioConciergeService, is_request_rate_limited
 from app.inbound.services.site_config_service import site_config_service
@@ -222,6 +223,20 @@ async def post_portfolio_message(
     except KeyError:
         raise HTTPException(status_code=404, detail="Concierge site not found.")
     return await concierge_service.handle_message(body, client_ip=client_ip, db=db)
+
+
+@router.get("/voice/capabilities", response_model=VoiceCapabilitiesResponse)
+async def get_voice_capabilities() -> VoiceCapabilitiesResponse:
+    """Returns status of ElevenLabs Scribe v2 Realtime vs 100% Free Native Mode."""
+    from app.inbound.services.elevenlabs_service import elevenlabs_service
+    caps = elevenlabs_service.get_capabilities()
+    return VoiceCapabilitiesResponse(
+        realtime_enabled=caps["realtime_enabled"],
+        provider=caps["provider"],
+        scribe_model=caps["scribe_model"],
+        tts_model=caps["tts_model"],
+        barge_in_supported=caps["barge_in_supported"],
+    )
 
 
 @router.post("/portfolio/voice/session", response_model=VoiceCallSessionResponse)

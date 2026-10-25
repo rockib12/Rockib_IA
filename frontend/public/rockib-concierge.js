@@ -2235,9 +2235,20 @@ Quelle est votre activité ou votre idée de projet ?</div>
     if (subEl && cfg.subtitle) subEl.textContent = cfg.subtitle;
     if (launcherSpan && cfg.launcher_label) launcherSpan.textContent = cfg.launcher_label;
 
-    // 4. Default Voice Profile
+    // 4. Default Voice Profile & Realtime Provider Status
     if (voiceProfileSelect && cfg.default_voice) {
       voiceProfileSelect.value = cfg.default_voice;
+    }
+    if (voiceModeLabel) {
+      if (cfg.realtime_voice_enabled) {
+        voiceModeLabel.textContent = 'SCRIBE V2 REALTIME';
+        voiceModeLabel.style.color = '#00F0FF';
+        voiceModeLabel.title = 'Mode Scribe v2 Realtime activé';
+      } else {
+        voiceModeLabel.textContent = 'VOCAL NATIVE (100% GRATUIT)';
+        voiceModeLabel.style.color = '#00FF9D';
+        voiceModeLabel.title = 'Mode 100% gratuit et illimité (Web Speech & Edge Neural TTS)';
+      }
     }
 
     // 5. Welcome Message & Quick Chips

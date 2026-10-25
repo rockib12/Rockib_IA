@@ -26,6 +26,7 @@ from app.inbound.schemas import (
 )
 from app.inbound.services.portfolio_handler import EMAIL_REGEX, PHONE_REGEX, is_request_rate_limited, redact_contact_details
 from app.inbound.services.site_config_service import site_config_service
+from app.inbound.services.elevenlabs_service import elevenlabs_service
 from app.inbound.services.tracing import ConciergeTraceData, concierge_tracing_service
 from app.intelligence.services.providers.groq_provider import GroqProvider, compute_token_cost
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -78,12 +79,22 @@ class VoiceCallService:
         self._sessions: Dict[str, VoiceCallSession] = {}
 
     async def synthesize_neural_speech(self, text: str, voice_profile: str = "henri") -> bytes:
-        """Synthesizes natural HD MP3 speech using Microsoft Edge Neural TTS (100% free)."""
-        import edge_tts
-
+        """Synthesizes natural HD MP3 speech via ElevenLabs Turbo if enabled, with auto-fallback to Edge-TTS (100% free)."""
         clean_text = re.sub(r"[*#_`>\[\]]", "", (text or "")).strip()
         if not clean_text:
             raise ValueError("Empty text for TTS synthesis")
+
+        # 1. Option Scribe / ElevenLabs si activé dans le .env
+        if elevenlabs_service.is_realtime_enabled():
+            try:
+                eleven_audio = await elevenlabs_service.synthesize_speech(clean_text, voice_profile=voice_profile)
+                if eleven_audio:
+                    return eleven_audio
+            except Exception as e:
+                logger.warning("Fallback sur Edge-TTS suite à l'erreur ElevenLabs: %s", e)
+
+        # 2. Mode 100% Gratuit et Illimité par défaut (Microsoft Edge Neural TTS)
+        import edge_tts
 
         voice_id = NEURAL_VOICE_PROFILES.get((voice_profile or "henri").lower().strip(), "fr-FR-HenriNeural")
         # A slightly slower pace gives the French neural voices room to breathe.

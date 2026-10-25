@@ -64,6 +64,13 @@ class Settings(BaseSettings):
     CONCIERGE_LEAD_RETENTION_DAYS: int = 90
     TRUSTED_PROXY_CIDRS: list[str] = ["127.0.0.0/8", "::1/128"]
 
+    # ElevenLabs Scribe v2 Realtime Voice (Controlled via TRUE/FALSE flag)
+    ENABLE_ELEVENLABS_REALTIME: bool = False
+    ELEVENLABS_API_KEY: Optional[str] = None
+    ELEVENLABS_VOICE_ID: str = "21m00Tcm4TlvDq8ikWAM"
+    ELEVENLABS_MODEL_ID: str = "scribe_v2_realtime"
+    ELEVENLABS_TTS_MODEL_ID: str = "eleven_turbo_v2_5"
+
     # Execution / Sandboxing
     WORKSPACES_ROOT: str = "/tmp/rockib_workspaces"
 

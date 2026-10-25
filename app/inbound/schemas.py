@@ -143,6 +143,16 @@ class ConciergeSiteConfigPublic(BaseModel):
     voice_greeting: str
     quick_chips: List[str] = Field(default_factory=list)
     voice_topic_chips: List[VoiceTopicChip] = Field(default_factory=list)
+    realtime_voice_enabled: bool = False
+    voice_provider: str = "native"
+
+
+class VoiceCapabilitiesResponse(BaseModel):
+    realtime_enabled: bool
+    provider: str
+    scribe_model: str
+    tts_model: str
+    barge_in_supported: bool
 
 
 class ConciergeSiteConfigPrivate(ConciergeSiteConfigPublic):

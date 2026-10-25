@@ -16,6 +16,7 @@ import secrets
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from app.core.config import settings
 from app.inbound.schemas import (
     ConciergeSiteConfigPrivate,
     ConciergeSiteConfigPublic,
@@ -226,6 +227,8 @@ class SiteConfigService:
                 VoiceTopicChip(**c) if isinstance(c, dict) else c
                 for c in (data.get("voice_topic_chips") or [])
             ],
+            realtime_voice_enabled=bool(settings.ENABLE_ELEVENLABS_REALTIME and settings.ELEVENLABS_API_KEY),
+            voice_provider="elevenlabs" if bool(settings.ENABLE_ELEVENLABS_REALTIME and settings.ELEVENLABS_API_KEY) else "native",
         )
 
     def get_private_config(self, site_key: Optional[str]) -> ConciergeSiteConfigPrivate:
