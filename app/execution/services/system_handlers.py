@@ -109,7 +109,7 @@ def install_production_handlers() -> None:
     )
     
     from app.connectors.api_connector import api_call_handler
-    from app.connectors.agent_connectors import agent_spawn_handler
+    from app.connectors.agent_connectors import agent_spawn_handler, agent_message_handler
     
     register_action_handler("system", "read", system_read_handler)
     register_action_handler("system", "create", fs_write_handler)
@@ -135,6 +135,9 @@ def install_production_handlers() -> None:
     # Agent Handlers
     register_action_handler("agent", "spawn", agent_spawn_handler)
     register_action_handler("agent", "create", agent_spawn_handler)
+    register_action_handler("agent", "send", agent_message_handler)
+    register_action_handler("agent", "message", agent_message_handler)
+    register_action_handler("communication", "send", agent_message_handler)
     
     # Social Network & Meta Handlers
     register_action_handler("facebook", "post", facebook_post_handler)

@@ -11,16 +11,19 @@ import {
   AlertTriangle,
   Terminal,
   Clock,
-  FileText
+  FileText,
+  MessageSquare,
+  Send
 } from 'lucide-react';
 import { authFetch } from '../lib/authFetch';
 
 /**
  * AgentActivityCard — Carte holographique affichant en direct
- * ce que fait l'agent sélectionné (pensée, tâche active, sécurité, sous-agents).
+ * ce que fait l'agent sélectionné (pensée, tâche active, sécurité, dialogue P2P, sous-agents).
  */
 export default function AgentActivityCard({
   agent,
+  allAgents = [],
   parentAgent,
   subAgents = [],
   activeGoal,
@@ -29,6 +32,7 @@ export default function AgentActivityCard({
   onSpawnSubAgent,
   onOpenCreateGoal,
   onSelectAgent,
+  onDialogueSuccess,
   isWaking = false,
 }) {
   if (!agent) return null;
@@ -40,7 +44,23 @@ export default function AgentActivityCard({
   const [logs, setLogs] = useState([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
+  // États pour le Bus de Dialogue P2P Inter-Agents
+  const [showP2P, setShowP2P] = useState(false);
+  const [targetPeerId, setTargetPeerId] = useState('');
+  const [p2pSubject, setP2pSubject] = useState('Synchronisation Technique P2P');
+  const [p2pMessage, setP2pMessage] = useState('');
+  const [sendingP2P, setSendingP2P] = useState(false);
+  const [lastP2PReply, setLastP2PReply] = useState(null);
+
+  const peerAgents = allAgents.filter((a) => a.id !== agent.id);
+
   useEffect(() => {
+    if (peerAgents.length > 0 && !targetPeerId) {
+      setTargetPeerId(peerAgents[0].id);
+    }
+  }, [agent?.id, allAgents.length]);
+
+  const fetchAgentLogs = () => {
     if (agent && agent.id) {
       setLoadingLogs(true);
       authFetch(`/api/v1/agents/${agent.id}/logs?limit=30`)
@@ -51,7 +71,42 @@ export default function AgentActivityCard({
         .catch((err) => console.warn('Erreur chargement logs agent:', err))
         .finally(() => setLoadingLogs(false));
     }
+  };
+
+  useEffect(() => {
+    fetchAgentLogs();
+    setLastP2PReply(null);
   }, [agent?.id]);
+
+  const handleSendP2P = async (e) => {
+    e.preventDefault();
+    if (!targetPeerId || !p2pMessage.trim() || sendingP2P) return;
+    setSendingP2P(true);
+    try {
+      const res = await authFetch('/api/v1/agents/dialogue', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id: agent.workspace_id,
+          sender_agent_id: agent.id,
+          recipient_agent_id: targetPeerId,
+          subject: p2pSubject || 'Collaboration P2P',
+          message: p2pMessage.trim(),
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setLastP2PReply(data);
+        setP2pMessage('');
+        fetchAgentLogs();
+        if (onDialogueSuccess) onDialogueSuccess(data);
+      }
+    } catch (err) {
+      console.error('Erreur dialogue P2P:', err);
+    } finally {
+      setSendingP2P(false);
+    }
+  };
 
   return (
     <div className="agent-activity-card glass-panel hud-interactive">
@@ -160,7 +215,114 @@ export default function AgentActivityCard({
           </div>
         </div>
 
-        {/* Section 4 : Sous-agents créés par cet agent */}
+        {/* Section 4 : Bus de Dialogue P2P Inter-Agents */}
+        <div className="info-section">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="info-section-title" style={{ color: '#EC4899' }}>
+              Bus de Dialogue P2P Inter-Agents
+            </span>
+            <button
+              onClick={() => setShowP2P(!showP2P)}
+              className="control-btn"
+              style={{ padding: '3px 8px', fontSize: '0.72rem', color: '#EC4899', borderColor: 'rgba(236,72,153,0.35)', display: 'flex', alignItems: 'center', gap: '4px' }}
+            >
+              <MessageSquare size={12} />
+              {showP2P ? 'Fermer Bus P2P' : 'Dialoguer avec un Pair'}
+            </button>
+          </div>
+
+          {showP2P && (
+            <form
+              onSubmit={handleSendP2P}
+              style={{
+                background: 'rgba(236, 72, 153, 0.06)',
+                border: '1px solid rgba(236, 72, 153, 0.3)',
+                borderRadius: '8px',
+                padding: '10px',
+                marginTop: '6px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <div>
+                <label style={{ fontSize: '0.68rem', color: '#F472B6', display: 'block', marginBottom: '3px' }}>
+                  AGENT PAIR DESTINATAIRE :
+                </label>
+                <select
+                  value={targetPeerId}
+                  onChange={(e) => setTargetPeerId(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    background: '#060A17',
+                    border: '1px solid rgba(236, 72, 153, 0.35)',
+                    borderRadius: '6px',
+                    color: '#F8FAFC',
+                    fontSize: '0.76rem',
+                  }}
+                >
+                  {peerAgents.map((pa) => (
+                    <option key={pa.id} value={pa.id}>
+                      {pa.name} ({pa.role || 'Peer'})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <input
+                type="text"
+                value={p2pMessage}
+                onChange={(e) => setP2pMessage(e.target.value)}
+                placeholder={`Ex: Peux-tu synchroniser le contrat API avec ${agent.name} ?`}
+                style={{
+                  width: '100%',
+                  padding: '7px 10px',
+                  background: '#060A17',
+                  border: '1px solid rgba(0, 240, 255, 0.25)',
+                  borderRadius: '6px',
+                  color: '#F8FAFC',
+                  fontSize: '0.76rem',
+                }}
+              />
+
+              <button
+                type="submit"
+                disabled={sendingP2P || !p2pMessage.trim() || peerAgents.length === 0}
+                className="btn-cyber primary"
+                style={{
+                  padding: '6px 12px',
+                  fontSize: '0.75rem',
+                  justifyContent: 'center',
+                  background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(168, 85, 247, 0.25))',
+                  borderColor: '#EC4899',
+                }}
+              >
+                <Send size={13} />
+                {sendingP2P ? 'Négociation P2P en cours...' : 'Envoyer & Négocier en Direct'}
+              </button>
+
+              {lastP2PReply && (
+                <div
+                  style={{
+                    background: 'rgba(6, 10, 23, 0.9)',
+                    borderLeft: '3px solid #10B981',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    fontSize: '0.72rem',
+                  }}
+                >
+                  <div style={{ color: '#10B981', fontWeight: 700, marginBottom: '3px' }}>
+                    Réponse de {lastP2PReply.recipient_name} (Indexée en Mémoire Vectorielle) :
+                  </div>
+                  <div style={{ color: '#E2E8F0', lineHeight: 1.4 }}>{lastP2PReply.reply_content}</div>
+                </div>
+              )}
+            </form>
+          )}
+        </div>
+
+        {/* Section 5 : Sous-agents créés par cet agent */}
         <div className="info-section">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="info-section-title">
@@ -200,7 +362,7 @@ export default function AgentActivityCard({
           </div>
         </div>
 
-        {/* Section 5 : Empreinte d'exécution & Connecteurs */}
+        {/* Section 6 : Empreinte d'exécution & Connecteurs */}
         <div className="info-section">
           <span className="info-section-title">Connecteurs Sandboxed & Capacités</span>
           <div style={{ 
@@ -214,16 +376,16 @@ export default function AgentActivityCard({
             gap: '6px',
             border: '1px solid var(--border-subtle)'
           }}>
-            {['system.read', 'content.create', 'web.search', 'fs.write', 'api.request'].map((tool) => (
+            {['system.read', 'agent.send (P2P)', 'memory.vector', 'content.create', 'web.search', 'fs.write'].map((tool) => (
               <span
                 key={tool}
                 className="mono"
                 style={{
                   padding: '2px 7px',
                   borderRadius: '4px',
-                  background: 'rgba(0, 240, 255, 0.08)',
-                  border: '1px solid rgba(0, 240, 255, 0.25)',
-                  color: 'var(--neon-cyan)',
+                  background: tool.includes('P2P') || tool.includes('vector') ? 'rgba(236, 72, 153, 0.14)' : 'rgba(0, 240, 255, 0.08)',
+                  border: `1px solid ${tool.includes('P2P') || tool.includes('vector') ? 'rgba(236, 72, 153, 0.45)' : 'rgba(0, 240, 255, 0.25)'}`,
+                  color: tool.includes('P2P') || tool.includes('vector') ? '#F472B6' : 'var(--neon-cyan)',
                   fontSize: '0.7rem',
                 }}
               >
@@ -236,7 +398,7 @@ export default function AgentActivityCard({
           </div>
         </div>
 
-        {/* Section 6 : Journal d'Audit & Logs de l'Agent */}
+        {/* Section 7 : Journal d'Audit & Logs de l'Agent */}
         <div className="info-section">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="info-section-title">
@@ -271,6 +433,7 @@ export default function AgentActivityCard({
               {!loadingLogs && logs.length === 0 && <div style={{ color: '#64748B' }}>Aucun log enregistré pour cet agent.</div>}
               {!loadingLogs && logs.map((log) => {
                 const badgeColor =
+                  log.type === 'p2p_dialogue' ? '#EC4899' :
                   log.level === 'ALLOW' || log.level === 'SUCCESS' ? '#10B981' :
                   log.level === 'DENY' || log.level === 'CRITICAL' ? '#F43F5E' :
                   log.level === 'ESCALATE' || log.level === 'WARNING' ? '#F59E0B' : '#00F0FF';
@@ -329,4 +492,3 @@ export default function AgentActivityCard({
     </div>
   );
 }
-

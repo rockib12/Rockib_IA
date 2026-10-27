@@ -12,7 +12,7 @@ from pathlib import Path
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -42,7 +42,7 @@ from app.execution.services.system_handlers import install_production_handlers
 from app.goal_engine.models import Goal, GoalStatus
 from app.goal_engine.services.autonomous_loop import WakeResult, wake_goal
 from app.goal_engine.services.goal_manager import GoalManager
-from app.identity.models import Agent, Workspace, User
+from app.identity.models import Agent, AgentMessage, Workspace, User
 from app.intelligence.services.intelligence_service import IntelligenceService
 
 from app.task_engine.models import Task, TaskDependency, TaskStatus
@@ -416,6 +416,36 @@ async def get_agent_logs(
                 details={"gateway": "POST /api/v1/inbound/portfolio/voice/turn", "status": "ONLINE"}
             )
         )
+
+    # 5. Dialogues P2P Inter-Agents (AgentMessage)
+    try:
+        stmt_p2p = (
+            select(AgentMessage)
+            .where(or_(AgentMessage.sender_agent_id == agent_id, AgentMessage.recipient_agent_id == agent_id))
+            .order_by(desc(AgentMessage.created_at))
+            .limit(limit)
+        )
+        p2p_msgs = (await db.execute(stmt_p2p)).scalars().all()
+        for pm in p2p_msgs:
+            is_sender = pm.sender_agent_id == agent_id
+            logs.append(
+                AgentLogItem(
+                    id=f"p2p-{pm.id}",
+                    timestamp=pm.created_at,
+                    type="p2p_dialogue",
+                    level="ALLOW",
+                    title=f"{'Message envoyé' if is_sender else 'Message reçu'} ({pm.subject})",
+                    summary=f"Q: {pm.content[:80]} | R: {(pm.reply_content or '')[:80]}",
+                    details={
+                        "subject": pm.subject,
+                        "content": pm.content,
+                        "reply_content": pm.reply_content,
+                        "status": pm.status,
+                    },
+                )
+            )
+    except Exception:
+        pass
 
     logs.sort(key=lambda x: x.timestamp, reverse=True)
 
@@ -994,6 +1024,47 @@ async def get_telemetry_events(
             )
         )
 
+    # Derniers dialogues P2P inter-agents
+    try:
+        stmt_p2p = (
+            select(AgentMessage)
+            .where(AgentMessage.workspace_id.in_(user_ws_ids))
+            .order_by(desc(AgentMessage.created_at))
+            .limit(limit)
+        )
+        p2p_rows = (await db.execute(stmt_p2p)).scalars().all()
+        p2p_agent_ids = {m.sender_agent_id for m in p2p_rows} | {m.recipient_agent_id for m in p2p_rows}
+        missing_aids = p2p_agent_ids - set(agents_by_id.keys())
+        if missing_aids:
+            extra_agents = (await db.execute(select(Agent).where(Agent.id.in_(missing_aids)))).scalars().all()
+            for ea in extra_agents:
+                agents_by_id[ea.id] = ea
+
+        for pm in p2p_rows:
+            s_agent = agents_by_id.get(pm.sender_agent_id)
+            r_agent = agents_by_id.get(pm.recipient_agent_id)
+            s_name = s_agent.name if s_agent else "Agent"
+            r_name = r_agent.name if r_agent else "Peer"
+            events.append(
+                TelemetryEvent(
+                    id=f"p2p-{pm.id}",
+                    timestamp=pm.created_at,
+                    type="p2p_dialogue",
+                    agent_name=f"{s_name} ➔ {r_name}",
+                    summary=f"[{pm.subject}] {pm.content[:80]}",
+                    details={
+                        "sender": s_name,
+                        "recipient": r_name,
+                        "subject": pm.subject,
+                        "message": pm.content,
+                        "reply": pm.reply_content,
+                        "status": pm.status,
+                    },
+                )
+            )
+    except Exception:
+        pass
+
     # Trier par timestamp descendant
     events.sort(key=lambda x: x.timestamp, reverse=True)
     return events[:limit]
@@ -1046,4 +1117,166 @@ async def preview_workspace_file(
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+class P2PDialogueRequest(BaseModel):
+    workspace_id: uuid.UUID
+    sender_agent_id: uuid.UUID
+    recipient_agent_id: uuid.UUID
+    subject: str = Field(default="Synchronisation Technique P2P", min_length=1, max_length=200)
+    message: str = Field(..., min_length=1, max_length=3000)
+
+
+class P2PDialogueResponse(BaseModel):
+    id: uuid.UUID
+    workspace_id: uuid.UUID
+    sender_agent_id: uuid.UUID
+    sender_name: str
+    recipient_agent_id: uuid.UUID
+    recipient_name: str
+    subject: str
+    content: str
+    reply_content: Optional[str] = None
+    status: str
+    created_at: datetime
+
+
+@router.post("/agents/dialogue", response_model=P2PDialogueResponse, status_code=status.HTTP_201_CREATED)
+async def trigger_agent_p2p_dialogue(
+    payload: P2PDialogueRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+):
+    """Déclenche un échange P2P direct entre deux agents avec réponse temps réel et indexation mémoire."""
+    await assert_workspace_member(db, current_user, payload.workspace_id)
+
+    sender = (
+        await db.execute(select(Agent).where(Agent.id == payload.sender_agent_id, Agent.workspace_id == payload.workspace_id))
+    ).scalar_one_or_none()
+    recipient = (
+        await db.execute(select(Agent).where(Agent.id == payload.recipient_agent_id, Agent.workspace_id == payload.workspace_id))
+    ).scalar_one_or_none()
+
+    if not sender or not recipient:
+        raise HTTPException(status_code=404, detail="Agent émetteur ou destinataire introuvable dans ce workspace.")
+
+    reply_text = (
+        f"Bien reçu {sender.name}. En tant que {recipient.role or recipient.name}, "
+        f"je prends en charge ta demande sur '{payload.subject}' et je synchronise immédiatement mes livrables."
+    )
+    try:
+        from app.intelligence.services.providers.groq_provider import GroqProvider
+        provider = GroqProvider()
+        prompt = (
+            f"Tu es l'agent IA '{recipient.name}' (Rôle: {recipient.role}) dans le système Rockib IA.\n"
+            f"Ton pair '{sender.name}' (Rôle: {sender.role}) t'adresse cette requête de collaboration P2P :\n"
+            f"Sujet : {payload.subject}\n"
+            f"Message : {payload.message}\n\n"
+            "Réponds directement à ton collègue en 2 ou 3 phrases techniques, précises et collaboratives en français."
+        )
+        llm_reply = await provider.generate(prompt)
+        if llm_reply and len(llm_reply.strip()) > 5:
+            reply_text = llm_reply.strip()
+    except Exception:
+        pass
+
+    msg = AgentMessage(
+        id=uuid.uuid4(),
+        workspace_id=payload.workspace_id,
+        sender_agent_id=sender.id,
+        recipient_agent_id=recipient.id,
+        subject=payload.subject,
+        content=payload.message,
+        status="REPLIED",
+        reply_content=reply_text,
+        metadata_json={"triggered_by_user": str(current_user.id)},
+        replied_at=datetime.now(timezone.utc),
+    )
+    db.add(msg)
+
+    # Mémorisation vectorielle partagée (P1)
+    try:
+        from app.memory.services.ingestion import store_agent_lesson
+        await store_agent_lesson(
+            db=db,
+            workspace_id=payload.workspace_id,
+            agent_id=recipient.id,
+            lesson_text=f"Accord P2P [{sender.name} -> {recipient.name}] ({payload.subject}) : {payload.message} | Réponse : {reply_text}",
+            memory_type="project_memory",
+            confidence=0.94,
+            importance=0.88,
+            metadata={"p2p_message_id": str(msg.id), "sender_id": str(sender.id)},
+        )
+    except Exception:
+        pass
+
+    await db.commit()
+    await db.refresh(msg)
+
+    return P2PDialogueResponse(
+        id=msg.id,
+        workspace_id=msg.workspace_id,
+        sender_agent_id=sender.id,
+        sender_name=sender.name,
+        recipient_agent_id=recipient.id,
+        recipient_name=recipient.name,
+        subject=msg.subject,
+        content=msg.content,
+        reply_content=msg.reply_content,
+        status=msg.status,
+        created_at=msg.created_at,
+    )
+
+
+@router.get("/agents/dialogue", response_model=List[P2PDialogueResponse])
+async def list_agent_p2p_dialogues(
+    workspace_id: Optional[uuid.UUID] = None,
+    agent_id: Optional[uuid.UUID] = None,
+    limit: int = Query(default=25, ge=1, le=100),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+):
+    """Liste l'historique des échanges P2P entre agents."""
+    user_ws_ids = await get_user_workspace_ids(db, current_user)
+    if workspace_id:
+        if workspace_id not in user_ws_ids:
+            raise HTTPException(status_code=403, detail="Accès refusé.")
+        target_ws_ids = {workspace_id}
+    else:
+        target_ws_ids = user_ws_ids
+
+    if not target_ws_ids:
+        return []
+
+    stmt = select(AgentMessage).where(AgentMessage.workspace_id.in_(target_ws_ids))
+    if agent_id:
+        stmt = stmt.where(or_(AgentMessage.sender_agent_id == agent_id, AgentMessage.recipient_agent_id == agent_id))
+    stmt = stmt.order_by(desc(AgentMessage.created_at)).limit(limit)
+
+    rows = (await db.execute(stmt)).scalars().all()
+    if not rows:
+        return []
+
+    aids = {r.sender_agent_id for r in rows} | {r.recipient_agent_id for r in rows}
+    agents_map = {
+        a.id: a for a in (await db.execute(select(Agent).where(Agent.id.in_(aids)))).scalars().all()
+    }
+
+    return [
+        P2PDialogueResponse(
+            id=r.id,
+            workspace_id=r.workspace_id,
+            sender_agent_id=r.sender_agent_id,
+            sender_name=agents_map[r.sender_agent_id].name if r.sender_agent_id in agents_map else "Agent",
+            recipient_agent_id=r.recipient_agent_id,
+            recipient_name=agents_map[r.recipient_agent_id].name if r.recipient_agent_id in agents_map else "Peer",
+            subject=r.subject,
+            content=r.content,
+            reply_content=r.reply_content,
+            status=r.status,
+            created_at=r.created_at,
+        )
+        for r in rows
+    ]
+
 

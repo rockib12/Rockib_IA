@@ -32,12 +32,28 @@ async def lifespan(app: FastAPI):
 
     # Enregistrement des handlers d'exécution système (fs, web, api, social)
     install_production_handlers()
-    # Seeding automatique des skills fondamentaux
+    # Seeding automatique des skills fondamentaux et initialisation de la table P2P agent_messages
     try:
+        from sqlalchemy import text
         from app.core.database import AsyncSessionLocal
         from app.skills.catalog import seed_default_skills
         from app.skills.services.registry import SkillRegistryError
         async with AsyncSessionLocal() as session:
+            await session.execute(text("""
+                CREATE TABLE IF NOT EXISTS agent_messages (
+                    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                    workspace_id UUID NOT NULL REFERENCES workspaces(id) ON DELETE CASCADE,
+                    sender_agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+                    recipient_agent_id UUID NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
+                    subject VARCHAR(200) NOT NULL DEFAULT 'Inter-Agent Collaboration',
+                    content TEXT NOT NULL,
+                    status VARCHAR(30) NOT NULL DEFAULT 'DELIVERED',
+                    reply_content TEXT,
+                    metadata JSONB NOT NULL DEFAULT '{}'::jsonb,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
+                    replied_at TIMESTAMP WITH TIME ZONE
+                );
+            """))
             await seed_default_skills(session)
             await session.commit()
     except SkillRegistryError as e:

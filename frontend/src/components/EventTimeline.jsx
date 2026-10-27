@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   Zap,
+  MessageSquare,
 } from 'lucide-react';
 
 /**
@@ -47,6 +48,12 @@ const EVENT_CONFIG = {
     color: '#A855F7',
     label: 'Tâche',
     bgAlpha: 'rgba(168, 85, 247, 0.08)',
+  },
+  p2p_dialogue: {
+    icon: MessageSquare,
+    color: '#EC4899',
+    label: 'Dialogue P2P',
+    bgAlpha: 'rgba(236, 72, 153, 0.08)',
   },
 };
 
@@ -151,6 +158,7 @@ export default function EventTimeline({
     execution: true,
     agent_spawn: true,
     task_update: true,
+    p2p_dialogue: true,
   });
 
   const filteredEvents = useMemo(

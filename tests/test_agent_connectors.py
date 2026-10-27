@@ -96,3 +96,69 @@ async def test_agent_spawn_bounds_child_autonomy_by_parent(mock_session_local):
     assert spawned_goal.applied_autonomy_level == 1
     assert spawned_goal.applied_autonomy_level <= parent_agent.default_autonomy_level
 
+
+@pytest.mark.asyncio
+async def test_agent_message_missing_content():
+    from app.connectors.agent_connectors import agent_message_handler
+
+    action = ActionRecord(
+        id=uuid.uuid4(),
+        workspace_id=uuid.uuid4(),
+        agent_id=uuid.uuid4(),
+        tool="agent",
+        operation="send",
+        arguments={"recipient_name": "Cyber Agent"},
+    )
+    result = await agent_message_handler(action)
+    assert not result.success
+    assert result.error_code == "MISSING_MESSAGE"
+
+
+@pytest.mark.asyncio
+@patch("app.connectors.agent_connectors.AsyncSessionLocal")
+async def test_agent_message_p2p_dialogue_success(mock_session_local):
+    """Vérifie le bus de dialogue P2P inter-agents et la création d'un AgentMessage."""
+    from app.connectors.agent_connectors import agent_message_handler
+    from app.identity.models import Agent, AgentMessage
+
+    ws_id = uuid.uuid4()
+    sender = Agent(id=uuid.uuid4(), workspace_id=ws_id, name="Architect Agent", role="Lead Architect")
+    recipient = Agent(id=uuid.uuid4(), workspace_id=ws_id, name="Security Agent", role="Cybersecurity Specialist")
+
+    mock_db = mock_session_local.return_value.__aenter__.return_value
+    added_entities = []
+    mock_db.add = MagicMock(side_effect=lambda entity: added_entities.append(entity))
+    mock_db.commit = AsyncMock()
+
+    # 1er appel: sender_agent, 2ème appel: recipient_agent par ID
+    res_sender = MagicMock(scalar_one_or_none=MagicMock(return_value=sender))
+    res_recipient = MagicMock(scalar_one_or_none=MagicMock(return_value=recipient))
+    mock_db.execute = AsyncMock(side_effect=[res_sender, res_recipient])
+
+    action = ActionRecord(
+        id=uuid.uuid4(),
+        workspace_id=ws_id,
+        agent_id=sender.id,
+        decision_id=uuid.uuid4(),
+        tool="agent",
+        operation="send",
+        arguments={
+            "recipient_agent_id": str(recipient.id),
+            "subject": "Audit SAST API Payments",
+            "message": "Peux-tu valider le schéma HMAC du webhook de paiement avant déploiement ?",
+        },
+    )
+
+    with patch("app.memory.services.ingestion.store_agent_lesson", new_callable=AsyncMock):
+        result = await agent_message_handler(action)
+
+    assert result.success
+    assert "Architect Agent -> Security Agent" in result.output
+    msg_entities = [e for e in added_entities if isinstance(e, AgentMessage)]
+    assert len(msg_entities) == 1
+    assert msg_entities[0].sender_agent_id == sender.id
+    assert msg_entities[0].recipient_agent_id == recipient.id
+    assert msg_entities[0].status == "REPLIED"
+    assert msg_entities[0].reply_content is not None
+
+

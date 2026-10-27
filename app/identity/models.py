@@ -2,7 +2,8 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum as PyEnum
 from typing import List, Optional
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Table, Column, SmallInteger
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, Table, Column, SmallInteger, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.database import Base
@@ -91,3 +92,20 @@ class Agent(Base):
 
     # Relations
     workspace: Mapped[Workspace] = relationship(back_populates="agents")
+
+
+class AgentMessage(Base):
+    """Bus de communication P2P direct entre agents (Agent Dialogue Bus)."""
+    __tablename__ = "agent_messages"
+
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
+    workspace_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
+    sender_agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    recipient_agent_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("agents.id", ondelete="CASCADE"), nullable=False)
+    subject: Mapped[str] = mapped_column(String(200), default="Inter-Agent Collaboration", nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(String(30), default="DELIVERED", nullable=False)
+    reply_content: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=_utcnow, nullable=False)
+    replied_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import ThreeCanvas from './components/ThreeCanvas';
 import CockpitSidebar from './components/CockpitSidebar';
 import AgentActivityCard from './components/AgentActivityCard';
@@ -584,6 +584,11 @@ export default function App() {
         {selectedAgent && !isTimelineOpen && (
           <AgentActivityCard
             agent={selectedAgent}
+            allAgents={agents}
+            onDialogueSuccess={() => {
+              fetchTelemetry();
+              addToast("Dialogue P2P inter-agents exécuté et mémorisé !", "success");
+            }}
             parentAgent={parentAgent}
             subAgents={subAgents}
             activeGoal={agentActiveGoal}
