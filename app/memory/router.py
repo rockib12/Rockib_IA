@@ -118,3 +118,52 @@ async def search_agent_memories(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur de recherche mémoire: {exc}",
         )
+
+
+class GemmaRecognitionRequest(BaseModel):
+    text: str = Field(..., min_length=2, max_length=2000, description="Texte ou intention à reconnaître")
+    objective: Optional[str] = Field(default="")
+    situation: Optional[str] = Field(default="")
+
+
+@memory_router.post("/recognize")
+async def recognize_with_gemma(
+    body: GemmaRecognitionRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """Point d'entrée unifié de reconnaissance vectorielle EmbeddingGemma / Gemma-2 (768d).
+
+    Retourne simultanément :
+    - La classification Domaine & Permission (DomainClassifier + Gemma-2)
+    - La reconnaissance d'intention visiteur/prospect (Inbound Intent)
+    - Le backend d'embedding 768d actif
+    """
+    from app.intelligence.services.gemma_recognition import GemmaRecognitionEngine
+    from app.memory.services.embedding import get_active_embedding_backend
+
+    domain_res, domain_diag = await GemmaRecognitionEngine.recognize_domain(
+        proposed_action=body.text,
+        objective=body.objective or "",
+        situation=body.situation or "",
+    )
+    intent_res = await GemmaRecognitionEngine.recognize_inbound_intent(body.text)
+
+    return {
+        "embedding_engine": get_active_embedding_backend(),
+        "dimensions": 768,
+        "domain_recognition": {
+            "status": domain_res.status.value,
+            "domain": domain_res.domain,
+            "permission_action": domain_res.permission_action.value if domain_res.permission_action else None,
+            "diagnostics": domain_diag,
+        },
+        "intent_recognition": {
+            "intent": intent_res.intent,
+            "confidence": intent_res.confidence,
+            "recommended_skill": intent_res.recommended_skill,
+            "should_capture_lead": intent_res.should_capture_lead,
+            "runner_up_intent": intent_res.runner_up_intent,
+            "scores": intent_res.scores,
+        },
+    }
+

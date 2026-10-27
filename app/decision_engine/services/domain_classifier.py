@@ -43,11 +43,16 @@ class DomainClassifier:
         re.IGNORECASE,
     )
 
-    def __init__(self, mapping: Dict[str, Tuple[str, PermissionAction]] = None):
+    def __init__(
+        self,
+        mapping: Dict[str, Tuple[str, PermissionAction]] = None,
+        use_gemma_semantic: bool = False,
+    ):
         """Initialize with a mapping of keywords to (domain, permission_action).
         Example: {"refund": ("finance", PermissionAction.UPDATE)}
         """
         self.mapping = mapping or {}
+        self.use_gemma_semantic = use_gemma_semantic
 
     def _detect_financial_intent(
         self, proposed_action: str, objective: str, situation: str
@@ -164,6 +169,14 @@ class DomainClassifier:
                         matches.add((fin_domain, fin_perm))
 
             if not matches:
+                if self.use_gemma_semantic:
+                    from app.intelligence.services.gemma_recognition import GemmaRecognitionEngine
+                    gemma_res, _ = await GemmaRecognitionEngine.recognize_domain(
+                        proposed_action=clean_action,
+                        objective=objective,
+                        situation=situation,
+                    )
+                    return gemma_res
                 return ClassificationResult(status=ClassificationStatus.UNKNOWN)
             if len(matches) > 1:
                 return ClassificationResult(status=ClassificationStatus.AMBIGUOUS)
@@ -183,3 +196,21 @@ class DomainClassifier:
 
         except Exception:
             return ClassificationResult(status=ClassificationStatus.ERROR)
+
+    async def classify_with_gemma(
+        self,
+        proposed_action: str,
+        objective: str,
+        situation: str,
+    ) -> ClassificationResult:
+        """Classification hybride : règles déterministes en priorité absolue + reconnaissance vectorielle Gemma-2."""
+        res = await self.classify(proposed_action, objective, situation)
+        if res.status != ClassificationStatus.UNKNOWN:
+            return res
+        from app.intelligence.services.gemma_recognition import GemmaRecognitionEngine
+        gemma_res, _ = await GemmaRecognitionEngine.recognize_domain(
+            proposed_action=proposed_action,
+            objective=objective,
+            situation=situation,
+        )
+        return gemma_res

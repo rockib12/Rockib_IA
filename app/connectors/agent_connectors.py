@@ -209,16 +209,28 @@ async def agent_message_handler(action: ActionRecord) -> ExecutionResult:
                 ).scalars().first()
 
             if not recipient_agent:
-                # Fallback : chercher un autre agent actif du même workspace
-                recipient_agent = (
-                    await db.execute(
-                        select(Agent).where(
-                            Agent.workspace_id == action.workspace_id,
-                            Agent.id != action.agent_id,
-                            Agent.is_active == True,
+                # Reconnaissance vectorielle Gemma-2 : trouver l'agent pair dont le rôle correspond le mieux au besoin
+                peer_candidates = list(
+                    (
+                        await db.execute(
+                            select(Agent).where(
+                                Agent.workspace_id == action.workspace_id,
+                                Agent.id != action.agent_id,
+                                Agent.is_active == True,
+                            )
                         )
-                    )
-                ).scalars().first()
+                    ).scalars().all()
+                )
+                if peer_candidates:
+                    try:
+                        from app.intelligence.services.gemma_recognition import GemmaRecognitionEngine
+                        recipient_agent, _ = await GemmaRecognitionEngine.recognize_best_peer_agent(
+                            message_text=message_text,
+                            subject=subject,
+                            candidate_agents=peer_candidates,
+                        )
+                    except Exception:
+                        recipient_agent = peer_candidates[0]
 
             if not recipient_agent:
                 return ExecutionResult(

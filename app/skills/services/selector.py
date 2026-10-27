@@ -163,10 +163,28 @@ class SkillSelector:
         if not eligible_versions:
             return []
 
-        # Scoring heuristics to choose top matching skills
+        # Scoring heuristics + Reconnaissance Sémantique Gemma-2 768d
         scored_skills: List[tuple[int, SkillVersion]] = []
         hint_lower = (task_skill_hint or "").lower().strip()
         desc_lower = (task_description or "").lower().strip()
+
+        semantic_scores: dict[str, float] = {}
+        if desc_lower and len( eligible_versions ) > 1:
+            try:
+                from app.intelligence.services.gemma_recognition import GemmaRecognitionEngine
+                profiles = [
+                    (
+                        v.skill.slug,
+                        f"{v.skill.slug} {v.skill.name} {(v.instructions or '')[:240]} {' '.join(v.required_tools or [])}",
+                    )
+                    for v in eligible_versions
+                ]
+                semantic_scores = await GemmaRecognitionEngine.rank_skills_by_similarity(
+                    f"{hint_lower} {desc_lower}".strip(),
+                    profiles,
+                )
+            except Exception as exc:
+                logger.debug("Fallback lexical pour SkillSelector: %s", exc)
 
         for ver in eligible_versions:
             score = 0
@@ -187,6 +205,11 @@ class SkillSelector:
                 for tool in ver.required_tools:
                     if tool.lower() in desc_lower:
                         score += 15
+
+                # Bonus de reconnaissance vectorielle Gemma-2 (si forte proximité cosinus >= 0.25)
+                sim = semantic_scores.get(ver.skill.slug, 0.0)
+                if sim >= 0.25:
+                    score += int(sim * 40)
 
             scored_skills.append((score, ver))
 
