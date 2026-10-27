@@ -38,6 +38,13 @@ async def lifespan(app: FastAPI):
         from app.core.database import AsyncSessionLocal
         from app.skills.catalog import seed_default_skills
         from app.skills.services.registry import SkillRegistryError
+        async with AsyncSessionLocal() as vec_session:
+            try:
+                await vec_session.execute(text("CREATE EXTENSION IF NOT EXISTS vector;"))
+                await vec_session.execute(text("ALTER TABLE memories ADD COLUMN IF NOT EXISTS embedding vector(768);"))
+                await vec_session.commit()
+            except Exception:
+                await vec_session.rollback()
         async with AsyncSessionLocal() as session:
             await session.execute(text("""
                 CREATE TABLE IF NOT EXISTS agent_messages (
