@@ -174,3 +174,45 @@ async def reconcile_attempt(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erreur interne lors de la réconciliation: {str(e)}",
         )
+
+
+class SandboxRunRequest(BaseModel):
+    workspace_id: uuid.UUID
+    code: str = Field(..., min_length=1, max_length=64000, description="Code source à compiler et exécuter")
+    test_code: str = Field(default="", max_length=64000, description="Suite d'assertions ou tests unitaires")
+    language: str = Field(default="python")
+    timeout_seconds: float = Field(default=5.0, ge=0.5, le=15.0)
+
+
+@execution_router.post("/sandbox/run")
+async def run_agent_code_in_sandbox(
+    req: SandboxRunRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+):
+    """P3 — Compile, vérifie (SAST/AST) et exécute du code + tests unitaires dans une sandbox isolée."""
+    await assert_workspace_member(db, current_user, req.workspace_id)
+
+    from app.connectors.sandbox_connector import execute_in_sandbox
+
+    report = await execute_in_sandbox(
+        code=req.code,
+        test_code=req.test_code,
+        language=req.language,
+        timeout_seconds=req.timeout_seconds,
+        workspace_id=str(req.workspace_id),
+    )
+
+    return {
+        "run_id": report.run_id,
+        "language": report.language,
+        "compile_ok": report.compile_ok,
+        "execution_ok": report.execution_ok,
+        "tests_passed": report.tests_passed,
+        "exit_code": report.exit_code,
+        "stdout": report.stdout,
+        "stderr": report.stderr,
+        "duration_ms": report.duration_ms,
+        "security_violations": report.security_violations,
+    }
+

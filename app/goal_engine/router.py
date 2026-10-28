@@ -989,6 +989,8 @@ async def get_telemetry_events(
                 agent_name=agent.name if agent else "Agent",
                 summary=f"Arbitrage [{outcome_val}] pour action '{d.proposed_action[:40]}' (Risque: {risk_val})",
                 details={
+                    "decision_id": str(d.id),
+                    "agent_id": str(d.agent_id),
                     "outcome": outcome_val,
                     "risk_level": risk_val,
                     "reason": d.control_reason,

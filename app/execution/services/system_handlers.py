@@ -152,6 +152,15 @@ def install_production_handlers() -> None:
     from app.connectors.content_connector import content_create_handler
     register_action_handler("content", "create", content_create_handler)
 
+    # P3 — Isolated Code & Test Execution Sandbox Handlers
+    from app.connectors.sandbox_connector import sandbox_run_handler
+    register_action_handler("sandbox", "run", sandbox_run_handler)
+    register_action_handler("sandbox", "test", sandbox_run_handler)
+    register_action_handler("code", "create", sandbox_run_handler)
+    register_action_handler("code", "update", sandbox_run_handler)
+    register_action_handler("testing", "read", sandbox_run_handler)
+    register_action_handler("testing", "create", sandbox_run_handler)
+
 
 # Alias pour compatibilité
 register_standard_system_handlers = install_production_handlers

@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import ThreeCanvas from './components/ThreeCanvas';
 import CockpitSidebar from './components/CockpitSidebar';
 import AgentActivityCard from './components/AgentActivityCard';
@@ -587,6 +587,7 @@ export default function App() {
           isSplitView={isSplitView}
           spawnEvent={spawnEvent}
           p2pLinks={p2pLinks}
+          telemetry={telemetry}
         />
 
         {/* Fiche d'activité holographique de l'agent sélectionné */}

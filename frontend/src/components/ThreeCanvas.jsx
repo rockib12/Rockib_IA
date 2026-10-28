@@ -140,6 +140,7 @@ export default function ThreeCanvas({
   isSplitView,
   spawnEvent, // { agentId, parentId, timestamp }
   p2pLinks = [], // [{ sender_agent_id, recipient_agent_id, subject }]
+  telemetry = [], // Événements temps réel d'arbitrage (ALLOW, ESCALATE, DENY, STOP)
 }) {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -148,6 +149,8 @@ export default function ThreeCanvas({
   const agentMeshesRef = useRef(new Map()); // id -> Group
   const linkLinesRef = useRef([]); // array of Line objects
   const p2pArcsRef = useRef([]); // array of { mesh, pulseOrb, curve, speed, offset }
+  const arbitrationWavesRef = useRef([]); // P4: Anneaux d'onde de choc d'arbitrage 3D
+  const seenDecisionsRef = useRef(new Set()); // IDs des décisions déjà animées
   const particleBurstRef = useRef([]); // active spawn particles
   const targetLookAtRef = useRef(new THREE.Vector3(0, 0, 0));
   const currentLookAtRef = useRef(new THREE.Vector3(0, 0, 0));
@@ -456,6 +459,34 @@ export default function ThreeCanvas({
         }
       });
 
+      // P4 — Animate 3D Arbitration Shockwave Rings & Containment Shields
+      for (let i = arbitrationWavesRef.current.length - 1; i >= 0; i--) {
+        const wave = arbitrationWavesRef.current[i];
+        wave.userData.age += delta;
+        const maxAge = wave.userData.maxAge || 1.8;
+        const progress = Math.min(1.0, wave.userData.age / maxAge);
+        const scale = 1.0 + progress * 3.8;
+        wave.scale.set(scale, scale, 1);
+        wave.material.opacity = Math.max(0, (1.0 - progress) * 0.85);
+        if (wave.userData.age >= maxAge) {
+          scene.remove(wave);
+          arbitrationWavesRef.current.splice(i, 1);
+        }
+      }
+
+      agentMeshesRef.current.forEach((group) => {
+        if (group.userData.arbShield && group.userData.arbShield.visible) {
+          group.userData.arbShield.rotation.y -= delta * 1.6;
+          group.userData.arbShield.rotation.z += delta * 0.8;
+          const shieldPulse = 1.0 + Math.sin(elapsed * 5.0) * 0.06;
+          group.userData.arbShield.scale.set(shieldPulse, shieldPulse, shieldPulse);
+        }
+        if (group.userData.beacon && group.userData.arbOutcome === 'ESCALATE') {
+          const flash = Math.sin(elapsed * 10.0) > 0 ? 1.4 : 0.6;
+          group.userData.beacon.scale.set(flash, flash, flash);
+        }
+      });
+
       // Smooth Camera Positioning (orbital)
       const { theta, phi, radius } = cameraOrbitRef.current;
       const targetCamX =
@@ -674,6 +705,21 @@ export default function ThreeCanvas({
         const beacon = new THREE.Mesh(beaconGeo, beaconMat);
         beacon.position.y = 3.0;
         agentGroup.add(beacon);
+        agentGroup.userData.beacon = beacon;
+
+        // E2. P4 — Dôme de Confinement / Bouclier d'Arbitrage 3D (ESCALATE / DENY / STOP)
+        const shieldGeo = new THREE.IcosahedronGeometry(2.15, 1);
+        const shieldMat = new THREE.MeshBasicMaterial({
+          color: '#F59E0B',
+          wireframe: true,
+          transparent: true,
+          opacity: 0.48,
+        });
+        const arbShield = new THREE.Mesh(shieldGeo, shieldMat);
+        arbShield.position.y = 1.4;
+        arbShield.visible = false;
+        agentGroup.add(arbShield);
+        agentGroup.userData.arbShield = arbShield;
 
         // F. Halo selection ring (ground level)
         const haloGeo = new THREE.RingGeometry(2.4, 2.7, 36);
@@ -835,7 +881,82 @@ export default function ThreeCanvas({
         offset: idx * 0.27,
       });
     });
-  }, [agents, selectedAgentId, p2pLinks]);
+
+    // 5. ── P4 : Animations Réactives 3D sur Événements Réels d'Arbitrage ──
+    const decisionEvents = (telemetry || []).filter((ev) => ev.type === 'decision');
+    const latestOutcomeByAgent = new Map();
+
+    decisionEvents.forEach((ev) => {
+      const outcome = (ev.details?.outcome || '').toUpperCase();
+      let agId = ev.details?.agent_id;
+      if (!agId && ev.agent_name) {
+        const matched = agents.find((a) => a.name === ev.agent_name);
+        if (matched) agId = matched.id;
+      }
+      if (!agId || !outcome) return;
+
+      if (!latestOutcomeByAgent.has(agId)) {
+        latestOutcomeByAgent.set(agId, outcome);
+      }
+
+      // Si c'est un nouvel événement d'arbitrage non encore joué, lancer l'onde de choc 3D
+      if (ev.id && !seenDecisionsRef.current.has(ev.id)) {
+        seenDecisionsRef.current.add(ev.id);
+        const group = agentMeshesRef.current.get(agId);
+        if (group) {
+          const waveColor =
+            outcome === 'ALLOW'
+              ? '#10B981'
+              : outcome === 'ESCALATE'
+              ? '#F59E0B'
+              : '#F43F5E';
+
+          const waveGeo = new THREE.RingGeometry(1.6, 2.15, 48);
+          const waveMat = new THREE.MeshBasicMaterial({
+            color: waveColor,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.9,
+          });
+          const waveMesh = new THREE.Mesh(waveGeo, waveMat);
+          waveMesh.rotation.x = Math.PI / 2;
+          waveMesh.position.set(group.position.x, -1.75, group.position.z);
+          waveMesh.userData = { age: 0, maxAge: 1.9 };
+          scene.add(waveMesh);
+          arbitrationWavesRef.current.push(waveMesh);
+
+          if (outcome === 'DENY' || outcome === 'STOP' || outcome === 'ESCALATE') {
+            triggerParticleBurst(scene, particleBurstRef, group.position, waveColor, false);
+          }
+        }
+      }
+    });
+
+    // Mettre à jour l'état visuel du bouclier d'arbitrage sur chaque pod 3D
+    agentMeshesRef.current.forEach((group, agId) => {
+      const outcome = latestOutcomeByAgent.get(agId);
+      group.userData.arbOutcome = outcome || null;
+      if (!group.userData.arbShield) return;
+
+      if (outcome === 'ESCALATE') {
+        group.userData.arbShield.visible = true;
+        group.userData.arbShield.material.color.set('#F59E0B');
+        group.userData.arbShield.material.opacity = 0.48;
+        if (group.userData.beacon) group.userData.beacon.material.color.set('#F59E0B');
+      } else if (outcome === 'DENY' || outcome === 'STOP') {
+        group.userData.arbShield.visible = true;
+        group.userData.arbShield.material.color.set('#F43F5E');
+        group.userData.arbShield.material.opacity = 0.65;
+        if (group.userData.beacon) group.userData.beacon.material.color.set('#F43F5E');
+      } else {
+        group.userData.arbShield.visible = false;
+        if (outcome === 'ALLOW' && group.userData.beacon) {
+          group.userData.beacon.material.color.set('#10B981');
+          group.userData.beacon.scale.set(1, 1, 1);
+        }
+      }
+    });
+  }, [agents, selectedAgentId, p2pLinks, telemetry]);
 
   // ─── Spawn Particle Burst ──────────────────────────────────────
   useEffect(() => {

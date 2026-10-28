@@ -54,6 +54,17 @@ export default function AgentActivityCard({
   const [conveningCouncil, setConveningCouncil] = useState(false);
   const [councilVerdict, setCouncilVerdict] = useState(null);
 
+  // P3 — États pour la Sandbox d'Exécution Isolée (Code + Tests Unitaires)
+  const [showSandbox, setShowSandbox] = useState(false);
+  const [sandboxCode, setSandboxCode] = useState(
+    'def compute_risk_score(autonomy: int, spend: float) -> float:\n    return round(min(1.0, (spend / 1000.0) * (6 - autonomy) * 0.2), 3)\n\nprint("Risk score:", compute_risk_score(3, 450.0))'
+  );
+  const [sandboxTests, setSandboxTests] = useState(
+    'assert compute_risk_score(3, 450.0) == 0.27\nassert compute_risk_score(5, 0.0) == 0.0'
+  );
+  const [runningSandbox, setRunningSandbox] = useState(false);
+  const [sandboxReport, setSandboxReport] = useState(null);
+
   const peerAgents = allAgents.filter((a) => a.id !== agent.id);
 
   useEffect(() => {
@@ -108,6 +119,33 @@ export default function AgentActivityCard({
       console.error('Erreur Conseil IA:', err);
     } finally {
       setConveningCouncil(false);
+    }
+  };
+
+  const handleRunSandbox = async (e) => {
+    e.preventDefault();
+    if (runningSandbox || !sandboxCode.trim()) return;
+    setRunningSandbox(true);
+    try {
+      const res = await authFetch('/api/v1/execution/sandbox/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id: agent.workspace_id,
+          code: sandboxCode,
+          test_code: sandboxTests,
+          language: 'python',
+          timeout_seconds: 5.0,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSandboxReport(data);
+      }
+    } catch (err) {
+      console.error('Erreur exécution sandbox:', err);
+    } finally {
+      setRunningSandbox(false);
     }
   };
 
@@ -439,6 +477,129 @@ export default function AgentActivityCard({
           </div>
         </div>
 
+        {/* Section 5b : P3 — Sandbox d'Exécution Isolée (Code, Compilation & Tests) */}
+        <div className="info-section">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="info-section-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Terminal size={13} color="#10B981" />
+              Sandbox d'Exécution Isolée (P3)
+            </span>
+            <button
+              onClick={() => setShowSandbox(!showSandbox)}
+              className="control-btn"
+              style={{
+                padding: '2px 8px',
+                fontSize: '0.7rem',
+                color: '#10B981',
+                borderColor: 'rgba(16, 185, 129, 0.45)',
+              }}
+            >
+              {showSandbox ? 'Masquer Sandbox' : 'Coder & Tester'}
+            </button>
+          </div>
+
+          {showSandbox && (
+            <form
+              onSubmit={handleRunSandbox}
+              style={{
+                marginTop: '8px',
+                padding: '10px',
+                borderRadius: '8px',
+                background: 'rgba(16, 185, 129, 0.06)',
+                border: '1px solid rgba(16, 185, 129, 0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <div>
+                <label style={{ fontSize: '0.68rem', color: '#94A3B8', display: 'block', marginBottom: '3px' }}>
+                  CODE PYTHON ISOLÉ (SAST/AST VÉRIFIÉ) :
+                </label>
+                <textarea
+                  rows={3}
+                  value={sandboxCode}
+                  onChange={(e) => setSandboxCode(e.target.value)}
+                  className="mono"
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    background: '#060A17',
+                    border: '1px solid rgba(16, 185, 129, 0.35)',
+                    borderRadius: '6px',
+                    color: '#E2E8F0',
+                    fontSize: '0.72rem',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              <div>
+                <label style={{ fontSize: '0.68rem', color: '#94A3B8', display: 'block', marginBottom: '3px' }}>
+                  SUITE D'ASSERTIONS / TESTS UNITAIRES :
+                </label>
+                <textarea
+                  rows={2}
+                  value={sandboxTests}
+                  onChange={(e) => setSandboxTests(e.target.value)}
+                  className="mono"
+                  style={{
+                    width: '100%',
+                    padding: '6px 8px',
+                    background: '#060A17',
+                    border: '1px solid rgba(0, 240, 255, 0.25)',
+                    borderRadius: '6px',
+                    color: '#E2E8F0',
+                    fontSize: '0.72rem',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={runningSandbox || !sandboxCode.trim()}
+                className="btn-cyber"
+                style={{
+                  padding: '6px 10px',
+                  fontSize: '0.73rem',
+                  justifyContent: 'center',
+                  background: 'rgba(16, 185, 129, 0.18)',
+                  borderColor: '#10B981',
+                  color: '#10B981',
+                }}
+              >
+                <Play size={13} />
+                {runningSandbox ? 'Compilation & Tests en cours...' : 'Compiler & Exécuter en Sandbox'}
+              </button>
+
+              {sandboxReport && (
+                <div
+                  className="mono"
+                  style={{
+                    background: 'rgba(4, 7, 16, 0.95)',
+                    borderLeft: `3px solid ${sandboxReport.execution_ok ? '#10B981' : '#F43F5E'}`,
+                    padding: '8px',
+                    borderRadius: '4px',
+                    fontSize: '0.7rem',
+                    color: '#E2E8F0',
+                  }}
+                >
+                  <div style={{ fontWeight: 700, color: sandboxReport.execution_ok ? '#10B981' : '#F43F5E', marginBottom: '4px' }}>
+                    {sandboxReport.execution_ok ? '✓ EXÉCUTION & TESTS VALIDÉS' : '✗ ÉCHEC / VIOLATION SAST'} ({sandboxReport.duration_ms} ms | exit={sandboxReport.exit_code})
+                  </div>
+                  {sandboxReport.stdout && (
+                    <pre style={{ margin: 0, whiteSpace: 'pre-wrap', color: '#A7F3D0' }}>{sandboxReport.stdout}</pre>
+                  )}
+                  {sandboxReport.stderr && (
+                    <pre style={{ margin: '4px 0 0 0', whiteSpace: 'pre-wrap', color: '#FDA4AF' }}>{sandboxReport.stderr}</pre>
+                  )}
+                </div>
+              )}
+            </form>
+          )}
+        </div>
+
         {/* Section 6 : Empreinte d'exécution & Connecteurs */}
         <div className="info-section">
           <span className="info-section-title">Connecteurs Sandboxed & Capacités</span>
@@ -453,7 +614,7 @@ export default function AgentActivityCard({
             gap: '6px',
             border: '1px solid var(--border-subtle)'
           }}>
-            {['system.read', 'agent.send (P2P)', 'memory.vector', 'content.create', 'web.search', 'fs.write'].map((tool) => (
+            {['system.read', 'sandbox.run (P3)', 'agent.send (P2P)', 'memory.vector', 'content.create', 'web.search', 'fs.write'].map((tool) => (
               <span
                 key={tool}
                 className="mono"
