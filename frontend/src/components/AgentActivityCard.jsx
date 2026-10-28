@@ -523,12 +523,12 @@ export default function AgentActivityCard({
             <div style={{ display: 'flex', gap: '6px' }}>
               <button
                 onClick={handleTriggerAutoSwarmP6}
-                disabled={spawningSwarmP6}
+                disabled={spawningSwarm}
                 className="control-btn"
                 title="P6 : Décomposer l'objectif actif en escouade de 3 spécialistes 3D (Architecte, Exécuteur, Sentinelle)"
                 style={{ padding: '2px 8px', fontSize: '0.7rem', color: '#00F0FF', borderColor: 'rgba(0, 240, 255, 0.45)' }}
               >
-                {spawningSwarmP6 ? 'Déploiement...' : '⚡ Auto-Swarm 3D (P6)'}
+                {spawningSwarm ? 'Déploiement...' : '⚡ Auto-Swarm 3D (P6)'}
               </button>
               <button
                 onClick={() => onSpawnSubAgent(agent.id)}
@@ -749,9 +749,9 @@ export default function AgentActivityCard({
                 </button>
               </div>
 
-              {memoryResults.length > 0 && (
+              {memoriesList.length > 0 && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
-                  {memoryResults.map((mem, i) => (
+                  {memoriesList.map((mem, i) => (
                     <div
                       key={mem.id || i}
                       style={{
@@ -781,12 +781,12 @@ export default function AgentActivityCard({
         <div className="info-section">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span className="info-section-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <ShieldAlert size={13} color="#F59E0B" />
+              <ShieldCheck size={13} color="#F59E0B" />
               Veille Proactive & Auto-Audit (P7)
             </span>
             <button
               onClick={handleRunProactiveWatchP7}
-              disabled={runningWatchP7}
+              disabled={runningWatch}
               className="control-btn"
               style={{
                 padding: '2px 8px',
@@ -795,27 +795,27 @@ export default function AgentActivityCard({
                 borderColor: 'rgba(245, 158, 11, 0.45)',
               }}
             >
-              {runningWatchP7 ? 'Audit en cours...' : 'Lancer Audit P7'}
+              {runningWatch ? 'Audit en cours...' : 'Lancer Audit P7'}
             </button>
           </div>
 
-          {watchReportP7 && (
+          {watchReport && (
             <div
               className="mono"
               style={{
                 marginTop: '8px',
                 background: 'rgba(4, 7, 16, 0.95)',
-                borderLeft: `3px solid ${watchReportP7.overall_health === 'OPTIMAL' ? '#10B981' : '#F59E0B'}`,
+                borderLeft: `3px solid ${watchReport.overall_health === 'OPTIMAL' ? '#10B981' : '#F59E0B'}`,
                 padding: '8px',
                 borderRadius: '4px',
                 fontSize: '0.7rem',
                 color: '#E2E8F0',
               }}
             >
-              <div style={{ fontWeight: 700, color: watchReportP7.overall_health === 'OPTIMAL' ? '#10B981' : '#F59E0B', marginBottom: '4px' }}>
-                ÉTAT ESSAIM : {watchReportP7.overall_health} ({watchReportP7.duration_ms} ms)
+              <div style={{ fontWeight: 700, color: watchReport.overall_health === 'OPTIMAL' ? '#10B981' : '#F59E0B', marginBottom: '4px' }}>
+                ÉTAT ESSAIM : {watchReport.overall_health} ({watchReport.duration_ms} ms)
               </div>
-              {watchReportP7.probes && Object.entries(watchReportP7.probes).map(([k, v]) => (
+              {watchReport.probes && Object.entries(watchReport.probes).map(([k, v]) => (
                 <div key={k} style={{ color: '#94A3B8', fontSize: '0.67rem' }}>
                   • <strong style={{ color: '#E2E8F0' }}>{k}</strong> : {v.status}
                 </div>
