@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rockib-sdk"
+version = "0.1.0"
+description = "Framework d'agents IA gouvernés : arbitrage déterministe, budget hiérarchique, compétences scellées SHA-256 et audit chaîné."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "Rockib Quenum", email = "contact@iia-factory.com" }]
+keywords = ["ai", "agents", "governance", "llm", "multi-agent", "guardrails", "audit"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-asyncio>=0.23"]
+
+[project.scripts]
+rockib = "rockib_sdk.cli:main"
+
+[project.urls]
+Homepage = "https://rockib-quenum.netlify.app/"
+Repository = "https://github.com/rockib12/Rockib_IA"
+
+[tool.setuptools.packages.find]
+include = ["rockib_sdk*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
