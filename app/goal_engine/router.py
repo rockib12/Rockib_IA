@@ -254,14 +254,41 @@ async def list_agents(
                     except (ValueError, TypeError):
                         pass
 
-        # Distinguer orchestrateur permanent (racine) vs sous-agent de mission éphémère
+        # Distinguer agent permanent (racine ou pilier de l'agence) vs sous-agent de mission éphémère
         name_lower = (ag.name or "").lower()
         role_lower = (ag.role or "").lower()
-        is_root = (
+        is_permanent_pillar = any(
+            kw in name_lower
+            for kw in (
+                "orchestrateur",
+                "ambassador",
+                "agent frontend",
+                "agent backend",
+                "agent cyber",
+                "agent commercial",
+                "agent a",
+                "agent b",
+                "agent observability",
+            )
+        )
+        is_root = is_permanent_pillar or (
             parent_agent_id is None
             and (
-                any(kw in role_lower for kw in ("orchestrator", "architect", "ambassador", "sentinel", "suprême", "principal", "lead"))
-                or any(kw in name_lower for kw in ("orchestrateur", "ambassador", "lead", "agent a", "agent b", "agent observability"))
+                any(
+                    kw in role_lower
+                    for kw in (
+                        "orchestrator",
+                        "architect",
+                        "ambassador",
+                        "sentinel",
+                        "suprême",
+                        "principal",
+                        "lead",
+                        "directeur",
+                        "auditeur",
+                    )
+                )
+                or any(kw in name_lower for kw in ("lead", "sentinel"))
                 or not goals
             )
         )
@@ -272,11 +299,13 @@ async def list_agents(
         # - Ou aucun objectif actif n'est en cours et il a des tâches passées
         # - Ou son compte a été désactivé (is_active == False)
         is_finished = bool(
-            is_ephemeral
-            and (
-                (total_tasks > 0 and completed_tasks == total_tasks and not has_running)
-                or (not active_goals and not has_running and total_tasks > 0)
-                or not ag.is_active
+            not ag.is_active
+            or (
+                is_ephemeral
+                and (
+                    (total_tasks > 0 and completed_tasks == total_tasks and not has_running)
+                    or (not active_goals and not has_running and total_tasks > 0)
+                )
             )
         )
 
@@ -287,8 +316,8 @@ async def list_agents(
             current_status = "RUNNING" if has_running else ("READY" if active_goals else "IDLE")
             current_action = running_task_desc or (f"Supervise {len(active_goals)} objectif(s)" if active_goals else "En veille orbitale")
 
-        # Filtre cockpit 3D : si active_only est actif, les sous-agents ayant terminé disparaissent du cockpit
-        if active_only and is_ephemeral and is_finished:
+        # Filtre cockpit 3D : si active_only est actif, les agents désactivés et les sous-agents éphémères terminés disparaissent du cockpit
+        if active_only and (not ag.is_active or (is_ephemeral and is_finished)):
             continue
 
         result.append(
