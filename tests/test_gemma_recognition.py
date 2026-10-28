@@ -195,3 +195,54 @@ def test_dag_working_memory_upstream_outputs_injection():
     assert "upstream_outputs=" in req.situation
     assert "sha256:9f8a" in req.situation
 
+
+@pytest.mark.asyncio
+async def test_council_of_specialists_deliberation():
+    """Vérifie le protocole de consensus multi-agents CouncilOfSpecialists (Chantier N°4)."""
+    from unittest.mock import AsyncMock, MagicMock
+    from app.identity.models import Agent, AgentMessage
+    from app.intelligence.services.council import CouncilOfSpecialists
+
+    ws_id = uuid.uuid4()
+    lead = Agent(id=uuid.uuid4(), workspace_id=ws_id, name="Master Orchestrator", role="Lead Architect")
+    sec_specialist = Agent(id=uuid.uuid4(), workspace_id=ws_id, name="SecOps Sentinel", role="Cybersecurity OWASP Auditor")
+    infra_specialist = Agent(id=uuid.uuid4(), workspace_id=ws_id, name="Cloud Kubernetes Ops", role="DevOps Docker & Cloud Engineer")
+    ui_specialist = Agent(id=uuid.uuid4(), workspace_id=ws_id, name="React Designer", role="Frontend UI Specialist")
+
+    # 1. Sélection des 2 meilleurs spécialistes par Gemma-2 768d
+    top_2 = await CouncilOfSpecialists.select_top_specialists(
+        query_text="Audit OWASP SAST et déploiement du cluster Docker Kubernetes en production",
+        candidates=[sec_specialist, infra_specialist, ui_specialist],
+        max_specialists=2,
+    )
+    selected_names = {ag.name for ag, _ in top_2}
+    assert "SecOps Sentinel" in selected_names
+    assert "Cloud Kubernetes Ops" in selected_names
+
+    # 2. Session complète de délibération parallèle du Conseil
+    mock_db = AsyncMock()
+    added_rows = []
+    mock_db.add = MagicMock(side_effect=lambda obj: added_rows.append(obj))
+    mock_db.commit = AsyncMock()
+
+    res_lead = MagicMock(scalar_one_or_none=MagicMock(return_value=lead))
+    res_peers = MagicMock(scalars=MagicMock(return_value=MagicMock(all=MagicMock(return_value=[sec_specialist, infra_specialist]))))
+    mock_db.execute = AsyncMock(side_effect=[res_lead, res_peers])
+
+    verdict = await CouncilOfSpecialists.convene_council(
+        db=mock_db,
+        workspace_id=ws_id,
+        lead_agent_id=lead.id,
+        objective="Sécuriser et déployer l'API en production",
+        proposed_action="Valider le chiffrement AES-256 et déployer le conteneur Docker",
+        max_specialists=2,
+    )
+
+    assert verdict.consensus_stance == "APPROVE"
+    assert verdict.consensus_confidence > 0.8
+    assert len(verdict.votes) == 2
+    assert len(verdict.p2p_message_ids) == 2
+    p2p_msgs = [r for r in added_rows if isinstance(r, AgentMessage)]
+    assert len(p2p_msgs) == 2
+
+

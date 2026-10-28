@@ -25,6 +25,7 @@ export default function App() {
   const [selectedGoalId, setSelectedGoalId] = useState(null);
   const [goalDetails, setGoalDetails] = useState(null);
   const [telemetry, setTelemetry] = useState([]);
+  const [p2pLinks, setP2pLinks] = useState([]);
   const [healthStatus, setHealthStatus] = useState({ status: 'healthy', database: 'up', redis: 'up' });
   const [toasts, setToasts] = useState([]);
   const [isSplitView, setIsSplitView] = useState(false);
@@ -146,13 +147,20 @@ export default function App() {
     return null;
   }, []);
 
-  // Charger la télémétrie
+  // Charger la télémétrie et les liens synaptiques P2P 3D
   const fetchTelemetry = useCallback(async () => {
     try {
-      const res = await authFetch('/api/v1/telemetry');
+      const [res, p2pRes] = await Promise.all([
+        authFetch('/api/v1/telemetry'),
+        authFetch('/api/v1/agents/dialogue?limit=15'),
+      ]);
       if (res.ok) {
         const data = await res.json();
         setTelemetry(data);
+      }
+      if (p2pRes.ok) {
+        const p2pData = await p2pRes.json();
+        setP2pLinks(Array.isArray(p2pData) ? p2pData : []);
       }
     } catch (e) {
       console.warn("Erreur télémétrie:", e);
@@ -578,6 +586,7 @@ export default function App() {
           }}
           isSplitView={isSplitView}
           spawnEvent={spawnEvent}
+          p2pLinks={p2pLinks}
         />
 
         {/* Fiche d'activité holographique de l'agent sélectionné */}

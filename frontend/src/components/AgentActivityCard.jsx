@@ -51,6 +51,8 @@ export default function AgentActivityCard({
   const [p2pMessage, setP2pMessage] = useState('');
   const [sendingP2P, setSendingP2P] = useState(false);
   const [lastP2PReply, setLastP2PReply] = useState(null);
+  const [conveningCouncil, setConveningCouncil] = useState(false);
+  const [councilVerdict, setCouncilVerdict] = useState(null);
 
   const peerAgents = allAgents.filter((a) => a.id !== agent.id);
 
@@ -76,7 +78,38 @@ export default function AgentActivityCard({
   useEffect(() => {
     fetchAgentLogs();
     setLastP2PReply(null);
+    setCouncilVerdict(null);
   }, [agent?.id]);
+
+  const handleConveneCouncil = async () => {
+    if (conveningCouncil || peerAgents.length === 0) return;
+    setConveningCouncil(true);
+    try {
+      const objectiveText = activeGoal?.objective || `Coordination stratégique pour ${agent.name}`;
+      const actionText = p2pMessage.trim() || agent.current_action || `Audit architectural et sécurité par le Conseil IA`;
+      const res = await authFetch('/api/v1/agents/council', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id: agent.workspace_id,
+          lead_agent_id: agent.id,
+          objective: objectiveText,
+          proposed_action: actionText,
+          max_specialists: 2,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setCouncilVerdict(data);
+        fetchAgentLogs();
+        if (onDialogueSuccess) onDialogueSuccess(data);
+      }
+    } catch (err) {
+      console.error('Erreur Conseil IA:', err);
+    } finally {
+      setConveningCouncil(false);
+    }
+  };
 
   const handleSendP2P = async (e) => {
     e.preventDefault();
@@ -286,21 +319,65 @@ export default function AgentActivityCard({
                 }}
               />
 
-              <button
-                type="submit"
-                disabled={sendingP2P || !p2pMessage.trim() || peerAgents.length === 0}
-                className="btn-cyber primary"
-                style={{
-                  padding: '6px 12px',
-                  fontSize: '0.75rem',
-                  justifyContent: 'center',
-                  background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(168, 85, 247, 0.25))',
-                  borderColor: '#EC4899',
-                }}
-              >
-                <Send size={13} />
-                {sendingP2P ? 'Négociation P2P en cours...' : 'Envoyer & Négocier en Direct'}
-              </button>
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <button
+                  type="submit"
+                  disabled={sendingP2P || !p2pMessage.trim() || peerAgents.length === 0}
+                  className="btn-cyber primary"
+                  style={{
+                    flex: 1,
+                    padding: '6px 10px',
+                    fontSize: '0.73rem',
+                    justifyContent: 'center',
+                    background: 'linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(168, 85, 247, 0.25))',
+                    borderColor: '#EC4899',
+                  }}
+                >
+                  <Send size={13} />
+                  {sendingP2P ? 'Négociation...' : 'Négocier P2P'}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleConveneCouncil}
+                  disabled={conveningCouncil || peerAgents.length === 0}
+                  className="btn-cyber"
+                  style={{
+                    flex: 1,
+                    padding: '6px 10px',
+                    fontSize: '0.73rem',
+                    justifyContent: 'center',
+                    background: 'rgba(16, 185, 129, 0.16)',
+                    borderColor: '#10B981',
+                    color: '#10B981',
+                  }}
+                  title="Réunit les spécialistes pertinents via Gemma-2 768d"
+                >
+                  <ShieldCheck size={13} />
+                  {conveningCouncil ? 'Délibération...' : 'Conseil IA (Gemma-2)'}
+                </button>
+              </div>
+
+              {councilVerdict && (
+                <div
+                  style={{
+                    background: 'rgba(6, 10, 23, 0.94)',
+                    borderLeft: '3px solid #EC4899',
+                    padding: '8px',
+                    borderRadius: '4px',
+                    fontSize: '0.71rem',
+                  }}
+                >
+                  <div style={{ color: '#EC4899', fontWeight: 700, marginBottom: '4px' }}>
+                    Verdict Conseil IA ({councilVerdict.consensus_stance} — Confiance {Math.round((councilVerdict.consensus_confidence || 0) * 100)}%) :
+                  </div>
+                  {(councilVerdict.votes || []).map((v) => (
+                    <div key={v.agent_id} style={{ color: '#E2E8F0', marginBottom: '4px', lineHeight: 1.35 }}>
+                      <strong style={{ color: '#00F0FF' }}>{v.agent_name}</strong> ({v.stance}, sim={v.specialty_similarity}): {v.opinion}
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {lastP2PReply && (
                 <div

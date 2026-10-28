@@ -1280,3 +1280,58 @@ async def list_agent_p2p_dialogues(
     ]
 
 
+class CouncilConveneRequest(BaseModel):
+    workspace_id: uuid.UUID
+    lead_agent_id: uuid.UUID
+    objective: str = Field(..., min_length=3, max_length=500)
+    proposed_action: str = Field(..., min_length=3, max_length=1500)
+    max_specialists: int = Field(default=2, ge=1, le=5)
+
+
+@router.post("/agents/council", status_code=status.HTTP_200_OK)
+async def convene_agent_council(
+    payload: CouncilConveneRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+):
+    """Réunit le Conseil des Spécialistes IA (Council of Specialists) en parallèle."""
+    user_ws_ids = await get_user_workspace_ids(db, current_user)
+    if payload.workspace_id not in user_ws_ids:
+        raise HTTPException(status_code=403, detail="Accès refusé à ce workspace.")
+
+    from app.intelligence.services.council import CouncilOfSpecialists
+
+    verdict = await CouncilOfSpecialists.convene_council(
+        db=db,
+        workspace_id=payload.workspace_id,
+        lead_agent_id=payload.lead_agent_id,
+        objective=payload.objective,
+        proposed_action=payload.proposed_action,
+        max_specialists=payload.max_specialists,
+    )
+
+    return {
+        "council_id": verdict.council_id,
+        "lead_agent_id": verdict.lead_agent_id,
+        "objective": verdict.objective,
+        "proposed_action": verdict.proposed_action,
+        "consensus_stance": verdict.consensus_stance,
+        "consensus_confidence": verdict.consensus_confidence,
+        "synthesized_recommendation": verdict.synthesized_recommendation,
+        "p2p_message_ids": verdict.p2p_message_ids,
+        "votes": [
+            {
+                "agent_id": v.agent_id,
+                "agent_name": v.agent_name,
+                "agent_role": v.agent_role,
+                "specialty_similarity": v.specialty_similarity,
+                "stance": v.stance,
+                "confidence": v.confidence,
+                "opinion": v.opinion,
+            }
+            for v in verdict.votes
+        ],
+    }
+
+
+

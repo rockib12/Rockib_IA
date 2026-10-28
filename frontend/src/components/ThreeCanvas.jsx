@@ -139,6 +139,7 @@ export default function ThreeCanvas({
   onSelectAgent,
   isSplitView,
   spawnEvent, // { agentId, parentId, timestamp }
+  p2pLinks = [], // [{ sender_agent_id, recipient_agent_id, subject }]
 }) {
   const mountRef = useRef(null);
   const sceneRef = useRef(null);
@@ -146,6 +147,7 @@ export default function ThreeCanvas({
   const rendererRef = useRef(null);
   const agentMeshesRef = useRef(new Map()); // id -> Group
   const linkLinesRef = useRef([]); // array of Line objects
+  const p2pArcsRef = useRef([]); // array of { mesh, pulseOrb, curve, speed, offset }
   const particleBurstRef = useRef([]); // active spawn particles
   const targetLookAtRef = useRef(new THREE.Vector3(0, 0, 0));
   const currentLookAtRef = useRef(new THREE.Vector3(0, 0, 0));
@@ -442,6 +444,17 @@ export default function ThreeCanvas({
           particleBurstRef.current.splice(i, 1);
         }
       }
+
+      // Animate 3D P2P Synaptic Data Pulse Orbs along Bézier curves
+      p2pArcsRef.current.forEach((arcObj) => {
+        if (arcObj.pulseOrb && arcObj.curve) {
+          const t = ((elapsed * arcObj.speed + arcObj.offset) % 1.0 + 1.0) % 1.0;
+          const pt = arcObj.curve.getPointAt(t);
+          arcObj.pulseOrb.position.copy(pt);
+          const s = 1.0 + Math.sin(elapsed * 8.0 + arcObj.offset) * 0.25;
+          arcObj.pulseOrb.scale.set(s, s, s);
+        }
+      });
 
       // Smooth Camera Positioning (orbital)
       const { theta, phi, radius } = cameraOrbitRef.current;
@@ -758,7 +771,71 @@ export default function ThreeCanvas({
         linkLinesRef.current.push(rope);
       }
     });
-  }, [agents, selectedAgentId]);
+
+    // 4. ── Render 3D P2P & Council Synaptic Arcs with Data Pulse Orbs ──
+    p2pArcsRef.current.forEach((arcObj) => {
+      if (arcObj.mesh) scene.remove(arcObj.mesh);
+      if (arcObj.pulseOrb) scene.remove(arcObj.pulseOrb);
+    });
+    p2pArcsRef.current = [];
+
+    const seenPairs = new Set();
+    (p2pLinks || []).slice(0, 12).forEach((link, idx) => {
+      const sId = link.sender_agent_id;
+      const rId = link.recipient_agent_id;
+      if (!sId || !rId || sId === rId) return;
+      if (!positions.has(sId) || !positions.has(rId)) return;
+
+      const pairKey = `${sId}->${rId}`;
+      if (seenPairs.has(pairKey)) return;
+      seenPairs.add(pairKey);
+
+      const p1 = positions.get(sId);
+      const p2 = positions.get(rId);
+      const isCouncil = (link.subject || '').includes('Conseil IA');
+      const arcColor = isCouncil ? '#EC4899' : '#10B981';
+
+      const mid = new THREE.Vector3(
+        (p1.x + p2.x) / 2,
+        7.8 + (idx % 3) * 1.4,
+        (p1.z + p2.z) / 2
+      );
+
+      const curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(p1.x, 2.2, p1.z),
+        mid,
+        new THREE.Vector3(p2.x, 2.2, p2.z),
+      ]);
+
+      const arcGeo = new THREE.TubeGeometry(curve, 44, 0.065, 8, false);
+      const arcMat = new THREE.MeshStandardMaterial({
+        color: arcColor,
+        emissive: arcColor,
+        emissiveIntensity: 2.2,
+        transparent: true,
+        opacity: 0.78,
+      });
+      const arcMesh = new THREE.Mesh(arcGeo, arcMat);
+      scene.add(arcMesh);
+
+      const orbGeo = new THREE.SphereGeometry(0.24, 12, 12);
+      const orbMat = new THREE.MeshBasicMaterial({
+        color: '#FFFFFF',
+        transparent: true,
+        opacity: 0.95,
+      });
+      const pulseOrb = new THREE.Mesh(orbGeo, orbMat);
+      scene.add(pulseOrb);
+
+      p2pArcsRef.current.push({
+        mesh: arcMesh,
+        pulseOrb,
+        curve,
+        speed: isCouncil ? 0.65 : 0.45,
+        offset: idx * 0.27,
+      });
+    });
+  }, [agents, selectedAgentId, p2pLinks]);
 
   // ─── Spawn Particle Burst ──────────────────────────────────────
   useEffect(() => {
