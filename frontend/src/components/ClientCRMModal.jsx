@@ -25,7 +25,7 @@ export default function ClientCRMModal({
   workspaceId,
   onNotify,
 }) {
-  const [activeTab, setActiveTab] = useState('pipeline'); // 'pipeline' | 'embed' | 'roi'
+  const [activeTab, setActiveTab] = useState('pipeline'); // 'pipeline' | 'embed' | 'roi' | 'proposal'
   const [selectedSiteKey, setSelectedSiteKey] = useState('rockib-portfolio');
   const [availableSites, setAvailableSites] = useState([]);
   const [leads, setLeads] = useState([]);
@@ -33,6 +33,39 @@ export default function ClientCRMModal({
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [copiedSnippet, setCopiedSnippet] = useState(false);
+
+  // P8 : Auto-Proposal Engine State
+  const [propClientName, setPropClientName] = useState('Entreprise Partenaire');
+  const [propCompany, setPropCompany] = useState('Groupe B2B');
+  const [propBrief, setPropBrief] = useState('Plateforme SaaS e-commerce multi-boutique avec agent IA WhatsApp et paiement sécurisé');
+  const [generatingProposal, setGeneratingProposal] = useState(false);
+  const [generatedProposal, setGeneratedProposal] = useState(null);
+
+  const handleGenerateProposalP8 = async (e) => {
+    if (e) e.preventDefault();
+    if (!propBrief.trim()) return;
+    try {
+      setGeneratingProposal(true);
+      const res = await authFetch('/api/v1/inbound/proposal/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          client_name: propClientName || 'Client',
+          company_name: propCompany || null,
+          project_brief: propBrief,
+          currency: 'EUR',
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setGeneratedProposal(data);
+      if (onNotify) onNotify(`Proposition P8 générée (${data.estimated_budget_eur} € / ${data.estimated_days}j)`, 'success');
+    } catch (err) {
+      if (onNotify) onNotify(`Erreur devis P8: ${err.message}`, 'error');
+    } finally {
+      setGeneratingProposal(false);
+    }
+  };
 
   // Charger la liste des sites disponibles
   const fetchSites = useCallback(async () => {
@@ -253,6 +286,15 @@ export default function ClientCRMModal({
             >
               <DollarSign size={14} />
               <span>Impact Commercial & ROI</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('proposal')}
+              className={`btn-cyber ${activeTab === 'proposal' ? 'primary' : 'secondary'}`}
+              style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+            >
+              <Sparkles size={14} />
+              <span>⚡ Devis IA Auto (P8)</span>
             </button>
           </div>
 
@@ -646,6 +688,138 @@ export default function ClientCRMModal({
                   </a>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB 4: P8 — AUTO-PROPOSAL ENGINE (GÉNÉRATEUR DE DEVIS & ARCHITECTURE IA) */}
+          {activeTab === 'proposal' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <form onSubmit={handleGenerateProposalP8} className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <h4 style={{ color: '#fff', fontSize: '1.02rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Sparkles size={16} color="var(--neon-cyan)" />
+                  <span>P8 — Moteur Autonome de Proposition Technique & Chiffrage Commercial</span>
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Nom du Client / Contact</label>
+                    <input
+                      type="text"
+                      value={propClientName}
+                      onChange={(e) => setPropClientName(e.target.value)}
+                      className="cyber-input"
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>Société / Organisation</label>
+                    <input
+                      type="text"
+                      value={propCompany}
+                      onChange={(e) => setPropCompany(e.target.value)}
+                      className="cyber-input"
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                    Cahier des Charges / Besoin Exprimé par le Prospect (analysé par Gemma-2 768d) :
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={propBrief}
+                    onChange={(e) => setPropBrief(e.target.value)}
+                    className="cyber-input"
+                    style={{ width: '100%', resize: 'vertical' }}
+                  />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <button
+                    type="submit"
+                    disabled={generatingProposal || !propBrief.trim()}
+                    className="btn-cyber primary"
+                    style={{ padding: '8px 18px', fontSize: '0.84rem' }}
+                  >
+                    <Sparkles size={14} />
+                    <span>{generatingProposal ? 'Génération Architecturale en cours...' : 'Générer Proposition & Chiffrage'}</span>
+                  </button>
+                </div>
+              </form>
+
+              {generatedProposal && (
+                <div className="glass-panel" style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px', borderLeft: '4px solid var(--neon-emerald)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
+                    <div>
+                      <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--neon-cyan)' }}>{generatedProposal.proposal_ref}</span>
+                      <h4 style={{ margin: '2px 0 0 0', color: '#fff', fontSize: '1.05rem' }}>
+                        Architecture & Chiffrage pour {generatedProposal.client_name}
+                      </h4>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                      <div style={{ textAlign: 'right' }}>
+                        <div className="mono" style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--neon-emerald)' }}>
+                          {generatedProposal.estimated_budget_eur.toLocaleString('fr-FR')} € HT
+                        </div>
+                        <div className="mono" style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          ({generatedProposal.estimated_budget_fcfa.toLocaleString('fr-FR')} FCFA • {generatedProposal.estimated_days} jours-homme)
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(generatedProposal.proposal_markdown || '');
+                          if (onNotify) onNotify('Proposition Markdown copiée dans le presse-papier !', 'success');
+                        }}
+                        className="btn-cyber secondary"
+                        style={{ padding: '6px 12px', fontSize: '0.78rem' }}
+                      >
+                        <Copy size={13} />
+                        <span>Copier Markdown</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
+                    {(generatedProposal.recommended_stack || []).map((tech, i) => (
+                      <span
+                        key={i}
+                        className="mono"
+                        style={{
+                          fontSize: '0.7rem',
+                          padding: '3px 8px',
+                          borderRadius: '6px',
+                          background: 'rgba(0, 240, 255, 0.1)',
+                          border: '1px solid rgba(0, 240, 255, 0.3)',
+                          color: '#00F0FF',
+                        }}
+                      >
+                        {tech}
+                      </span>
+                    ))}
+                  </div>
+
+                  <pre
+                    className="mono"
+                    style={{
+                      margin: 0,
+                      padding: '12px',
+                      borderRadius: '8px',
+                      background: 'rgba(3, 6, 14, 0.9)',
+                      border: '1px solid rgba(255, 255, 255, 0.08)',
+                      color: '#E2E8F0',
+                      fontSize: '0.74rem',
+                      maxHeight: '260px',
+                      overflowY: 'auto',
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    {generatedProposal.proposal_markdown}
+                  </pre>
+                </div>
+              )}
             </div>
           )}
         </div>

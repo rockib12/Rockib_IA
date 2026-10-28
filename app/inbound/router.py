@@ -1,4 +1,4 @@
-﻿"""FastAPI router for Inbound Portfolio Gateway."""
+"""FastAPI router for Inbound Portfolio Gateway."""
 from __future__ import annotations
 
 import secrets
@@ -485,3 +485,37 @@ async def voice_realtime_websocket(websocket: WebSocket, site_key: str = "rockib
     """Full-Duplex Real-Time Voice WebSocket (P2)."""
     bridge = RealtimeVoiceBridge(site_key=site_key, voice_profile=voice)
     await bridge.run(websocket)
+
+
+from pydantic import BaseModel
+from app.inbound.services.realtime_voice_service import RealtimeVoiceBridge
+from app.core.dependencies import get_current_user
+
+
+class AutoProposalRequest(BaseModel):
+    client_name: str = "Client Partenaire"
+    company_name: str | None = None
+    project_summary: str = ""
+    project_brief: str | None = None
+    budget_hint: str = ""
+    timeline_hint: str = ""
+    currency: str = "EUR"
+
+
+@router.post("/proposal/generate")
+async def generate_auto_proposal(
+    body: AutoProposalRequest,
+    current_user: User = Depends(get_current_user),
+):
+    """P8 — Génère automatiquement l'architecture cible, le découpage en phases et le devis client."""
+    from app.inbound.services.proposal_generator import AutoProposalEngine
+
+    return await AutoProposalEngine.generate_proposal(
+        client_name=body.client_name,
+        company_name=body.company_name,
+        project_summary=body.project_summary,
+        project_brief=body.project_brief,
+        budget_hint=body.budget_hint,
+        timeline_hint=body.timeline_hint,
+        currency=body.currency,
+    )

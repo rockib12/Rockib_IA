@@ -99,3 +99,24 @@ async def test_sandbox_run_handler_action_record():
     res_blocked = await sandbox_run_handler(action_blocked)
     assert res_blocked.success is False
     assert res_blocked.error_code == "SANDBOX_SECURITY_VIOLATION"
+
+
+@pytest.mark.asyncio
+async def test_p8_auto_proposal_engine_generates_architecture_and_budget():
+    from app.inbound.services.proposal_generator import AutoProposalEngine
+
+    proposal = await AutoProposalEngine.generate_proposal(
+        client_name="Amadou Diallo",
+        company_name="MartiGroup Africa",
+        project_brief="Créer une plateforme SaaS e-commerce multi-boutique avec agent IA WhatsApp et paiement Stripe/Mobile Money",
+        currency="EUR",
+    )
+    assert proposal["proposal_ref"].startswith("PROP-RK-")
+    assert proposal["estimated_days"] >= 8
+    assert proposal["estimated_budget_eur"] > 0
+    assert proposal["estimated_budget_fcfa"] > proposal["estimated_budget_eur"] * 600
+    assert len(proposal["recommended_stack"]) >= 4
+    assert len(proposal["phases"]) == 4
+    assert "PROPOSITION D'ARCHITECTURE" in proposal["proposal_markdown"]
+    assert "Amadou Diallo" in proposal["proposal_markdown"]
+

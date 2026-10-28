@@ -65,6 +65,16 @@ export default function AgentActivityCard({
   const [runningSandbox, setRunningSandbox] = useState(false);
   const [sandboxReport, setSandboxReport] = useState(null);
 
+  // P5, P6, P7 — États pour Mémoire Vectorielle (P5), Auto-Swarm (P6) et Veille Proactive (P7)
+  const [showMemoryP5, setShowMemoryP5] = useState(false);
+  const [memoryQuery, setMemoryQuery] = useState('');
+  const [memoriesList, setMemoriesList] = useState([]);
+  const [searchingMemory, setSearchingMemory] = useState(false);
+  const [spawningSwarm, setSpawningSwarm] = useState(false);
+  const [swarmResult, setSwarmResult] = useState(null);
+  const [runningWatch, setRunningWatch] = useState(false);
+  const [watchReport, setWatchReport] = useState(null);
+
   const peerAgents = allAgents.filter((a) => a.id !== agent.id);
 
   useEffect(() => {
@@ -146,6 +156,73 @@ export default function AgentActivityCard({
       console.error('Erreur exécution sandbox:', err);
     } finally {
       setRunningSandbox(false);
+    }
+  };
+
+  // P5 — Recherche sémantique dans pgvector (768d)
+  const handleSearchMemoryP5 = async (e) => {
+    if (e) e.preventDefault();
+    const q = (memoryQuery || agent.name || 'architecture').trim();
+    setSearchingMemory(true);
+    try {
+      const res = await authFetch(
+        `/api/v1/memory/search?workspace_id=${agent.workspace_id}&q=${encodeURIComponent(q)}&limit=6`
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setMemoriesList(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.error('Erreur recherche mémoire P5:', err);
+    } finally {
+      setSearchingMemory(false);
+    }
+  };
+
+  // P6 — Déploiement Auto-Swarm 3D
+  const handleTriggerAutoSwarmP6 = async () => {
+    if (!activeGoal?.id || spawningSwarm) return;
+    setSpawningSwarm(true);
+    try {
+      const res = await authFetch(`/api/v1/goals/${activeGoal.id}/auto-swarm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ max_sub_agents: 3 }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSwarmResult(data);
+        if (onDialogueSuccess) onDialogueSuccess(data);
+      }
+    } catch (err) {
+      console.error('Erreur Auto-Swarm P6:', err);
+    } finally {
+      setSpawningSwarm(false);
+    }
+  };
+
+  // P7 — Exécuter la Sonde de Veille Proactive
+  const handleRunProactiveWatchP7 = async () => {
+    if (runningWatch) return;
+    setRunningWatch(true);
+    try {
+      const res = await authFetch('/api/v1/goals/proactive-watch/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          workspace_id: agent.workspace_id,
+          agent_id: agent.id,
+          notify_telegram: false,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWatchReport(data);
+      }
+    } catch (err) {
+      console.error('Erreur Veille Proactive P7:', err);
+    } finally {
+      setRunningWatch(false);
     }
   };
 
@@ -437,19 +514,30 @@ export default function AgentActivityCard({
           )}
         </div>
 
-        {/* Section 5 : Sous-agents créés par cet agent */}
+        {/* Section 5 : Sous-agents créés par cet agent + P6 Auto-Swarm 3D */}
         <div className="info-section">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
             <span className="info-section-title">
               Sous-Agents déployés ({subAgents.length})
             </span>
-            <button
-              onClick={() => onSpawnSubAgent(agent.id)}
-              className="control-btn"
-              style={{ padding: '2px 8px', fontSize: '0.7rem', color: 'var(--neon-purple)' }}
-            >
-              + Déployer
-            </button>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <button
+                onClick={handleTriggerAutoSwarmP6}
+                disabled={spawningSwarmP6}
+                className="control-btn"
+                title="P6 : Décomposer l'objectif actif en escouade de 3 spécialistes 3D (Architecte, Exécuteur, Sentinelle)"
+                style={{ padding: '2px 8px', fontSize: '0.7rem', color: '#00F0FF', borderColor: 'rgba(0, 240, 255, 0.45)' }}
+              >
+                {spawningSwarmP6 ? 'Déploiement...' : '⚡ Auto-Swarm 3D (P6)'}
+              </button>
+              <button
+                onClick={() => onSpawnSubAgent(agent.id)}
+                className="control-btn"
+                style={{ padding: '2px 8px', fontSize: '0.7rem', color: 'var(--neon-purple)' }}
+              >
+                + Déployer
+              </button>
+            </div>
           </div>
 
           <div className="subagents-tree">
@@ -597,6 +685,142 @@ export default function AgentActivityCard({
                 </div>
               )}
             </form>
+          )}
+        </div>
+
+        {/* Section 5c : P5 — Inspecteur de Mémoire Vectorielle (pgvector 768d) */}
+        <div className="info-section">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="info-section-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Cpu size={13} color="#38BDF8" />
+              Mémoire Vectorielle pgvector (P5)
+            </span>
+            <button
+              onClick={() => setShowMemoryP5(!showMemoryP5)}
+              className="control-btn"
+              style={{
+                padding: '2px 8px',
+                fontSize: '0.7rem',
+                color: '#38BDF8',
+                borderColor: 'rgba(56, 189, 248, 0.45)',
+              }}
+            >
+              {showMemoryP5 ? 'Masquer' : 'Explorer Souvenirs'}
+            </button>
+          </div>
+
+          {showMemoryP5 && (
+            <form
+              onSubmit={handleSearchMemoryP5}
+              style={{
+                marginTop: '8px',
+                padding: '10px',
+                borderRadius: '8px',
+                background: 'rgba(56, 189, 248, 0.06)',
+                border: '1px solid rgba(56, 189, 248, 0.3)',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+              }}
+            >
+              <div style={{ display: 'flex', gap: '6px' }}>
+                <input
+                  type="text"
+                  value={memoryQuery}
+                  onChange={(e) => setMemoryQuery(e.target.value)}
+                  placeholder="Rechercher par similarité cosinus (768d)..."
+                  style={{
+                    flex: 1,
+                    padding: '6px 8px',
+                    background: '#060A17',
+                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                    borderRadius: '6px',
+                    color: '#E2E8F0',
+                    fontSize: '0.74rem',
+                  }}
+                />
+                <button
+                  type="submit"
+                  disabled={searchingMemory}
+                  className="btn-cyber"
+                  style={{ padding: '6px 10px', fontSize: '0.72rem' }}
+                >
+                  {searchingMemory ? '...' : 'Chercher'}
+                </button>
+              </div>
+
+              {memoryResults.length > 0 && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', maxHeight: '150px', overflowY: 'auto' }}>
+                  {memoryResults.map((mem, i) => (
+                    <div
+                      key={mem.id || i}
+                      style={{
+                        background: 'rgba(4, 7, 16, 0.92)',
+                        borderLeft: '3px solid #38BDF8',
+                        padding: '6px 8px',
+                        borderRadius: '4px',
+                        fontSize: '0.7rem',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', color: '#38BDF8', fontWeight: 700, marginBottom: '2px' }}>
+                        <span>[{mem.memory_type || 'EPISODIC'}]</span>
+                        {mem.similarity !== undefined && (
+                          <span className="mono">{Math.round(mem.similarity * 100)}% cos</span>
+                        )}
+                      </div>
+                      <div style={{ color: '#CBD5E1', lineHeight: 1.35 }}>{mem.content}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </form>
+          )}
+        </div>
+
+        {/* Section 5d : P7 — Sentinelle de Veille Proactive & Auto-Audit */}
+        <div className="info-section">
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span className="info-section-title" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <ShieldAlert size={13} color="#F59E0B" />
+              Veille Proactive & Auto-Audit (P7)
+            </span>
+            <button
+              onClick={handleRunProactiveWatchP7}
+              disabled={runningWatchP7}
+              className="control-btn"
+              style={{
+                padding: '2px 8px',
+                fontSize: '0.7rem',
+                color: '#F59E0B',
+                borderColor: 'rgba(245, 158, 11, 0.45)',
+              }}
+            >
+              {runningWatchP7 ? 'Audit en cours...' : 'Lancer Audit P7'}
+            </button>
+          </div>
+
+          {watchReportP7 && (
+            <div
+              className="mono"
+              style={{
+                marginTop: '8px',
+                background: 'rgba(4, 7, 16, 0.95)',
+                borderLeft: `3px solid ${watchReportP7.overall_health === 'OPTIMAL' ? '#10B981' : '#F59E0B'}`,
+                padding: '8px',
+                borderRadius: '4px',
+                fontSize: '0.7rem',
+                color: '#E2E8F0',
+              }}
+            >
+              <div style={{ fontWeight: 700, color: watchReportP7.overall_health === 'OPTIMAL' ? '#10B981' : '#F59E0B', marginBottom: '4px' }}>
+                ÉTAT ESSAIM : {watchReportP7.overall_health} ({watchReportP7.duration_ms} ms)
+              </div>
+              {watchReportP7.probes && Object.entries(watchReportP7.probes).map(([k, v]) => (
+                <div key={k} style={{ color: '#94A3B8', fontSize: '0.67rem' }}>
+                  • <strong style={{ color: '#E2E8F0' }}>{k}</strong> : {v.status}
+                </div>
+              ))}
+            </div>
           )}
         </div>
 

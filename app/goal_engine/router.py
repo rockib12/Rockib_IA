@@ -1336,4 +1336,59 @@ async def convene_agent_council(
     }
 
 
+class AutoSwarmRequest(BaseModel):
+    max_sub_agents: int = Field(default=3, ge=1, le=3)
+
+
+@router.post("/goals/{goal_id}/auto-swarm", status_code=status.HTTP_201_CREATED)
+async def trigger_goal_auto_swarm(
+    goal_id: uuid.UUID,
+    payload: Optional[AutoSwarmRequest] = None,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+):
+    """P6 — Décompose automatiquement un Goal en sous-agents spécialisés 3D avec contrat P2P initial."""
+    user_ws_ids = await get_user_workspace_ids(db, current_user)
+    goal = (await db.execute(select(Goal).where(Goal.id == goal_id))).scalar_one_or_none()
+    if not goal or goal.workspace_id not in user_ws_ids:
+        raise HTTPException(status_code=404, detail="Goal introuvable dans votre workspace.")
+
+    from app.goal_engine.services.auto_swarm import AutoSwarmSpawner
+
+    max_subs = payload.max_sub_agents if payload else 3
+    return await AutoSwarmSpawner.spawn_swarm_for_goal(
+        db=db,
+        goal_id=goal_id,
+        max_sub_agents=max_subs,
+    )
+
+
+class ProactiveWatchRequest(BaseModel):
+    workspace_id: uuid.UUID
+    agent_id: Optional[uuid.UUID] = None
+    notify_telegram: bool = False
+
+
+@router.post("/goals/proactive-watch/run", status_code=status.HTTP_200_OK)
+async def run_proactive_watch_audit(
+    payload: ProactiveWatchRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+):
+    """P7 — Exécute une sonde de veille proactive autonome et mémorise le bilan dans pgvector."""
+    user_ws_ids = await get_user_workspace_ids(db, current_user)
+    if payload.workspace_id not in user_ws_ids:
+        raise HTTPException(status_code=403, detail="Accès refusé à ce workspace.")
+
+    from app.goal_engine.services.proactive_watch import ProactiveWatchService
+
+    return await ProactiveWatchService.run_proactive_audit(
+        db=db,
+        workspace_id=payload.workspace_id,
+        agent_id=payload.agent_id,
+        notify_telegram=payload.notify_telegram,
+    )
+
+
+
 
