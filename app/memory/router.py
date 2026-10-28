@@ -167,3 +167,69 @@ async def recognize_with_gemma(
         },
     }
 
+
+class GemmaMultimodalRequest(BaseModel):
+    modality: str = Field(..., pattern="^(image|audio)$", description="'image' ou 'audio'")
+    payload_base64: str = Field(default="", description="Image ou Audio encodé en base64 ou URL")
+    mime_type: str = Field(default="image/png")
+    filename: str = Field(default="input.wav")
+    language: str = Field(default="fr")
+    prompt_or_transcript_hint: str = Field(default="")
+    workspace_id: Optional[uuid.UUID] = Field(default=None)
+    agent_id: Optional[uuid.UUID] = Field(default=None)
+    persist_in_memory: bool = Field(default=False)
+
+
+@memory_router.post("/recognize-multimodal")
+async def recognize_multimodal_with_gemma(
+    body: GemmaMultimodalRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+):
+    """Reconnaissance Multimodale Gemma-2 (768d) pour Images (Vision+OCR) et Audios (Whisper).
+
+    Projette l'image ou l'audio dans l'espace vectoriel 768d, identifie le domaine,
+    la permission, l'intention et la compétence associée, et l'indexe dans `pgvector` si demandé.
+    """
+    from app.intelligence.services.gemma_recognition import GemmaRecognitionEngine
+
+    if body.modality == "image":
+        res = await GemmaRecognitionEngine.recognize_image(
+            image_data=body.payload_base64,
+            mime_type=body.mime_type,
+            prompt_hint=body.prompt_or_transcript_hint,
+        )
+        extracted_text = res["visual_description"]
+    else:
+        res = await GemmaRecognitionEngine.recognize_audio(
+            audio_b64=body.payload_base64,
+            filename=body.filename,
+            language=body.language,
+            transcript_hint=body.prompt_or_transcript_hint,
+        )
+        extracted_text = res["transcript"]
+
+    # Ne pas renvoyer le tableau complet de 768 flottants dans la réponse JSON légère
+    res_clean = {k: v for k, v in res.items() if k != "embedding"}
+
+    if body.persist_in_memory and body.workspace_id:
+        mem = await store_agent_lesson(
+            db=db,
+            workspace_id=body.workspace_id,
+            agent_id=body.agent_id,
+            lesson_text=f"[Perception {body.modality.upper()}] {extracted_text}",
+            memory_type="experience",
+            confidence=0.90,
+            importance=0.85,
+            metadata={
+                "modality": body.modality,
+                "domain": res["domain_recognition"].get("domain"),
+                "intent": res["intent_recognition"].get("intent"),
+            },
+        )
+        await db.commit()
+        res_clean["persisted_memory_id"] = str(mem.id)
+
+    return res_clean
+
+

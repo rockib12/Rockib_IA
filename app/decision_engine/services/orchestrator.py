@@ -113,22 +113,40 @@ class DecisionOrchestrator:
         classification_domain = classification.domain
         classification_permission = classification.permission_action
 
-        # 2. Opinions
-        # Cognitive Opinion
-        cog_opinion = await self.cognitive_simulator.simulate(
-            CognitiveInput(workspace_id=request.workspace_id, objective=request.objective, situation=request.situation),
-            patterns
-        )
+        # 1b. Sélection Sémantique JIT des Skills de l'Agent (parmi les 107 Skills)
+        active_skills = None
+        try:
+            from app.skills.services.selector import SkillSelector
+            selected = await SkillSelector.select_skills_for_task(
+                session=self.db,
+                agent_id=request.agent_id,
+                workspace_id=request.workspace_id,
+                task_skill_hint=classification_domain,
+                task_description=f'{request.proposed_action} {request.objective}',
+            )
+            if selected:
+                active_skills = selected
+        except Exception:
+            active_skills = None
 
-        # Intelligence Opinion
+        # 2. Opinions exécutées en parallèle (CognitiveSimulator + IntelligenceService)
+        import asyncio
         intel_input = IntelligenceInput(
             objective=request.objective,
             situation=request.situation,
             proposed_action=request.proposed_action,
             domain=classification_domain,
-            permission_action=classification_permission
+            permission_action=classification_permission,
+            active_skills=active_skills,
         )
-        intel_opinion = await self.intelligence.evaluate(intel_input)
+
+        cog_opinion, intel_opinion = await asyncio.gather(
+            self.cognitive_simulator.simulate(
+                CognitiveInput(workspace_id=request.workspace_id, objective=request.objective, situation=request.situation),
+                patterns
+            ),
+            self.intelligence.evaluate(intel_input),
+        )
 
         # 3. Arbitration
         decision = await self.arbitrator.arbitrate(

@@ -374,3 +374,197 @@ class GemmaRecognitionEngine:
             runner_up_intent=runner_up,
             scores=dict(scored),
         )
+
+    @classmethod
+    async def recognize_image(
+        cls,
+        image_data: str,
+        mime_type: str = "image/png",
+        prompt_hint: str = "",
+    ) -> Dict[str, Any]:
+        """Reconnaissance Multimodale d'Image (Vision + OCR -> Vecteur Gemma-2 768d -> Domaine & Intention).
+
+        Accepte une image en base64 (ou data URI / URL), extrait le contenu visuel & OCR via
+        le modèle Vision (Llama-4 Scout / Gemma-3 Vision) avec repli déterministe hors-ligne,
+        puis projette la scène dans l'espace vectoriel 768d.
+        """
+        import os
+
+        raw_b64 = (image_data or "").strip()
+        if raw_b64.startswith("data:") and ";base64," in raw_b64:
+            header, raw_b64 = raw_b64.split(";base64,", 1)
+            mime_type = header.replace("data:", "") or mime_type
+
+        visual_caption = ""
+        api_key = os.getenv("GROQ_API_KEY", "").strip()
+        if api_key and raw_b64 and not raw_b64.startswith("test_"):
+            try:
+                import httpx
+
+                data_uri = (
+                    raw_b64
+                    if raw_b64.startswith("http")
+                    else f"data:{mime_type};base64,{raw_b64}"
+                )
+                vision_model = os.getenv(
+                    "GROQ_VISION_MODEL",
+                    "meta-llama/llama-4-scout-17b-16e-instruct",
+                )
+                async with httpx.AsyncClient(timeout=12.0) as client:
+                    resp = await client.post(
+                        "https://api.groq.com/openai/v1/chat/completions",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        json={
+                            "model": vision_model,
+                            "messages": [
+                                {
+                                    "role": "user",
+                                    "content": [
+                                        {
+                                            "type": "text",
+                                            "text": (
+                                                "Décris précisément cette image pour un système d'agents IA : "
+                                                "extrais tout le texte visible (OCR), identifie s'il s'agit "
+                                                "d'une facture/budget, d'un schéma d'architecture, d'un code/bug "
+                                                "ou d'un rapport de sécurité. Contexte : "
+                                                + (prompt_hint or "Analyse technique")
+                                            ),
+                                        },
+                                        {
+                                            "type": "image_url",
+                                            "image_url": {"url": data_uri},
+                                        },
+                                    ],
+                                }
+                            ],
+                            "temperature": 0.1,
+                            "max_tokens": 350,
+                        },
+                    )
+                    if resp.status_code == 200:
+                        visual_caption = (
+                            resp.json()["choices"][0]["message"]["content"].strip()
+                        )
+            except Exception as exc:
+                logger.debug("Fallback descripteur visuel local: %s", exc)
+
+        if not visual_caption:
+            visual_caption = (
+                f"[Image {mime_type}] {prompt_hint}".strip()
+                if prompt_hint
+                else f"Capture visuelle technique ({mime_type}) soumise pour inspection."
+            )
+
+        embedding_768d = await embed_text(
+            visual_caption, task_type="search_document", title="image_perception"
+        )
+        domain_res, domain_diag = await cls.recognize_domain(
+            proposed_action=visual_caption,
+            objective=prompt_hint,
+        )
+        intent_res = await cls.recognize_inbound_intent(visual_caption)
+
+        return {
+            "modality": "image",
+            "mime_type": mime_type,
+            "visual_description": visual_caption,
+            "embedding_dim": len(embedding_768d),
+            "embedding_preview": [round(x, 4) for x in embedding_768d[:8]],
+            "embedding": embedding_768d,
+            "domain_recognition": {
+                "status": domain_res.status.value,
+                "domain": domain_res.domain,
+                "permission_action": (
+                    domain_res.permission_action.value
+                    if domain_res.permission_action
+                    else None
+                ),
+                "diagnostics": domain_diag,
+            },
+            "intent_recognition": {
+                "intent": intent_res.intent,
+                "confidence": intent_res.confidence,
+                "recommended_skill": intent_res.recommended_skill,
+                "should_capture_lead": intent_res.should_capture_lead,
+            },
+        }
+
+    @classmethod
+    async def recognize_audio(
+        cls,
+        audio_b64: str = "",
+        filename: str = "voice.wav",
+        language: str = "fr",
+        transcript_hint: str = "",
+    ) -> Dict[str, Any]:
+        """Reconnaissance Multimodale Audio (Whisper Large v3 Turbo -> Vecteur Gemma-2 768d -> Domaine & Intention).
+
+        Décode et transcrit un flux audio base64 via Whisper (ou utilise transcript_hint),
+        génère l'embedding 768d Gemma-2 et identifie immédiatement le domaine et l'intention.
+        """
+        import base64
+        import os
+
+        transcript = (transcript_hint or "").strip()
+        api_key = os.getenv("GROQ_API_KEY", "").strip()
+
+        if not transcript and audio_b64 and api_key:
+            try:
+                import httpx
+
+                clean_b64 = (
+                    audio_b64.split(";base64,", 1)[1]
+                    if ";base64," in audio_b64
+                    else audio_b64
+                )
+                audio_bytes = base64.b64decode(clean_b64)
+                whisper_model = os.getenv("GROQ_WHISPER_MODEL", "whisper-large-v3-turbo")
+                async with httpx.AsyncClient(timeout=12.0) as client:
+                    files = {"file": (filename, audio_bytes, "audio/wav")}
+                    data = {"model": whisper_model, "language": language}
+                    resp = await client.post(
+                        "https://api.groq.com/openai/v1/audio/transcriptions",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        files=files,
+                        data=data,
+                    )
+                    if resp.status_code == 200:
+                        transcript = (resp.json().get("text") or "").strip()
+            except Exception as exc:
+                logger.debug("Fallback transcription audio locale: %s", exc)
+
+        if not transcript:
+            transcript = "Signal audio vocal reçu sans transcription textuelle."
+
+        embedding_768d = await embed_text(
+            transcript, task_type="search_document", title="audio_perception"
+        )
+        domain_res, domain_diag = await cls.recognize_domain(proposed_action=transcript)
+        intent_res = await cls.recognize_inbound_intent(transcript)
+
+        return {
+            "modality": "audio",
+            "filename": filename,
+            "language": language,
+            "transcript": transcript,
+            "embedding_dim": len(embedding_768d),
+            "embedding_preview": [round(x, 4) for x in embedding_768d[:8]],
+            "embedding": embedding_768d,
+            "domain_recognition": {
+                "status": domain_res.status.value,
+                "domain": domain_res.domain,
+                "permission_action": (
+                    domain_res.permission_action.value
+                    if domain_res.permission_action
+                    else None
+                ),
+                "diagnostics": domain_diag,
+            },
+            "intent_recognition": {
+                "intent": intent_res.intent,
+                "confidence": intent_res.confidence,
+                "recommended_skill": intent_res.recommended_skill,
+                "should_capture_lead": intent_res.should_capture_lead,
+            },
+        }
+

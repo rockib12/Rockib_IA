@@ -157,6 +157,11 @@ def build_decision_request(
     if task.decision_id is not None:
         parts.append(f"previous_decision={task.decision_id}")
     parts.append(f"goal_objective={goal.objective}")
+    task_outputs = (goal.goal_metadata or {}).get("task_outputs")
+    if isinstance(task_outputs, dict) and upstream:
+        up_results = {uid: task_outputs[uid] for uid in upstream if uid in task_outputs}
+        if up_results:
+            parts.append(f"upstream_outputs={up_results}")
     return DecisionRequest(
         workspace_id=goal.workspace_id,
         agent_id=goal.agent_id,
@@ -556,6 +561,21 @@ async def _close_task_with_outcome(
             decision_uuid = None
         if decision_uuid is not None:
             task.decision_id = decision_uuid
+        meta = dict(goal.goal_metadata or {})
+        if target is TaskStatus.COMPLETED and response.execution_output:
+            t_outs = dict(meta.get("task_outputs") or {})
+            t_outs[str(task_id)] = str(response.execution_output)[:800]
+            meta["task_outputs"] = t_outs
+            goal.goal_metadata = meta
+            flag_modified(goal, "goal_metadata")
+        elif target is TaskStatus.FAILED:
+            meta["last_failed_task"] = {
+                "task_id": str(task_id),
+                "description": task.description,
+                "error": str(response.execution_error or "execution_failed")[:400],
+            }
+            goal.goal_metadata = meta
+            flag_modified(goal, "goal_metadata")
         await _heal_step_counter(db, goal=goal, goal_id=task_goal_id)
         await db.commit()
         return CloseResult(

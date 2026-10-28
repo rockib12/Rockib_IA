@@ -133,3 +133,65 @@ async def test_gemma_inbound_intent_recognition():
     )
     assert intent_cyber.intent == "CYBER_SECURITY_AUDIT"
     assert intent_cyber.recommended_skill == "cybersecurity_defensive"
+
+
+@pytest.mark.asyncio
+async def test_gemma_multimodal_image_and_audio_recognition():
+    # 1. Reconnaissance d'Image (ex: capture d'une facture Stripe / devis budget)
+    img_res = await GemmaRecognitionEngine.recognize_image(
+        image_data="test_base64_invoice_png",
+        mime_type="image/png",
+        prompt_hint="Facture Stripe paiement 450 EUR budget campagne publicitaire",
+    )
+    assert img_res["modality"] == "image"
+    assert img_res["embedding_dim"] == 768
+    assert img_res["domain_recognition"]["domain"] == "finance"
+    assert img_res["domain_recognition"]["permission_action"] == "SPEND"
+
+    # 2. Reconnaissance d'Audio (ex: note vocale demandant un audit sécurité OWASP)
+    aud_res = await GemmaRecognitionEngine.recognize_audio(
+        audio_b64="",
+        filename="note_vocale.wav",
+        language="fr",
+        transcript_hint="Il faut lancer un audit de cybersécurité SAST OWASP pour vérifier les tokens JWT",
+    )
+    assert aud_res["modality"] == "audio"
+    assert aud_res["embedding_dim"] == 768
+    assert aud_res["domain_recognition"]["domain"] == "security"
+    assert aud_res["intent_recognition"]["intent"] == "CYBER_SECURITY_AUDIT"
+
+
+def test_dag_working_memory_upstream_outputs_injection():
+    """Vérifie que build_decision_request transmet les résultats des tâches amont du DAG."""
+    from app.goal_engine.models import Goal, GoalStatus
+    from app.goal_engine.services.autonomous_loop import build_decision_request
+    from app.task_engine.models import Task, TaskDependency, TaskStatus
+    from app.task_engine.services.task_graph import TaskGraph
+
+    goal_id = uuid.uuid4()
+    t1_id = uuid.uuid4()
+    t2_id = uuid.uuid4()
+
+    goal = Goal(
+        id=goal_id,
+        workspace_id=uuid.uuid4(),
+        agent_id=uuid.uuid4(),
+        objective="Déployer le microservice",
+        requested_autonomy_level=3,
+        applied_autonomy_level=3,
+        status=GoalStatus.ACTIVE,
+        goal_metadata={
+            "task_outputs": {
+                str(t1_id): "Schéma PostgreSQL validé et image Docker compilée (sha256:9f8a)"
+            }
+        },
+    )
+    t1 = Task(id=t1_id, goal_id=goal_id, description="Compiler image", status=TaskStatus.COMPLETED)
+    t2 = Task(id=t2_id, goal_id=goal_id, description="Déployer conteneur", status=TaskStatus.READY)
+    dep = TaskDependency(goal_id=goal_id, task_id=t2_id, depends_on_task_id=t1_id)
+    graph = TaskGraph([t1, t2], [dep])
+
+    req = build_decision_request(goal=goal, task=t2, graph=graph)
+    assert "upstream_outputs=" in req.situation
+    assert "sha256:9f8a" in req.situation
+
