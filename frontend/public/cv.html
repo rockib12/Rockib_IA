@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>CV — Rockib Quenum | Lead Software Architect & Autonomous AI Systems Engineer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #0f172a;
+      --slate: #334155;
+      --muted: #64748b;
+      --accent: #0284c7;
+      --accent-dark: #0369a1;
+      --border: #e2e8f0;
+      --bg-chip: #f1f5f9;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0b1120;
+      color: var(--ink);
+      line-height: 1.45;
+      padding: 28px 16px 60px;
+    }
+
+    /* Barre d'actions flottante (masquée à l'impression PDF) */
+    .toolbar {
+      max-width: 210mm;
+      margin: 0 auto 18px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(15, 23, 42, 0.92);
+      border: 1px solid rgba(56, 189, 248, 0.35);
+      padding: 12px 18px;
+      border-radius: 10px;
+      color: #f8fafc;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    .toolbar-title {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: #38bdf8;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .toolbar-actions {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn {
+      cursor: pointer;
+      border: 1px solid rgba(56, 189, 248, 0.45);
+      background: rgba(2, 132, 199, 0.2);
+      color: #f8fafc;
+      font-weight: 600;
+      font-size: 0.82rem;
+      padding: 8px 14px;
+      border-radius: 7px;
+      transition: all 0.15s ease;
+    }
+
+    .btn:hover {
+      background: #0284c7;
+      border-color: #38bdf8;
+    }
+
+    .btn-primary {
+      background: #0284c7;
+      border-color: #38bdf8;
+    }
+
+    /* Feuille A4 */
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 0 auto;
+      background: #ffffff;
+      padding: 13mm 15mm;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.55);
+      border-radius: 4px;
+    }
+
+    /* En-tête */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      border-bottom: 2.5px solid var(--ink);
+      padding-bottom: 11px;
+      margin-bottom: 12px;
+      gap: 16px;
+    }
+
+    .name {
+      font-size: 1.75rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--ink);
+      text-transform: uppercase;
+    }
+
+    .headline {
+      font-size: 0.96rem;
+      font-weight: 700;
+      color: var(--accent-dark);
+      margin-top: 2px;
+    }
+
+    .subheadline {
+      font-size: 0.78rem;
+      color: var(--slate);
+      margin-top: 3px;
+    }
+
+    .contact-grid {
+      text-align: right;
+      font-size: 0.75rem;
+      color: var(--slate);
+      line-height: 1.55;
+      white-space: nowrap;
+    }
+
+    .contact-grid a {
+      color: var(--ink);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .contact-grid a:hover {
+      color: var(--accent);
+    }
+
+    /* Résumé exécutif */
+    .summary {
+      font-size: 0.8rem;
+      color: var(--slate);
+      background: #f8fafc;
+      border-left: 3.5px solid var(--accent);
+      padding: 8px 12px;
+      margin-bottom: 13px;
+      text-align: justify;
+    }
+
+    /* Bandeau KPIs */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-bottom: 13px;
+    }
+
+    .kpi-box {
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 6px 10px;
+      background: #ffffff;
+    }
+
+    .kpi-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.92rem;
+      font-weight: 700;
+      color: var(--accent-dark);
+    }
+
+    .kpi-lbl {
+      font-size: 0.68rem;
+      color: var(--muted);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    /* Sections */
+    .section {
+      margin-bottom: 12px;
+    }
+
+    .section-title {
+      font-size: 0.78rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--ink);
+      border-bottom: 1.5px solid var(--border);
+      padding-bottom: 3px;
+      margin-bottom: 8px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .section-title span.tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.66rem;
+      color: var(--accent-dark);
+      font-weight: 600;
+    }
+
+    /* Expériences & Systèmes en Production */
+    .item {
+      margin-bottom: 9px;
+    }
+
+    .item-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 8px;
+    }
+
+    .item-title {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--ink);
+    }
+
+    .item-role {
+      color: var(--accent-dark);
+      font-weight: 600;
+    }
+
+    .item-meta {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+      white-space: nowrap;
+    }
+
+    .item-stack {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.69rem;
+      color: var(--slate);
+      margin: 2px 0 4px;
+    }
+
+    .bullets {
+      list-style: none;
+      padding-left: 0;
+    }
+
+    .bullets li {
+      position: relative;
+      padding-left: 12px;
+      font-size: 0.77rem;
+      color: var(--slate);
+      margin-bottom: 2.5px;
+    }
+
+    .bullets li::before {
+      content: "▸";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-weight: bold;
+    }
+
+    /* Grille de compétences */
+    .skills-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px 14px;
+    }
+
+    .skill-cat {
+      font-size: 0.76rem;
+    }
+
+    .skill-cat strong {
+      color: var(--ink);
+      display: inline-block;
+      margin-right: 4px;
+    }
+
+    .skill-cat span {
+      color: var(--slate);
+    }
+
+    /* Bas de page 2 colonnes */
+    .bottom-grid {
+      display: grid;
+      grid-template-columns: 1.25fr 0.75fr;
+      gap: 16px;
+    }
+
+    @media print {
+      body {
+        background: #ffffff;
+        padding: 0;
+      }
+      .toolbar {
+        display: none !important;
+      }
+      .page {
+        box-shadow: none;
+        margin: 0;
+        width: 100%;
+        min-height: auto;
+        padding: 10mm 12mm;
+      }
+      @page {
+        size: A4 portrait;
+        margin: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="toolbar">
+    <div class="toolbar-title">
+      <span>📄 CV Exécutif A4 — Rockib Quenum (ATS-Friendly & Prêt à imprimer en PDF)</span>
+    </div>
+    <div class="toolbar-actions">
+      <button class="btn" onclick="toggleLang()" id="langBtn">🌐 Switch to English (EN)</button>
+      <button class="btn btn-primary" onclick="window.print()">🖨️ Télécharger / Imprimer en PDF (A4)</button>
+    </div>
+  </div>
+
+  <!-- ======================= VERSION FRANÇAISE ======================= -->
+  <div class="page" id="cv-fr">
+    <header class="header">
+      <div>
+        <h1 class="name">Rockib Quenum</h1>
+        <div class="headline">Lead Software Architect &amp; Autonomous AI Systems Engineer</div>
+        <div class="subheadline">Systèmes Multi-Agents Gouvernés • Backend Python (FastAPI / Django 5.2) • React 19 • Sécurité Zero-Trust</div>
+      </div>
+      <div class="contact-grid">
+        <div>📍 Cotonou, Bénin (Remote International / UTC+1)</div>
+        <div>✉️ <a href="mailto:rockibdev@gmail.com">rockibdev@gmail.com</a> • <a href="mailto:rockibquenum408@gmail.com">rockibquenum408@gmail.com</a></div>
+        <div>🌐 Portfolio : <a href="https://rockib-quenum.netlify.app/" target="_blank">rockib-quenum.netlify.app</a></div>
+        <div>💻 GitHub : <a href="https://github.com/rockib12" target="_blank">github.com/rockib12</a></div>
+        <div>🔗 LinkedIn : <a href="https://www.linkedin.com/in/rockib-quenum-974471306" target="_blank">in/rockib-quenum-974471306</a></div>
+      </div>
+    </header>
+
+    <div class="summary">
+      <strong>Profil Exécutif :</strong> Architecte Logiciel Full-Stack et Ingénieur en Systèmes d'Agents IA Autonomes, spécialisé dans la conception et le déploiement en production d'infrastructures distribuées haute fiabilité. Créateur du moteur <strong>Rockib AI</strong> (arbitrage déterministe, mémoire vectorielle <code>pgvector</code> 768d, 107 compétences scellées SHA-256, baux transactionnels ACID et SDK Python gouverné) ainsi que de plateformes SaaS B2B et e-commerce conversationnel (<strong>MARTISTORE</strong>, <strong>WaAuto</strong>, <strong>Agence IIA</strong>). Approche orientée résultats : sécurité OWASP Zero-Trust, maîtrise des coûts LLM et couverture de tests rigoureuse.
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-box">
+        <div class="kpi-val">750+ Tests</div>
+        <div class="kpi-lbl">Suite Pytest 100% Verte</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val">107 Skills</div>
+        <div class="kpi-lbl">Catalogue Scellé SHA-256</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val">100% ACID</div>
+        <div class="kpi-lbl">Verrous &amp; Quotas Financiers</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val">4 Systèmes</div>
+        <div class="kpi-lbl">Déployés en Production Live</div>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="section-title">
+        <span>Compétences Techniques Clés</span>
+        <span class="tag">STACK DE PRODUCTION</span>
+      </div>
+      <div class="skills-grid">
+        <div class="skill-cat"><strong>IA &amp; Systèmes Agentiques :</strong> <span>Orchestration DAG Multi-Agents, Arbitrage Déterministe, EmbeddingGemma / Gemma-2 (768d), RAG <code>pgvector</code>, Groq LLM (Llama 3.3 / Whisper), Vision CLIP, WebSocket Vocal Full-Duplex.</span></div>
+        <div class="skill-cat"><strong>Backend &amp; Architecture :</strong> <span>Python 3.12, FastAPI (Async), Django 5.2, Django REST Framework, SQLAlchemy 2.0, Alembic, Celery &amp; Celery Beat, Redis 7, PostgreSQL 16 (Advisory Locks).</span></div>
+        <div class="skill-cat"><strong>Frontend &amp; Visualisation 3D :</strong> <span>React 19, Vite, Three.js / WebGL (Cockpit 3D Temps Réel), TailwindCSS, Framer Motion, Web Components autonomes (Widgets JS embarqués).</span></div>
+        <div class="skill-cat"><strong>Cybersécurité &amp; DevOps :</strong> <span>Chiffrement AEAD AES-256-GCM (HKDF-SHA256), SAST/AST Sandbox, Immunité SSRF &amp; DNS Rebinding, Webhooks HMAC-SHA256, Docker, Nginx, Supervisord, CI/CD.</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <span>Expériences &amp; Systèmes Déployés en Production</span>
+        <span class="tag">OWNERSHIP COMPLET (ARCHITECTURE → PROD)</span>
+      </div>
+
+      <div class="item">
+        <div class="item-head">
+          <div class="item-title">Rockib AI Engine &amp; <code>rockib-sdk</code> — <span class="item-role">Lead AI Systems Architect &amp; Créateur</span></div>
+          <div class="item-meta">2025 – 2026 | Production</div>
+        </div>
+        <div class="item-stack">Stack : Python 3.12 • FastAPI • PostgreSQL 16 + pgvector • Celery/Redis • Groq LLM • Gemma-2 768d • React 19 • Three.js • Docker</div>
+        <ul class="bullets">
+          <li><strong>Moteur d'Arbitrage Déterministe &amp; Gouvernance :</strong> Conception d'un pipeline décisionnel évaluant chaque action d'agent (<code>ALLOW</code>, <code>ESCALATE</code>, <code>DENY</code>) avec monotonie d'autonomie hiérarchique stricte ($child \le parent$) et réservation budgétaire atomique par verrous PostgreSQL.</li>
+          <li><strong>Reconnaissance Sémantique &amp; Multimodale (768d) :</strong> Déploiement d'un moteur unifié (Texte, Vision OCR, Audio Whisper) pilotant la sélection JIT de <strong>107 compétences scellées par hash SHA-256</strong>, le routage synaptique P2P inter-agents et le Conseil des Spécialistes.</li>
+          <li><strong>Sandbox d'Exécution Isolée (SAST/AST) &amp; Cockpit 3D :</strong> Création d'un environnement clean-room permettant aux agents de coder et exécuter leurs tests unitaires sans accès aux secrets, supervisé dans un Cockpit 3D WebGL temps réel et via approbation Telegram.</li>
+          <li><strong>Suite Qualité &amp; Sécurité Zero-Trust :</strong> Coffre-fort multi-tenant AES-256-GCM, protection anti-SSRF/DNS Rebinding, Golden Benchmark et <strong>750+ tests automatisés Pytest</strong>.</li>
+        </ul>
+      </div>
+
+      <div class="item">
+        <div class="item-head">
+          <div class="item-title">Agence IIA (Portail Client, CRM B2B &amp; Conciergerie IA) — <span class="item-role">Fondateur &amp; Lead Full-Stack Engineer</span></div>
+          <div class="item-meta">2024 – 2026 | Production</div>
+        </div>
+        <div class="item-stack">Stack : Django 5.2 • DRF • React 19 • SimpleJWT • Stripe &amp; FedaPay (Mobile Money) • Webhooks HMAC • Widget rockib-concierge.js</div>
+        <ul class="bullets">
+          <li><strong>Passerelle Concierge IA Multi-Tenant (Voix &amp; Chat) :</strong> Développement d'un widget JS embarquable en 1 ligne sur tout site client (appel vocal WebSocket full-duplex, qualification automatique de leads, calcul de coût token temps réel et moteur de génération automatique de devis EUR/FCFA).</li>
+          <li><strong>Portail Client &amp; Facturation Sécurisée :</strong> Synchronisation Git temps réel (<code>#progress:N</code>, <code>#step:done</code>), webhooks signés <code>hmac.compare_digest</code> et barrière cryptographique HTTP 402 protégeant le téléchargement des livrables jusqu'au règlement complet.</li>
+        </ul>
+      </div>
+
+      <div class="item">
+        <div class="item-head">
+          <div class="item-title">MARTISTORE (<a href="https://martistore.shop" target="_blank">martistore.shop</a>) — <span class="item-role">Architecte Backend &amp; IA Conversationnelle</span></div>
+          <div class="item-meta">2024 – 2026 | Production</div>
+        </div>
+        <div class="item-stack">Stack : Python • Meta WhatsApp Cloud API • Vision CLIP • Groq LLM • Celery • PostgreSQL • React</div>
+        <ul class="bullets">
+          <li><strong>Commerce Conversationnel &amp; Recherche Visuelle CLIP :</strong> Conception d'un vendeur IA WhatsApp capable d'identifier les produits du catalogue à partir d'une simple photo envoyée par le client, de négocier et de valider les commandes 24h/24.</li>
+        </ul>
+      </div>
+
+      <div class="item">
+        <div class="item-head">
+          <div class="item-title">WaAuto SaaS (<a href="https://waauto-commercial.vercel.app" target="_blank">waauto-commercial.vercel.app</a>) — <span class="item-role">Architecte SaaS Multi-Boutique</span></div>
+          <div class="item-meta">2024 – 2026 | Production</div>
+        </div>
+        <div class="item-stack">Stack : Architecture Multi-Tenant Docker • Meta Cloud API &amp; Evolution API • Tarification Géolocalisée (XOF / EUR / USD)</div>
+        <ul class="bullets">
+          <li><strong>Automatisation WhatsApp B2B Clé en Main :</strong> Plateforme multi-boutique isolée par tenant avec configurateur d'onboarding en 4 étapes, routage résilient des messages et facturation multi-devises automatisée.</li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="bottom-grid">
+      <section class="section" style="margin-bottom:0;">
+        <div class="section-title">
+          <span>Principes d'Ingénierie &amp; Valeur Ajoutée</span>
+        </div>
+        <ul class="bullets">
+          <li><strong>Production-First :</strong> Livraison de systèmes conteneurisés (Docker All-in-One Nginx + FastAPI + React + Supervisord) prêts pour le trafic réel.</li>
+          <li><strong>Déterminisme &amp; Auditabilité :</strong> Les LLM proposent, le code déterministe décide. Traçabilité complète par chaîne de hachage SHA-256.</li>
+        </ul>
+      </section>
+
+      <section class="section" style="margin-bottom:0;">
+        <div class="section-title">
+          <span>Langues &amp; Disponibilité</span>
+        </div>
+        <ul class="bullets">
+          <li><strong>Français :</strong> Courant / Bilingue (C2)</li>
+          <li><strong>Anglais :</strong> Technique &amp; Professionnel</li>
+          <li><strong>Disponibilité :</strong> Immédiate (CDI, Freelance, Remote)</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <!-- ======================= ENGLISH VERSION ======================= -->
+  <div class="page" id="cv-en" style="display:none;">
+    <header class="header">
+      <div>
+        <h1 class="name">Rockib Quenum</h1>
+        <div class="headline">Lead Software Architect &amp; Autonomous AI Systems Engineer</div>
+        <div class="subheadline">Governed Multi-Agent Systems • Python Backend (FastAPI / Django 5.2) • React 19 • Zero-Trust Security</div>
+      </div>
+      <div class="contact-grid">
+        <div>📍 Cotonou, Benin (Global Remote / UTC+1)</div>
+        <div>✉️ <a href="mailto:rockibdev@gmail.com">rockibdev@gmail.com</a> • <a href="mailto:rockibquenum408@gmail.com">rockibquenum408@gmail.com</a></div>
+        <div>🌐 Portfolio: <a href="https://rockib-quenum.netlify.app/" target="_blank">rockib-quenum.netlify.app</a></div>
+        <div>💻 GitHub: <a href="https://github.com/rockib12" target="_blank">github.com/rockib12</a></div>
+        <div>🔗 LinkedIn: <a href="https://www.linkedin.com/in/rockib-quenum-974471306" target="_blank">in/rockib-quenum-974471306</a></div>
+      </div>
+    </header>
+
+    <div class="summary">
+      <strong>Executive Summary:</strong> Full-Stack Software Architect and Autonomous AI Systems Engineer specializing in production-grade distributed architectures and governed multi-agent systems. Creator of the <strong>Rockib AI Engine</strong> (deterministic arbitration, 768d <code>pgvector</code> semantic memory, 107 SHA-256 sealed skills, ACID financial quota locks, and governed Python SDK) and founder of live B2B SaaS &amp; conversational commerce platforms (<strong>MARTISTORE</strong>, <strong>WaAuto</strong>, <strong>Agence IIA</strong>). Proven track record of shipping resilient, OWASP Zero-Trust compliant systems with rigorous automated test coverage.
+    </div>
+
+    <div class="kpi-row">
+      <div class="kpi-box">
+        <div class="kpi-val">750+ Tests</div>
+        <div class="kpi-lbl">100% Passing Pytest Suite</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val">107 Skills</div>
+        <div class="kpi-lbl">SHA-256 Sealed Catalog</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val">100% ACID</div>
+        <div class="kpi-lbl">Financial Quota Locks</div>
+      </div>
+      <div class="kpi-box">
+        <div class="kpi-val">4 Live Systems</div>
+        <div class="kpi-lbl">In Active Production</div>
+      </div>
+    </div>
+
+    <section class="section">
+      <div class="section-title">
+        <span>Core Technical Stack</span>
+        <span class="tag">PRODUCTION ENGINEERING</span>
+      </div>
+      <div class="skills-grid">
+        <div class="skill-cat"><strong>AI &amp; Agentic Systems:</strong> <span>Multi-Agent DAG Orchestration, Deterministic Arbitration, EmbeddingGemma / Gemma-2 (768d), <code>pgvector</code> RAG, Groq LLM (Llama 3.3 / Whisper), CLIP Vision, Full-Duplex Voice WebSockets.</span></div>
+        <div class="skill-cat"><strong>Backend &amp; Distributed Systems:</strong> <span>Python 3.12, FastAPI (Async), Django 5.2, Django REST Framework, SQLAlchemy 2.0, Alembic, Celery &amp; Celery Beat, Redis 7, PostgreSQL 16 (Advisory Locks).</span></div>
+        <div class="skill-cat"><strong>Frontend &amp; 3D Observability:</strong> <span>React 19, Vite, Three.js / WebGL (Real-Time 3D Swarm Cockpit), TailwindCSS, Framer Motion, Standalone Embeddable JS Widgets.</span></div>
+        <div class="skill-cat"><strong>Cybersecurity &amp; DevOps:</strong> <span>AEAD AES-256-GCM Vault (HKDF-SHA256), SAST/AST Clean-Room Sandbox, SSRF &amp; DNS Rebinding Immunity, HMAC-SHA256 Webhooks, Docker, Nginx, CI/CD.</span></div>
+      </div>
+    </section>
+
+    <section class="section">
+      <div class="section-title">
+        <span>Production Experience &amp; Flagship Systems</span>
+        <span class="tag">END-TO-END OWNERSHIP</span>
+      </div>
+
+      <div class="item">
+        <div class="item-head">
+          <div class="item-title">Rockib AI Engine &amp; <code>rockib-sdk</code> — <span class="item-role">Lead AI Systems Architect &amp; Creator</span></div>
+          <div class="item-meta">2025 – 2026 | Production</div>
+        </div>
+        <div class="item-stack">Stack: Python 3.12 • FastAPI • PostgreSQL 16 + pgvector • Celery/Redis • Groq LLM • Gemma-2 768d • React 19 • Three.js • Docker</div>
+        <ul class="bullets">
+          <li><strong>Deterministic Arbitration &amp; Financial Governance:</strong> Engineered a zero-side-effect decision pipeline gating every agent action (<code>ALLOW</code>, <code>ESCALATE</code>, <code>DENY</code>) with strict monotonic child autonomy ($child \le parent$) and PostgreSQL advisory lock budget reservations.</li>
+          <li><strong>Unified 768d Multimodal Recognition:</strong> Built a semantic engine (Text, OCR Vision, Whisper Audio) powering JIT selection across <strong>107 SHA-256 sealed skills</strong>, P2P synaptic agent routing, and multi-specialist consensus deliberation.</li>
+          <li><strong>Isolated SAST/AST Code Sandbox &amp; 3D Cockpit:</strong> Created a clean-room Python execution sandbox for autonomous code &amp; unit-test verification, paired with a Three.js 3D observability cockpit and 1-click Telegram Human-in-the-Loop approval.</li>
+          <li><strong>Zero-Trust Hardening:</strong> Multi-tenant AES-256-GCM credential vault, SSRF/DNS rebinding socket pinning, and <strong>750+ automated Pytest unit/E2E tests</strong>.</li>
+        </ul>
+      </div>
+
+      <div class="item">
+        <div class="item-head">
+          <div class="item-title">Agence IIA (Client Portal, B2B CRM &amp; AI Concierge) — <span class="item-role">Founder &amp; Lead Full-Stack Engineer</span></div>
+          <div class="item-meta">2024 – 2026 | Production</div>
+        </div>
+        <div class="item-stack">Stack: Django 5.2 • DRF • React 19 • SimpleJWT • Stripe &amp; FedaPay • HMAC Webhooks • rockib-concierge.js</div>
+        <ul class="bullets">
+          <li><strong>Multi-Tenant Voice &amp; Chat AI Concierge:</strong> Built a 1-line embeddable JS widget featuring full-duplex voice calling, automated B2B lead qualification, token cost telemetry, and an automated technical/commercial proposal generator.</li>
+          <li><strong>Client Portal &amp; Payment Gateways:</strong> Automated Git commit progress tracking (<code>#progress:N</code>), timing-safe HMAC webhooks, and strict HTTP 402 paywall enforcement on deliverables.</li>
+        </ul>
+      </div>
+
+      <div class="item">
+        <div class="item-head">
+          <div class="item-title">MARTISTORE (<a href="https://martistore.shop" target="_blank">martistore.shop</a>) — <span class="item-role">Lead Backend &amp; Conversational AI Architect</span></div>
+          <div class="item-meta">2024 – 2026 | Production</div>
+        </div>
+        <div class="item-stack">Stack: Python • Meta WhatsApp Cloud API • CLIP Vision • Groq LLM • Celery • PostgreSQL • React</div>
+        <ul class="bullets">
+          <li><strong>Visual Search &amp; WhatsApp Commerce:</strong> Built an AI sales agent capable of recognizing catalog products from customer photos via CLIP embeddings and closing orders autonomously 24/7.</li>
+        </ul>
+      </div>
+
+      <div class="item">
+        <div class="item-head">
+          <div class="item-title">WaAuto SaaS (<a href="https://waauto-commercial.vercel.app" target="_blank">waauto-commercial.vercel.app</a>) — <span class="item-role">Multi-Tenant SaaS Architect</span></div>
+          <div class="item-meta">2024 – 2026 | Production</div>
+        </div>
+        <div class="item-stack">Stack: Multi-Tenant Docker • Meta Cloud API &amp; Evolution API • Geo-Localized Pricing (XOF / EUR / USD)</div>
+        <ul class="bullets">
+          <li><strong>Turnkey B2B WhatsApp Automation:</strong> Designed a multi-store SaaS platform with a 4-step onboarding configurator, resilient message queues, and localized multi-currency billing.</li>
+        </ul>
+      </div>
+    </section>
+
+    <div class="bottom-grid">
+      <section class="section" style="margin-bottom:0;">
+        <div class="section-title">
+          <span>Engineering Principles</span>
+        </div>
+        <ul class="bullets">
+          <li><strong>Production-First:</strong> Unified Docker deployments (Nginx + FastAPI + React + Supervisord) built for real traffic and high availability.</li>
+          <li><strong>Deterministic Safety:</strong> LLMs propose, deterministic code decides. Full SHA-256 hash-chained auditability.</li>
+        </ul>
+      </section>
+
+      <section class="section" style="margin-bottom:0;">
+        <div class="section-title">
+          <span>Languages &amp; Availability</span>
+        </div>
+        <ul class="bullets">
+          <li><strong>French:</strong> Native / Bilingual (C2)</li>
+          <li><strong>English:</strong> Professional Working Proficiency</li>
+          <li><strong>Availability:</strong> Immediate (Full-Time, Contract, Remote)</li>
+        </ul>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    let currentLang = 'fr';
+    function toggleLang() {
+      currentLang = currentLang === 'fr' ? 'en' : 'fr';
+      document.getElementById('cv-fr').style.display = currentLang === 'fr' ? 'block' : 'none';
+      document.getElementById('cv-en').style.display = currentLang === 'en' ? 'block' : 'none';
+      document.getElementById('langBtn').textContent = currentLang === 'fr'
+        ? '🌐 Switch to English (EN)'
+        : '🌐 Basculer en Français (FR)';
+    }
+  </script>
+</body>
+</html>

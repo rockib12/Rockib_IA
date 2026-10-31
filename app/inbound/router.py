@@ -519,3 +519,32 @@ async def generate_auto_proposal(
         timeline_hint=body.timeline_hint,
         currency=body.currency,
     )
+
+
+class LeadHunterRequest(BaseModel):
+    niche: str = "Agences immobilières"
+    location: str = "Cotonou"
+    max_leads: int = 3
+    site_key: str = "rockib-portfolio"
+    save_to_crm: bool = False
+    notify_telegram: bool = False
+
+
+@router.post("/lead-hunter/run")
+async def run_autonomous_lead_hunter(
+    body: LeadHunterRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_async_db),
+):
+    """P9 — Agent autonome de prospection B2B : recherche d'entreprises, diagnostic, chiffrage P8 et scripts WhatsApp/LinkedIn/Email."""
+    from app.inbound.services.lead_hunter import LeadHunterEngine
+
+    return await LeadHunterEngine.hunt_and_prepare_outreach(
+        niche=body.niche,
+        location=body.location,
+        max_leads=body.max_leads,
+        site_key=body.site_key,
+        save_to_crm=body.save_to_crm,
+        notify_telegram=body.notify_telegram,
+        db=db,
+    )

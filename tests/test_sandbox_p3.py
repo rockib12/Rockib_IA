@@ -120,3 +120,26 @@ async def test_p8_auto_proposal_engine_generates_architecture_and_budget():
     assert "PROPOSITION D'ARCHITECTURE" in proposal["proposal_markdown"]
     assert "Amadou Diallo" in proposal["proposal_markdown"]
 
+
+@pytest.mark.asyncio
+async def test_p9_lead_hunter_engine_discovers_prospects_and_builds_outreach_scripts():
+    from app.inbound.services.lead_hunter import LeadHunterEngine
+
+    report = await LeadHunterEngine.hunt_and_prepare_outreach(
+        niche="Agences immobilières",
+        location="Cotonou",
+        max_leads=3,
+        save_to_crm=False,
+        notify_telegram=False,
+    )
+    assert report["sector_key"] == "immobilier"
+    assert report["total_found"] == 3
+    first = report["prospects"][0]
+    assert "company_name" in first
+    assert "whatsapp" in first["scripts"]
+    assert "linkedin" in first["scripts"]
+    assert "email" in first["scripts"]
+    assert first["proposal_ref"].startswith("PROP-RK-")
+    assert "PROPOSITION D'ARCHITECTURE" in first["proposal_markdown"]
+
+

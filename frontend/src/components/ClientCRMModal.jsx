@@ -41,6 +41,49 @@ export default function ClientCRMModal({
   const [generatingProposal, setGeneratingProposal] = useState(false);
   const [generatedProposal, setGeneratedProposal] = useState(null);
 
+  // P9 : Autonomous B2B Lead Hunter State
+  const [hunterNiche, setHunterNiche] = useState('Agences immobilières & Promotion');
+  const [hunterLocation, setHunterLocation] = useState('Cotonou');
+  const [hunterMaxLeads, setHunterMaxLeads] = useState(3);
+  const [hunterSaveCRM, setHunterSaveCRM] = useState(true);
+  const [hunterNotifyTG, setHunterNotifyTG] = useState(false);
+  const [runningHunter, setRunningHunter] = useState(false);
+  const [hunterReport, setHunterReport] = useState(null);
+
+  const handleRunLeadHunterP9 = async (e) => {
+    if (e) e.preventDefault();
+    if (!hunterNiche.trim()) return;
+    try {
+      setRunningHunter(true);
+      const res = await authFetch('/api/v1/inbound/lead-hunter/run', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          niche: hunterNiche,
+          location: hunterLocation || 'Cotonou',
+          max_leads: Number(hunterMaxLeads) || 3,
+          site_key: selectedSiteKey || 'rockib-portfolio',
+          save_to_crm: hunterSaveCRM,
+          notify_telegram: hunterNotifyTG,
+        }),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setHunterReport(data);
+      if (hunterSaveCRM) fetchLeads();
+      if (onNotify) {
+        onNotify(
+          `🎯 ${data.total_found} prospects B2B qualifiés (${data.niche} - ${data.location})`,
+          'success'
+        );
+      }
+    } catch (err) {
+      if (onNotify) onNotify(`Erreur Lead Hunter P9: ${err.message}`, 'error');
+    } finally {
+      setRunningHunter(false);
+    }
+  };
+
   const handleGenerateProposalP8 = async (e) => {
     if (e) e.preventDefault();
     if (!propBrief.trim()) return;
@@ -295,6 +338,15 @@ export default function ClientCRMModal({
             >
               <Sparkles size={14} />
               <span>⚡ Devis IA Auto (P8)</span>
+            </button>
+
+            <button
+              onClick={() => setActiveTab('hunter')}
+              className={`btn-cyber ${activeTab === 'hunter' ? 'primary' : 'secondary'}`}
+              style={{ padding: '6px 14px', fontSize: '0.82rem' }}
+            >
+              <Search size={14} />
+              <span>🎯 Lead Hunter IA (P9)</span>
             </button>
           </div>
 
@@ -818,6 +870,202 @@ export default function ClientCRMModal({
                   >
                     {generatedProposal.proposal_markdown}
                   </pre>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 5: P9 — AUTONOMOUS B2B LEAD HUNTER (CHASSEUR DE PROSPECTS & SCRIPTS D'APPROCHE) */}
+          {activeTab === 'hunter' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '18px' }}>
+              <form
+                onSubmit={handleRunLeadHunterP9}
+                className="glass-panel"
+                style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '14px' }}
+              >
+                <h4 style={{ color: '#fff', fontSize: '1.02rem', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <Search size={16} color="var(--neon-emerald)" />
+                  <span>P9 — Agent Chasseur de Prospects B2B &amp; Générateur de Scripts d'Approche (WhatsApp / LinkedIn / Email)</span>
+                </h4>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1.2fr 0.8fr', gap: '12px' }}>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                      Secteur / Niche Cible
+                    </label>
+                    <input
+                      type="text"
+                      value={hunterNiche}
+                      onChange={(e) => setHunterNiche(e.target.value)}
+                      placeholder="Ex: Agences immobilières, Cliniques, Boutiques e-commerce, Concessions auto..."
+                      className="cyber-input"
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                      Ville / Pays
+                    </label>
+                    <input
+                      type="text"
+                      value={hunterLocation}
+                      onChange={(e) => setHunterLocation(e.target.value)}
+                      placeholder="Ex: Cotonou, Dakar, Abidjan, Paris..."
+                      className="cyber-input"
+                      style={{ width: '100%' }}
+                    />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '4px' }}>
+                      Nb. Cibles
+                    </label>
+                    <select
+                      value={hunterMaxLeads}
+                      onChange={(e) => setHunterMaxLeads(Number(e.target.value))}
+                      className="cyber-input"
+                      style={{ width: '100%' }}
+                    >
+                      <option value={2}>2 Entreprises</option>
+                      <option value={3}>3 Entreprises</option>
+                      <option value={4}>4 Entreprises</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                  <div style={{ display: 'flex', gap: '18px', fontSize: '0.78rem', color: '#CBD5E1' }}>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={hunterSaveCRM}
+                        onChange={(e) => setHunterSaveCRM(e.target.checked)}
+                      />
+                      <span>Injecter automatiquement dans le Pipeline CRM</span>
+                    </label>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={hunterNotifyTG}
+                        onChange={(e) => setHunterNotifyTG(e.target.checked)}
+                      />
+                      <span>Envoyer le rapport sur Telegram (@masterrockibot)</span>
+                    </label>
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={runningHunter || !hunterNiche.trim()}
+                    className="btn-cyber primary"
+                    style={{ padding: '8px 18px', fontSize: '0.84rem' }}
+                  >
+                    <Search size={14} />
+                    <span>{runningHunter ? 'Chasse B2B & Qualification en cours...' : 'Lancer la Prospection Autonome'}</span>
+                  </button>
+                </div>
+              </form>
+
+              {hunterReport && hunterReport.prospects && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  {hunterReport.prospects.map((p) => (
+                    <div
+                      key={p.rank}
+                      className="glass-panel"
+                      style={{
+                        padding: '18px',
+                        borderLeft: '4px solid var(--neon-cyan)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '10px' }}>
+                        <div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span className="mono" style={{ fontSize: '0.75rem', color: 'var(--neon-cyan)' }}>
+                              #{p.rank} • {p.proposal_ref}
+                            </span>
+                            <h4 style={{ margin: 0, color: '#fff', fontSize: '1rem' }}>{p.company_name}</h4>
+                          </div>
+                          <a
+                            href={p.website}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mono"
+                            style={{ fontSize: '0.74rem', color: '#38BDF8', textDecoration: 'none' }}
+                          >
+                            {p.website} ↗
+                          </a>
+                        </div>
+
+                        <div style={{ textAlign: 'right' }}>
+                          <div className="mono" style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--neon-emerald)' }}>
+                            Setup : {p.setup_fee_fcfa} • MRR : {p.monthly_mrr_fcfa}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            Offre recommandée : <strong style={{ color: '#E2E8F0' }}>{p.recommended_offer}</strong>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div style={{ fontSize: '0.76rem', color: '#94A3B8', background: 'rgba(0,0,0,0.28)', padding: '8px 10px', borderRadius: '6px' }}>
+                        <strong style={{ color: '#F59E0B' }}>Diagnostic :</strong> {p.pain_point}
+                      </div>
+
+                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(p.scripts.whatsapp);
+                            if (onNotify) onNotify(`Script WhatsApp pour ${p.company_name} copié !`, 'success');
+                          }}
+                          className="btn-cyber secondary"
+                          style={{ padding: '5px 11px', fontSize: '0.75rem' }}
+                        >
+                          <Copy size={12} />
+                          <span>Copier Pitch WhatsApp</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(p.scripts.linkedin);
+                            if (onNotify) onNotify(`Script LinkedIn pour ${p.company_name} copié !`, 'success');
+                          }}
+                          className="btn-cyber secondary"
+                          style={{ padding: '5px 11px', fontSize: '0.75rem' }}
+                        >
+                          <Copy size={12} />
+                          <span>Copier Pitch LinkedIn</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(p.scripts.email);
+                            if (onNotify) onNotify(`Email B2B pour ${p.company_name} copié !`, 'success');
+                          }}
+                          className="btn-cyber secondary"
+                          style={{ padding: '5px 11px', fontSize: '0.75rem' }}
+                        >
+                          <Copy size={12} />
+                          <span>Copier Email Froid</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(p.proposal_markdown);
+                            if (onNotify) onNotify(`Devis complet Markdown pour ${p.company_name} copié !`, 'success');
+                          }}
+                          className="btn-cyber primary"
+                          style={{ padding: '5px 11px', fontSize: '0.75rem' }}
+                        >
+                          <Copy size={12} />
+                          <span>Copier Devis Technique P8</span>
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
